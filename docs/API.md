@@ -14,8 +14,8 @@ stability tier from [API_STABILITY.md](API_STABILITY.md).
 | `Task`, `TaskStatus`, `TaskContext`, `TaskResult` | task model and lifecycle states | Stable |
 | `PipelineDefinition`, `PipelineStep`, `PipelineRun`, `PipelineStepRun` | pipeline definitions and run records | Stable |
 | `Plan`, `PlanStep` | planner output schema | Stable |
-| `Report`, `Finding`, `Confidence`, `Evidence`, `EvidenceKind`, `EvidenceInput`, `FindingOrigin`, `ReportArtifact`, `CombinedReport`, `AggregatedFinding`, `FindingSource` | report model (v2) | Stable |
-| `validateReport`, `normalizeEvidence`, `normalizeFinding`, `ReportValidationResult` | report validation (§13) | Stable |
+| `Report`, `Finding`, `Confidence`, `Evidence`, `EvidenceKind`, `EvidenceInput`, `FindingOrigin`, `ReportArtifact`, `CombinedReport`, `AggregatedFinding`, `FindingSource`, `ReportConflict`, `ConflictPosition` | report model (v2) | Stable |
+| `validateReport`, `normalizeEvidence`, `normalizeFinding`, `ReportValidationResult`, `detectConflicts` | report validation & conflict detection (§13–§14) | Stable |
 | `MemoryEntry`, `MemoryQuery`, `MemoryScope`, `MemoryCategory`, `MemoryProviderMetadata`, `IMemoryProvider` | memory contract (v2) | Stable |
 | `MemoryTaskContext`, `MemoryServiceOptions`, `MAX_CONTEXT_CHARS`, `defaultSearch`, `defaultMetadata` | context manager + contract helpers | Stable |
 | `Project` | project entity | Stable |

@@ -95,9 +95,33 @@ export interface AggregatedFinding {
   occurrences: number;
   /** Highest severity seen across merged duplicates. */
   severity?: FindingSeverity;
+  /** Highest confidence seen across merged duplicates (§14 — confidence preservation). */
   confidence?: Confidence;
+  /** Per-agent severity, so a disagreement is visible rather than flattened. */
+  severityBySource?: Record<string, FindingSeverity>;
+  /** Per-agent confidence. */
+  confidenceBySource?: Record<string, Confidence>;
+  /** Distinct recommendations attached to this finding across reports. */
+  recommendations?: string[];
   /** Typed evidence, normalized from strings when reports were ingested. */
   evidence: Evidence[];
+}
+
+/** One agent's position on a disputed finding (§14, Conflicts). */
+export interface ConflictPosition {
+  agent: string;
+  reportId: string;
+  severity?: FindingSeverity;
+  confidence?: Confidence;
+  recommendation?: string;
+}
+
+export interface ReportConflict {
+  type: "severity" | "recommendation";
+  findingTitle: string;
+  /** Both positions are preserved — OmniNode never silently chooses one. */
+  positions: ConflictPosition[];
+  note: string;
 }
 
 export interface AggregatedRecommendation {
@@ -115,6 +139,10 @@ export interface CombinedReport {
   taskIds: string[];
   summary: string;
   findings: AggregatedFinding[];
+  /** Findings multiple agents reported with the same severity (consensus). */
+  agreements: AggregatedFinding[];
+  /** Disagreements between agents (§14) — both positions preserved. */
+  conflicts: ReportConflict[];
   recommendations: AggregatedRecommendation[];
   /** Distinct agent names that contributed. */
   sources: string[];

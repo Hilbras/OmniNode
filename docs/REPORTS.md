@@ -54,6 +54,36 @@ issues. It runs on every report entering the system:
 - Normalization on the way in: `description` mirrors `detail`, and each
   finding gets `source` provenance (`agent`, `reportId`, `pipelineRunId`).
 
+## Aggregation (§14)
+
+`aggregateReports()` groups duplicate and similar findings deterministically,
+then splits the result into three honest sections:
+
+- **findings** — every finding group, with `severityBySource` /
+  `confidenceBySource` so nothing is flattened silently.
+- **agreements** — groups independently reported by 2+ agents *with the same
+  severity*: actual consensus.
+- **conflicts** — when agents disagree, both positions are preserved:
+
+  ```jsonc
+  {
+    "type": "severity",
+    "findingTitle": "SQL injection in the login handler",
+    "positions": [
+      { "agent": "kimi", "severity": "critical" },
+      { "agent": "gemini", "severity": "low" }
+    ],
+    "note": "Agents disagree on severity (low, critical); the highest severity is shown, every position is preserved."
+  }
+  ```
+
+  Conflict types: `severity` (different severities for the same finding) and
+  `recommendation` (different proposed fixes). OmniNode never silently
+  chooses one side.
+
+Confidence is preserved as the strongest reported value, with the per-source
+values kept alongside.
+
 ## Provenance
 
 Every finding carries `source`, and every aggregated finding carries

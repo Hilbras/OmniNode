@@ -4,6 +4,29 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.10] — v2 Phase 10 (Aggregation Improvements)
+
+### Added
+
+- **Conflict detection** (§14): when agents disagree about the same finding,
+  both positions are preserved instead of silently choosing one. Conflict
+  types: `severity` (different severities) and `recommendation` (divergent
+  proposed fixes), each carrying every agent's position and an explanatory
+  note.
+- **Agreements**: findings independently reported by 2+ agents with the same
+  severity are recorded as consensus.
+- **Confidence preservation**: the strongest reported confidence is kept and
+  per-agent values are recorded (`confidenceBySource`), alongside
+  `severityBySource`.
+- **Provenance-rich combined reports**: `agreements`, `conflicts` and metadata
+  counters (`agents`, `reports`, `rawFindings`, `findingGroups`, `agreements`,
+  `conflicts`).
+- CLI: `report combined` flags conflicts in listings; `report show` prints
+  every position of a conflict.
+- Tests: 366 (was 358) — agreement vs conflict detection, both position
+  preservation, confidence preservation, determinism (identical input →
+  identical structure).
+
 ## [2.0.0-alpha.9] — v2 Phase 9 (Report System v2)
 
 ### Added

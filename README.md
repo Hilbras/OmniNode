@@ -18,7 +18,7 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v2.0.0-alpha.9 — v2 Phase 9: Report System v2**
+**v2.0.0-alpha.10 — v2 Phase 10: Aggregation Improvements**
 (the reliability & interoperability line: architecture → execution →
 protocol → adapters → pipelines → providers → OmniHilbras → memory → reports) (the v2
 roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the v1 plan is complete:
@@ -31,6 +31,12 @@ for the plan and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design).
 
 ### What's new in v2 (so far)
 
+- **Phase 10 — Aggregation Improvements**: when agents disagree,
+  OmniNode now says so instead of flattening the answer — **conflict
+  detection** preserves every position (severity spread, divergent
+  recommended fixes), multi-agent **agreements** are recorded as
+  consensus, confidence is preserved per source, and the combined
+  report carries provenance-rich metadata. Still fully deterministic.
 - **Phase 9 — Report System v2**: reports are validated machine-readable
   objects — `validateReport()` runs on everything entering the system and
   malformed reports are rejected with diagnostics instead of poisoning

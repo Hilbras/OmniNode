@@ -47,8 +47,10 @@ export function registerReportCommands(program: Command): void {
         return;
       }
       for (const c of combined) {
+        const conflicts = c.conflicts.length > 0 ? `  ${c.conflicts.length} CONFLICT(S)` : "";
         console.log(
-          `${c.id}  ${c.findings.length} finding(s) from ${c.sources.length} source(s)${c.pipelineRunId ? `  run=${c.pipelineRunId}` : ""}`,
+          `${c.id}  ${c.findings.length} finding(s) from ${c.sources.length} source(s)` +
+            `${conflicts}${c.pipelineRunId ? `  run=${c.pipelineRunId}` : ""}`,
         );
       }
     });
@@ -90,6 +92,22 @@ export function registerReportCommands(program: Command): void {
         console.log(`  reports:   ${combined.reportIds.length}`);
         if (combined.pipelineRunId) console.log(`  run:       ${combined.pipelineRunId}`);
         console.log(`  summary:   ${combined.summary}`);
+        if (combined.conflicts.length > 0) {
+          console.log(`  CONFLICTS (${combined.conflicts.length}) — both positions preserved:`);
+          for (const conflict of combined.conflicts) {
+            console.log(`    ! ${conflict.findingTitle} [${conflict.type}]`);
+            for (const position of conflict.positions) {
+              console.log(
+                `        ${position.agent}: severity=${position.severity ?? "unstated"}` +
+                  `${position.recommendation ? ` fix="${position.recommendation}"` : ""}`,
+              );
+            }
+            console.log(`        ${conflict.note}`);
+          }
+        }
+        if (combined.agreements.length > 0) {
+          console.log(`  agreements: ${combined.agreements.length} (multi-agent consensus)`);
+        }
         if (combined.findings.length > 0) {
           console.log("  findings (grouped, duplicates merged):");
           for (const finding of combined.findings) {
