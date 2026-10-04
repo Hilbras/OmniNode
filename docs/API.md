@@ -17,7 +17,7 @@ stability tier from [API_STABILITY.md](API_STABILITY.md).
 | `Report`, `Finding`, `Confidence`, `CombinedReport`, `AggregatedFinding`, `FindingSource` | report model | Stable |
 | `MemoryEntry`, `MemoryQuery`, `MemoryScope`, `IMemoryProvider` | memory abstraction | Stable |
 | `Project` | project entity | Stable |
-| `ChatMessage`, `ChatRequest`, `ChatResponse`, `ChatRole`, `ChatUsage`, `ChatFn` | chat contracts; `ChatFn` was re-exported from `pipelines` in v1 and remains so | Stable |
+| `ChatMessage`, `ChatRequest`, `ChatResponse`, `ChatRole`, `ChatUsage`, `ChatFn`, `ChatStreamChunk` | chat contracts (incl. streaming chunks); `ChatFn` was re-exported from `pipelines` in v1 and remains so | Stable |
 | `MessageEnvelope`, `AgentToNodeMessage`, `NodeToAgentMessage` | JSON-lines agent protocol envelope | Experimental |
 | `AuditEvent`, `AuditAction`, `AuditSink`, `FileAuditLog` | append-only audit log | Experimental |
 
@@ -51,7 +51,8 @@ for `loadConfig`/`AppConfig`/schemas; helpers Experimental.
 | Export | Description | Tier |
 | --- | --- | --- |
 | `IProvider`/`IChatProvider` contracts | see types | Stable |
-| `OpenAICompatibleProvider` | OpenAI/OpenRouter/local-runtime adapter | Stable |
+| `OpenAICompatibleProvider` | OpenAI/OpenRouter/local-runtime adapter (chat + `stream`) | Stable |
+| `streamChatCompletion` | shared SSE streaming implementation | Stable |
 | `OmniHilbrasProvider` | OmniHilbras adapter (optional) | Stable |
 | `createProvider`, `OPENAI_COMPATIBLE_TYPES` | config→adapter factory | Stable |
 | `resolveApiKey`, `authHeaders`, `AuthRef` | credential resolution from env | Stable |

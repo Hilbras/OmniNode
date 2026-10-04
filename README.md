@@ -18,9 +18,9 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v2.0.0-alpha.6 — v2 Phase 6: Provider Infrastructure v2**
+**v2.0.0-alpha.7 — v2 Phase 7: OmniHilbras Integration v2**
 (the reliability & interoperability line: architecture → execution →
-protocol → adapters → pipelines → providers) (the v2
+protocol → adapters → pipelines → providers → OmniHilbras) (the v2
 roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the v1 plan is complete:
 the
 full loop from §28 runs in one command —
@@ -31,6 +31,12 @@ for the plan and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design).
 
 ### What's new in v2 (so far)
 
+- **Phase 7 — OmniHilbras Integration v2**: the dedicated adapter now
+  captures gateway-level metadata (version, tier, region) and attaches it
+  to discovered models, honors provider-level `timeout_ms`, and supports
+  streaming completions (`stream()` over SSE) — while a guard test proves
+  the core references OmniHilbras *only* through the provider layer, and a
+  full pipeline runs with no OmniHilbras configured at all.
 - **Phase 6 — Provider Infrastructure v2**: standardized provider contract
   (`providerId`, secret-free `authentication`, declared `capabilities`,
   `connect()` / `getModel()` discovery), richer model metadata (context

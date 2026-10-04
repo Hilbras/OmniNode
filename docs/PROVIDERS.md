@@ -86,9 +86,33 @@ import { OpenAICompatibleProvider } from "@hilbras/omninode";
 2. Register the type in `createProvider` (`src/providers/factory.ts`).
 3. Add tests for discovery, error mapping and health classification.
 
+## Streaming
+
+Where a gateway supports SSE streaming, adapters expose:
+
+```ts
+const response = await provider.stream?.(request, (chunk) => process.stdout.write(chunk.delta));
+// chunk: { delta, finishReason?, raw? } — response.content is the assembled text
+```
+
+## OmniHilbras
+
+`type: omnihilbras` selects the dedicated adapter, which adds:
+
+- **Gateway metadata**: the discovery response's `gateway` object (version,
+  tier, region…) is captured via `gatewayMetadata()` and attached to every
+  discovered model.
+- **`connectAndRegister(registry)`**: the full plan §6 flow — authenticate →
+  fetch models → validate/deduplicate → register — on top of the base
+  `connect()`.
+
+OmniHilbras is **optional**. The core depends only on `IProvider`; a guard test
+fails the build if OmniHilbras leaks outside the provider layer, and the full
+workflow runs with no OmniHilbras configured.
+
 ## Timeouts
 
-Request timeouts use the HTTP layer's per-request `AbortSignal.timeout`
-(30s default in the shared client); agents and pipelines have their own,
+Provider request timeouts come from `timeout_ms` (default 30s in the shared
+client) and apply to discovery, chat and streaming; agents and pipelines have their own,
 separate budgets (see the Phase 2 timeout model in ARCHITECTURE.md). A provider
 timeout is reported as kind `TIMEOUT`, never as a generic failure.

@@ -2,7 +2,7 @@
  * Provider abstraction. OmniNode is provider-agnostic: any AI gateway or local
  * runtime plugs in through this interface (DEVELOPMENT_PLAN.md §5–§7).
  */
-import type { ChatRequest, ChatResponse } from "./chat.js";
+import type { ChatRequest, ChatResponse, ChatStreamChunk } from "./chat.js";
 import type { ModelInfo } from "./model.js";
 
 export type ProviderType =
@@ -46,6 +46,8 @@ export interface ProviderConfig {
    */
   apiKeyEnvVar?: string;
   headers?: Record<string, string>;
+  /** Provider-level request timeout in ms (distinct from agent/pipeline budgets). */
+  timeoutMs?: number;
   /** Capabilities declared for this provider (discovered ones are merged in). */
   capabilities?: ProviderCapability[];
   enabled?: boolean;
@@ -86,4 +88,9 @@ export interface IProvider {
 /** Contract for providers that can run chat completions (foundation for planning). */
 export interface IChatProvider extends IProvider {
   chat(request: ChatRequest): Promise<ChatResponse>;
+  /**
+   * Stream a completion where the provider supports it (§11). Chunks are
+   * delivered in order; the resolved ChatResponse carries the assembled text.
+   */
+  stream?(request: ChatRequest, onChunk: (chunk: ChatStreamChunk) => void): Promise<ChatResponse>;
 }

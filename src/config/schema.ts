@@ -11,6 +11,7 @@ export const providerConfigSchema = z
     type: z.enum(["openai-compatible", "omnihilbras", "openrouter", "local", "custom"]),
     base_url: z.string().url(),
     api_key_env_var: z.string().min(1).optional(),
+    timeout_ms: z.number().int().positive().optional(),
     headers: z.record(z.string()).optional(),
     enabled: z.boolean().optional(),
     metadata: z.record(z.unknown()).optional(),
@@ -101,6 +102,7 @@ export const projectConfigSchema = z
         provider: z.string().min(1).default("local"),
         base_url: z.string().url().optional(),
         api_key_env_var: z.string().min(1).optional(),
+    timeout_ms: z.number().int().positive().optional(),
       })
       .strict()
       .optional(),

@@ -25,10 +25,39 @@ export interface OmniHilbrasConnectionResult {
 }
 
 export class OmniHilbrasProvider extends OpenAICompatibleProvider {
+  private gateway?: Record<string, unknown>;
+
+  override async listModels(): Promise<ModelInfo[]> {
+    // Capture gateway-level metadata from the discovery response, then
+    // delegate to the shared OpenAI-compatible discovery.
+    const raw = await this.rawModelsResponse();
+    await this.extractGatewayMetadata(raw);
+    const models = await super.listModels();
+    return this.gateway
+      ? models.map((model) => ({ ...model, metadata: { ...model.metadata, gateway: this.gateway } }))
+      : models;
+  }
   /**
    * Run the full connect flow. Throws on authentication or transport failure
    * (use healthCheck() for a non-throwing probe).
    */
+  /**
+   * Gateway metadata reported alongside the model list (gateway version, tier,
+   * region…), kept separate from per-model metadata (§11 — provider metadata).
+   */
+  gatewayMetadata(): Record<string, unknown> | undefined {
+    return this.gateway;
+  }
+
+  protected async extractGatewayMetadata(body: unknown): Promise<void> {
+    if (body !== null && typeof body === "object") {
+      const gateway = (body as Record<string, unknown>).gateway;
+      if (gateway !== null && typeof gateway === "object") {
+        this.gateway = gateway as Record<string, unknown>;
+      }
+    }
+  }
+
   async connectAndRegister(registry?: ModelRegistry): Promise<OmniHilbrasConnectionResult> {
     // Authenticate — throws PROVIDER_AUTH_FAILED when the referenced env var is unset.
     const apiKey = resolveApiKey(this.config);

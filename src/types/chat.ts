@@ -38,3 +38,12 @@ export interface ChatResponse {
  * layer so adapters (e.g. planner) never depend on engine modules.
  */
 export type ChatFn = (model: string, messages: ChatMessage[]) => Promise<string>;
+
+/** One streamed chunk (SSE deltas from OpenAI-compatible gateways). */
+export interface ChatStreamChunk {
+  /** Text delta (empty for role-only or final chunks). */
+  delta: string;
+  /** Provider-reported finish reason, on the final chunk. */
+  finishReason?: string;
+  raw?: unknown;
+}

@@ -170,6 +170,7 @@ function toProviderConfig(raw: ProviderConfigYaml): ProviderConfig {
     type: raw.type,
     baseUrl: raw.base_url,
     apiKeyEnvVar: raw.api_key_env_var,
+    timeoutMs: raw.timeout_ms,
     headers: raw.headers,
     enabled: raw.enabled,
     metadata: raw.metadata,

@@ -5,7 +5,10 @@
  */
 import { ProviderError } from "../../errors/index.js";
 import { logger, type Logger } from "../../logger/index.js";
-import type { ChatRequest, ChatResponse } from "../../types/chat.js";
+
+/** Default provider request timeout when the config does not set one. */
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+import type { ChatRequest, ChatResponse, ChatStreamChunk } from "../../types/chat.js";
 import type { Modality, ModelInfo } from "../../types/model.js";
 import type { IChatProvider, ProviderConfig, ProviderStatus } from "../../types/provider.js";
 import { authHeaders } from "../auth.js";
@@ -53,6 +56,11 @@ export class OpenAICompatibleProvider implements IChatProvider {
     this.log = log.child({ provider: config.name });
   }
 
+  /** Provider-level request timeout (roadmap §6.6/§11) with the shared default. */
+  private get requestTimeoutMs(): number {
+    return this.config.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+  }
+
   /** Authenticate + discover (roadmap §10, Model Discovery). */
   async connect(): Promise<ModelInfo[]> {
     authHeaders(this.config, this.env); // throws PROVIDER_AUTH_FAILED when the env var is unset
@@ -66,11 +74,18 @@ export class OpenAICompatibleProvider implements IChatProvider {
     return models.find((m) => m.id === modelId);
   }
 
-  async listModels(): Promise<ModelInfo[]> {
+  /** Raw /models body (protected so adapters can capture gateway-level metadata). */
+  protected async rawModelsResponse(): Promise<unknown> {
+    const response = await this.modelsRequest();
+    return response.body;
+  }
+
+  private async modelsRequest(): Promise<{ status: number; body: unknown }> {
     let response: { status: number; body: unknown };
     try {
       response = await requestJson(`${this.config.baseUrl}/models`, {
         headers: authHeaders(this.config, this.env),
+        timeoutMs: this.requestTimeoutMs,
       });
     } catch (error) {
       if (error instanceof ProviderError) throw error; // auth problem — keep the precise error
@@ -85,6 +100,11 @@ export class OpenAICompatibleProvider implements IChatProvider {
         body,
       });
     }
+    return response;
+  }
+
+  async listModels(): Promise<ModelInfo[]> {
+    const body = await this.rawModelsResponse();
 
     const entries = extractModelEntries(body, this.config);
     const models: ModelInfo[] = [];
@@ -139,6 +159,11 @@ export class OpenAICompatibleProvider implements IChatProvider {
     };
   }
 
+  /** Streaming where the gateway supports it (§11). */
+  stream(request: ChatRequest, onChunk: (chunk: ChatStreamChunk) => void): Promise<ChatResponse> {
+    return streamChatCompletion(this.config, request, onChunk, this.env);
+  }
+
   async healthCheck(): Promise<ProviderStatus> {
     const lastCheckedAt = new Date().toISOString();
     try {
@@ -174,6 +199,7 @@ export class OpenAICompatibleProvider implements IChatProvider {
       response = await requestJson(`${this.config.baseUrl}/chat/completions`, {
         method: "POST",
         headers: authHeaders(this.config, this.env),
+        timeoutMs: this.requestTimeoutMs,
         body: {
         model: request.model,
         messages: request.messages,
@@ -228,6 +254,87 @@ export class OpenAICompatibleProvider implements IChatProvider {
       raw: body,
     };
   }
+}
+
+/**
+ * Streams a chat completion from an OpenAI-compatible SSE endpoint (§11).
+ * Emits deltas through `onChunk` and returns the assembled response.
+ */
+export async function streamChatCompletion(
+  config: ProviderConfig,
+  request: ChatRequest,
+  onChunk: (chunk: ChatStreamChunk) => void,
+  env: Record<string, string | undefined> = process.env,
+): Promise<ChatResponse> {
+  const baseUrl = normalizeBaseUrl(config.baseUrl);
+  const timeoutMs = config.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        accept: "text/event-stream",
+        "content-type": "application/json",
+        ...authHeaders(config, env),
+      },
+      body: JSON.stringify({
+        model: request.model,
+        messages: request.messages,
+        stream: true,
+        ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
+        ...(request.maxTokens !== undefined ? { max_tokens: request.maxTokens } : {}),
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    throw providerTransportError({ provider: config.name, operation: "stream", cause: error });
+  }
+  if (!response.ok) {
+    const body: unknown = await response.json().catch(() => undefined);
+    throw providerHttpError({ provider: config.name, operation: "stream", status: response.status, body });
+  }
+  if (!response.body) {
+    throw providerHttpError({
+      provider: config.name,
+      operation: "stream",
+      status: 500,
+      body: { error: { message: "streaming is not supported by this endpoint" } },
+    });
+  }
+
+  let content = "";
+  let model = request.model;
+  let finishReason: string | undefined;
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  for await (const piece of response.body as unknown as AsyncIterable<Uint8Array>) {
+    buffer += decoder.decode(piece, { stream: true });
+    let newline = buffer.indexOf("\n");
+    while (newline >= 0) {
+      const line = buffer.slice(0, newline).trim();
+      buffer = buffer.slice(newline + 1);
+      newline = buffer.indexOf("\n");
+      if (line.length === 0 || line.startsWith(":")) continue;
+      const data = line.startsWith("data:") ? line.slice(5).trim() : line;
+      if (data === "[DONE]") continue;
+      let event: Record<string, unknown>;
+      try {
+        event = JSON.parse(data) as Record<string, unknown>;
+      } catch {
+        continue; // tolerate non-JSON SSE noise
+      }
+      if (typeof event.model === "string") model = event.model;
+      const choices = Array.isArray(event.choices) ? event.choices : [];
+      const first = choices[0] as { delta?: { content?: unknown }; finish_reason?: unknown } | undefined;
+      const delta = typeof first?.delta?.content === "string" ? first.delta.content : "";
+      if (delta.length > 0) content += delta;
+      if (typeof first?.finish_reason === "string") finishReason = first.finish_reason;
+      onChunk({ delta, ...(finishReason !== undefined ? { finishReason } : {}), raw: event });
+    }
+  }
+
+  return { model, content, ...(finishReason !== undefined ? { finishReason } : {}) };
 }
 
 /** Normalizes provider modality lists ("text", ["text","image"], …). */

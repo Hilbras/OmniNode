@@ -4,6 +4,35 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.7] — v2 Phase 7 (OmniHilbras Integration v2)
+
+### Added
+
+- **Streaming where supported** (§11): `IChatProvider.stream(request, onChunk)`
+  with SSE parsing shared by every OpenAI-compatible gateway — deltas are
+  emitted in order and the resolved response carries the assembled text and
+  finish reason.
+- **Provider-level timeouts**: `timeout_ms` on provider config, applied to
+  model discovery, chat and stream (distinct from agent/pipeline budgets per
+  the Phase 2 timeout model).
+- **Gateway metadata across the boundary** (§11): the OmniHilbras adapter
+  captures gateway-level metadata from the discovery response (version, tier,
+  region…) and attaches it to every discovered model, exposed via
+  `gatewayMetadata()`.
+- **Separation guarantees** (§11 exit criterion):
+  - a guard test fails the build if any module outside the provider layer,
+    config schema/loader, the barrel or the provider CLI references
+    OmniHilbras;
+  - an end-to-end test runs a full pipeline with no OmniHilbras configured.
+
+### Fixed
+
+- `chat()` now actually applies the provider-level timeout (the setting was
+  only reaching model discovery).
+
+- Tests: 339 (was 331) — gateway metadata, provider timeout, SSE streaming,
+  separation guard, core-without-OmniHilbras pipeline.
+
 ## [2.0.0-alpha.6] — v2 Phase 6 (Provider Infrastructure v2)
 
 ### Added
