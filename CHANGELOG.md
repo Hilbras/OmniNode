@@ -4,6 +4,26 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.18] — v2 Phase 18 (Documentation Overhaul)
+
+### Added
+
+- New documents completing the roadmap's set:
+  - **AGENTS.md** — registering agents, the three input modes, process
+    handling and states, writing native adapters
+  - **PIPELINES.md** — pipeline definitions, step kinds, scheduling semantics,
+    conditions, retries, results
+  - **TROUBLESHOOTING.md** — symptom → cause → fix across configuration,
+    providers, agents, pipelines and state
+  - **MIGRATION.md** — v1 → v2: compatibility summary, storage migration,
+    configuration additions, behavior changes, deprecations, upgrade steps
+  - **CONTRIBUTING.md** — setup, the branch→release workflow, the rules this
+    codebase holds itself to
+- **README rewritten** for v2 accuracy: what OmniNode is and is not, the v1.0
+  capability table, the v2 phase-by-phase status, a real quick start
+  (install → configure → pipeline → one-command run → inspect), roadmap with
+  the prerelease channel, and the full documentation index.
+
 ## [2.0.0-alpha.17] — v2 Phase 17 (Testing Expansion)
 
 ### Added

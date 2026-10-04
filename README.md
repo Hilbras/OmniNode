@@ -5,7 +5,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@hilbras/omninode)](https://www.npmjs.com/package/@hilbras/omninode)
 [![Node.js support](https://img.shields.io/node/v/@hilbras/omninode)](https://www.npmjs.com/package/@hilbras/omninode)
 [![License: MIT](https://img.shields.io/github/license/Hilbras/OmniNode)](LICENSE)
-[![Roadmap phase](https://img.shields.io/badge/phase-0_%2F_11-Foundation-8A2BE2)](docs/DEVELOPMENT_PLAN.md)
+[![v2 progress](https://img.shields.io/badge/v2-19%20%2F%2024%20phases-8A2BE2)](docs/ROADMAP_V2.md)
 
 **OmniNode** is a provider-agnostic multi-AI orchestration platform. It coordinates
 CLI-based AI agents, AI providers, persistent memory, roles, reports and planning
@@ -18,404 +18,170 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v2.0.0-alpha.17 — v2 Phase 17: Testing Expansion**
-(the reliability & interoperability line: architecture → execution →
-protocol → adapters → pipelines → providers → OmniHilbras → memory → reports) (the v2
-roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the v1 plan is complete:
-the
-full loop from §28 runs in one command —
-`User → project context → memory → research agents → reports → aggregation →
-planner → plan → execution → result` — with audit logging, error recovery and
-production hardening (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
-for the plan and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design).
+**v1.0.0 is feature complete. v2.0.0 — the reliability and interoperability
+release — is in progress**, shipping as tagged prereleases (`v2.0.0-alpha.N`).
 
-### What's new in v2 (so far)
-
-- **Phase 17 — Testing Expansion**: an explicit, auditable **failure
-  matrix** covering every scenario the roadmap lists — provider
-  429/500/401, model unavailable, network loss, malformed gateway
-  responses, agent crash/timeout/missing executable, malformed JSONL,
-  huge output, corrupted persistence, duplicate execution, partial
-  pipeline failure, Remembera/OmniHilbras unavailable — plus duplicate
-  configuration names now rejected instead of silently shadowing, and
-  protocol diagnostics surfaced on task results. Details:
-  [TESTING.md](docs/TESTING.md).
-- **Phase 16 — Configuration v2**: explicit precedence (CLI → env →
-  project file → user file → profile overlay → defaults), named
-  **profiles** (`development`/`production`/`testing`), `OMNINODE_*`
-  environment overrides, and actionable validation diagnostics
-  ("Provider 'deepseek': API key reference is missing"). `config
-  validate` now reports which sources and defaults produced the
-  effective configuration. Details: [CONFIGURATION.md](docs/CONFIGURATION.md).
-- **Phase 15 — CLI v2**: documented **exit codes** (0 success, 2 invalid
-  input, 3 config, 4 provider, 5 agent, 6 timeout, 7 cancelled, 8 not
-  found, 9 not implemented), a `config` group (`show` / `path` /
-  `validate`, never printing secret values), `pipeline create`, a real
-  `provider remove`, `agent run`, the `model` alias for `models`, and
-  `--json` output across the list and inspect commands. Guide:
-  [CLI.md](docs/CLI.md).
-- **Phase 14 — Audit & Observability**: every audit event now carries
-  correlation ids (`taskId`, `pipelineId`, `executionId`, `agentId`,
-  `providerId`), new event types cover agent start/complete and provider
-  errors, logs can be emitted as machine-readable JSON
-  (`logging.format: json`), and `omninode task|pipeline|agent|provider
-  inspect <id>` answers "what happened?" after a failed run — with
-  `--json` for tooling.
-- **Phase 13 — Security Hardening**: configuration containing literal
-  credentials is **rejected before parsing** (with a redacted, actionable
-  error); reports over 256 KiB are rejected rather than persisted; static
-  guards keep shell execution out of the codebase; and `omninode security
-  audit` reviews a project's posture (environment exposure, external working
-  directories, credential references) and states the agent trust model
-  plainly — agents run with your OS user's permissions, and OmniNode is not
-  a sandbox.
-- **Phase 12 — Persistence Layer v2**: writes are now **fsynced and atomic**
-  (temp → fsync → rename → directory fsync), corrupt store files are
-  **quarantined instead of lost**, documents carry a **schema version** with
-  v1 data migrated in place (`omninode migrate [--check]`), and files from a
-  newer OmniNode are refused rather than misread. Details:
-  [PERSISTENCE.md](docs/PERSISTENCE.md).
-- **Phase 11 — Planner v2**: the planner now receives the full §15 input —
-  task, project context, agent reports, **aggregated findings (consensus and
-  conflicts included)**, memory and **constraints** (settable per pipeline
-  step). Plans carry an explicit goal, every generated plan is **schema
-  validated**, invalid output produces a **structured error** or falls back to
-  heuristic planning, and a guard test proves the planner module depends on no
-  specific provider.
-- **Phase 10 — Aggregation Improvements**: when agents disagree,
-  OmniNode now says so instead of flattening the answer — **conflict
-  detection** preserves every position (severity spread, divergent
-  recommended fixes), multi-agent **agreements** are recorded as
-  consensus, confidence is preserved per source, and the combined
-  report carries provenance-rich metadata. Still fully deterministic.
-- **Phase 9 — Report System v2**: reports are validated machine-readable
-  objects — `validateReport()` runs on everything entering the system and
-  malformed reports are rejected with diagnostics instead of poisoning
-  aggregation. Findings gain description/confidence/source/recommendation,
-  evidence is typed (`file`, `line`, `url`, `command`, `observation`,
-  `artifact`), and reports carry artifacts and run provenance.
-  Details: [REPORTS.md](docs/REPORTS.md).
-- **Phase 8 — Remembera / Memory v2**: the memory contract is formalized
-  (`retrieve` / `store` / `search` / `metadata` with v1 `query` / `write`
-  aliases kept working), memory gains structured **categories** (decisions,
-  problems, conventions, tasks…), retrieval is **task-oriented and budgeted**
-  (never "load all memory"), and `memory.required: true` makes backend
-  failures fatal instead of tolerated. Details: [MEMORY.md](docs/MEMORY.md).
-- **Phase 7 — OmniHilbras Integration v2**: the dedicated adapter now
-  captures gateway-level metadata (version, tier, region) and attaches it
-  to discovered models, honors provider-level `timeout_ms`, and supports
-  streaming completions (`stream()` over SSE) — while a guard test proves
-  the core references OmniHilbras *only* through the provider layer, and a
-  full pipeline runs with no OmniHilbras configured at all.
-- **Phase 6 — Provider Infrastructure v2**: standardized provider contract
-  (`providerId`, secret-free `authentication`, declared `capabilities`,
-  `connect()` / `getModel()` discovery), richer model metadata (context
-  window, input/output modalities, tool/vision/structured-output/streaming
-  support), and **unified error normalization** — every provider failure now
-  carries a stable `kind` (auth, rate limit, invalid request, model not
-  found, timeout, network, server, unknown) plus `retryable` and
-  `retryAfterMs`. Details: [PROVIDERS.md](docs/PROVIDERS.md).
-- **Phase 5 — Pipeline Lifecycle**: first-class pipeline cancellation
-  (`omninode pipeline cancel <run-id>`: stop scheduling → cancel running
-  tasks → terminate agent processes → persist a `cancelled` run), `pipeline
-  validate` for pre-run checks (deps, cycles, agents, model references),
-  explicit run/step **attempts** in the run record, the
-  `IPipelineExecutor` contract, and recovery awareness — runs left `running`
-  without a `finishedAt` are flagged as interrupted in `pipeline runs`.
-- **Phase 4 — Agent Adapter Hardening**: process-tree cleanup (agents run in
-  their own process group; timeout, cancel and Ctrl-C reap the whole tree, so
-  no orphaned children), explicit environment policies
-  (`inherit` / `allowlist` / `denylist` / `explicit`), working-directory
-  validation against project boundaries, per-stream output limits that kill
-  runaway agents, binary-safe output decoding, human-readable exit/signal
-  reporting, and a native `IAgentAdapter` registry so new integration styles
-  plug in without touching core.
-- **Phase 3 — Agent Protocol v2**: versioned protocol
-  (`omninode-agent-protocol/2`), fully correlated envelopes, the complete
-  message-type set, HELLO handshake, QUESTION/RESPONSE round-trips, and
-  malformed input that can never crash OmniNode. Spec:
-  [PROTOCOL.md](docs/PROTOCOL.md).
-- **Phase 2 — Execution Reliability**: a task killed after dispatch is
-  `unknown`, **not** `failed` — retries never duplicate side effects blindly;
-  bounded retries with backoff, execution identity and history.
-- **Phase 1 — Architecture & API Stabilization**: one shared `JsonFileStore`
-  behind every local store, corrected dependency direction, and a guarded
-  public API ([API_STABILITY.md](docs/API_STABILITY.md), [API.md](docs/API.md),
-  [DEPRECATIONS.md](docs/DEPRECATIONS.md)).
-
-### What's in v1.0
+### v1.0.0 delivered
 
 | Capability | Where |
 | --- | --- |
-| Provider abstraction, custom providers, model discovery | `src/providers/`, `src/registry/` |
-| OmniHilbras integration (optional) | `src/providers/omnihilbras/` |
-| CLI agents (stdin/arg/protocol), agent registry | `src/agents/` |
-| Roles, projects, tasks (lifecycle + retry) | `src/roles/`, `src/tasks/` |
-| Pipelines (DAG, parallel, retries, conditions) | `src/pipelines/` |
-| Multi-AI research + report aggregation | `src/reports/` |
-| Planner layer (model + heuristic) | `src/planner/` |
-| Remembera / local memory | `src/memory/` |
-| CLI, configuration, security foundations, docs | `src/cli/`, `src/config/`, `docs/` |
+| Provider abstraction, custom providers, model discovery | [`src/providers/`](src/providers) |
+| OmniHilbras integration (optional) | `src/providers/omnihilbras` |
+| CLI agents (stdin / arg / protocol modes), agent registry | [`src/agents/`](src/agents) |
+| Roles, tasks with lifecycle and retry | `src/roles`, [`src/tasks/`](src/tasks) |
+| Pipelines: DAG scheduling, fan-out research, conditions, retries | [`src/pipelines/`](src/pipelines) |
+| Multi-AI reports with aggregation and conflict detection | [`src/reports/`](src/reports) |
+| Planner (model-backed with heuristic fallback) | [`src/planner/`](src/planner) |
+| Memory (local + Remembera) wired into the task loop | [`src/memory/`](src/memory) |
+| End-to-end workflow in one command | `omninode run <pipeline> "<objective>"` |
+| Audit log, security model, examples, Docker runtime | [`src/audit/`](src/audit), [docs/SECURITY.md](docs/SECURITY.md) |
 
-What exists today:
+### v2.0.0 progress (19 of 24 phases)
 
-- Core type contracts: provider, model, agent, role, task, report, pipeline,
-  protocol, memory (`src/types/`)
-- **Provider system** (`src/providers/`, `src/registry/`):
-  - OpenAI-compatible adapter — works with OpenAI, OpenRouter, local runtimes
-    (Ollama, LM Studio, vLLM) and custom gateways exposing `/models` and `/chat/completions`
-  - Model discovery with normalization into the model registry (`provider:model` keys)
-  - Health checks: connectivity, authentication and server-error classification
-  - Authentication from environment variables only — keys never touch config files
-  - Chat completions (`IChatProvider`) — the foundation for the planner phases
-  - Provider factory mapping config to adapters; `omnihilbras` gets a
-    dedicated adapter implementing the plan's connect flow —
-    Connect → Authenticate → Fetch Models → Validate Models → Register
-- **Agent system** (`src/agents/`):
-  - Process adapter: spawns CLI agents as child processes with lifecycle
-    management — environment, working directory, exit codes, stderr logs,
-    per-task timeouts (SIGTERM → SIGKILL) and cancellation
-  - Three input modes: `stdin` (composed task text on stdin), `arg` (prompt as
-    last argument) and `protocol` (the §21 JSON-lines task protocol —
-    `TASK`/`ROLE`/`CONTEXT`/`INSTRUCTION` envelopes in, `REPORT`/`COMPLETION`/
-    `ERROR` messages out, parsed into structured reports)
-  - Agent factory and registry (`createAgent`, `AgentRegistry`)
-- **Roles & tasks** (`src/roles/`, `src/tasks/`):
-  - `RoleRegistry` with assignment validation — a task can only reference roles
-    and agents that actually exist
-  - Task lifecycle (created → queued → running → completed/failed/cancelled)
-    with transition enforcement
-  - `TaskEngine` runs tasks through their assigned agent, records structured
-    results (summary, reports, errors, timestamps)
-  - `TaskStore` interface with a local-first JSON implementation in
-    `.omninode/tasks.json` (atomic writes; swap in any backend)
-- **Pipeline engine** (`src/pipelines/`):
-  - Pipelines defined in `omninode.yaml` under `project.pipelines`, validated
-    before every run (duplicate ids, unknown dependencies, cycles, missing
-    agents)
-  - Sequential execution by definition order; explicit `depends_on` unlocks
-    parallel branches, and research steps fan out to several agents in
-    parallel (§15)
-  - Step kinds: `research` (multi-agent fan-out), `collect`, `analyze`,
-    `plan` (calls a model as `provider:model-id` via the chat layer),
-    `execute`/`custom` (hand-off to an execution agent)
-  - Failure handling: retries per step, `on-success`/`on-failure`/`always`
-    conditions, combined context threaded downstream; every task runs through
-    the TaskEngine and every run is persisted to `.omninode/pipelines.json`
-- **Multi-AI report system** (`src/reports/`):
-  - Report collection from finished tasks — structured protocol reports pass
-    through; plain text output is normalized via deterministic extraction
-    (findings/recommendations/evidence sections, severity guessing)
-  - Persistence in `.omninode/reports.json` with full source attribution
-  - Aggregation (§17): duplicate/similar findings merged via deterministic
-    token-set similarity, sources preserved, highest severity kept
-  - Combined reports generated automatically at the end of every pipeline run
-- **Memory** (`src/memory/`): the §20 loop — before a task runs, relevant
-  memory is gathered and injected into the agent's context; after it finishes,
-  the outcome is recorded back. High/critical findings are promoted to
-  project-level "known problems". Opt in via a `memory:` config section:
-  - `provider: local` (default) — JSON file at `.omninode/memory.json` with
-    deterministic keyword/tag relevance scoring, zero dependencies
-  - `provider: remembera` — the preferred Hilbras memory integration over
-    HTTP (base URL + `api_key_env_var`); strictly optional, like every
-    Hilbras component
-  - Memory failures are best-effort: logged, never fatal to a task
-- **Planner layer** (`src/planner/`):
-  - Typed plan schema (`Plan` with ordered steps, targets, acceptance
-    criteria, risks, and finding traceability via `sourceFindings`)
-  - Planner context builder: objective + role + combined findings with
-    sources + relevant memory + research context
-  - `ModelPlanner` — asks a chat model (`provider:model-id`) for JSON matching
-    the plan contract; unparseable output degrades gracefully to the heuristic
-    fallback
-  - `HeuristicPlanner` — deterministic, offline plan from recommendations and
-    significant findings (also the fallback)
-  - Plans persist to `.omninode/plans.json`; pipeline runs record `planId`
-  - Configure with `planner: { kind: model | heuristic, model, instruction }`
-    — never hardcoded to any provider
-- **End-to-end workflow** (§28, §27 Phase 9):
-  - One-command execution via the top-level `run` alias (`omninode run <pipeline> "<objective>"`)
-  - `omninode status` — full project state overview: providers, agents,
-    roles, pipelines, task/run/report/plan counts, memory provider + entries
-  - Pipeline runs persist their objective and a final `resultSummary` (§28 "Result")
-  - Error recovery: `task retry [--run]` (reset a failed/cancelled task) and
-    `pipeline retry <run-id>` (re-run a recorded failed run as a new run)
-  - Full integration test (`tests/e2e.test.ts`) drives the entire §28 workflow
-    through the real CLI against a local gateway
-- Typed error hierarchy (`src/errors/`)
-- Leveled logger with pluggable sink (`src/logger/`)
-- Configuration system: `omninode.yaml` with `${ENV_VAR}` expansion and strict
-  validation (`src/config/`)
-- CLI: `init`, `provider add/list/test`, `models`, `agent list`, `role list`,
-  and honest stubs for the phase-dependent commands (`src/cli/`)
-- Test infrastructure (Vitest) and CI (GitHub Actions)
+| # | Phase | Outcome |
+| --- | --- | --- |
+| 1 | Architecture & API stabilization | shared persistence base, guarded public API, deprecation policy |
+| 2 | Execution reliability | `unknown` ≠ `failed`, attempts, execution identity, timeouts |
+| 3 | Agent Protocol v2 | versioned, correlated envelopes, malformed input never crashes |
+| 4 | Agent adapter hardening | process-tree cleanup, env policies, output limits, cwd confinement |
+| 5 | Pipeline lifecycle | cancellation, partial/unknown propagation, interrupted-run detection |
+| 6 | Provider infrastructure | model metadata, `connect`/`getModel`, normalized error kinds |
+| 7 | OmniHilbras v2 | gateway metadata, streaming, enforced separation |
+| 8 | Memory v2 | formal contract, categories, budgeted retrieval, `required` policy |
+| 9 | Report system v2 | validated reports, typed evidence, provenance |
+| 10 | Aggregation | agreements, conflicts (both positions preserved), confidence |
+| 11 | Planner v2 | full input, plan validation, structured errors, provider-agnostic |
+| 12 | Persistence | atomic writes, corruption quarantine, schema v2 + migration |
+| 13 | Security hardening | inline-secret refusal, static guards, `security audit` |
+| 14 | Audit & observability | correlated events, JSON logs, `inspect` diagnostics |
+| 15 | CLI v2 | exit codes, `config` group, `pipeline create`, `--json` |
+| 16 | Configuration v2 | precedence, profiles, `OMNINODE_*`, diagnostics |
+| 17 | Testing expansion | explicit failure matrix + regression tests |
+| 18 | Documentation overhaul | complete document set, rewritten README |
+| 19 | Package quality | public exports, runtime validation, npm contents (next) |
+| 20–24 | Performance · developer experience · CI/CD · migration tooling · final hardening | planned |
 
-## Requirements
+The roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the completed v1 plan is
+[docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md).
 
-- Node.js >= 20
+## Documentation
 
-## Quick start (from source)
-
-```bash
-npm install
-npm run build
-node dist/cli/index.js --help
-
-# Or run from source:
-npm run omninode -- --help
-```
-
-Start a project:
-
-```bash
-omninode init                 # writes omninode.yaml in the current directory
-
-# Register a provider and verify it end to end
-omninode provider add --name my-gateway --type openai-compatible \
-  --base-url https://example.com/v1 --api-key-env-var MY_API_KEY
-omninode provider test my-gateway
-
-# Discover models into the registry
-omninode models
-omninode models my-gateway --capability chat
-
-omninode agent list
-omninode role list
-```
-
-Register and verify a CLI agent (anything executable works — `opencode`,
-`kimi`, a custom script):
-
-```bash
-omninode agent add --name opencode --command opencode --input-mode arg
-omninode agent test opencode     # sends a trivial task over the real adapter
-```
-
-Create, run and track tasks (the `Project → Task → Role → Agent` chain):
-
-```bash
-omninode task create "audit the auth module" --role security-reviewer --agent opencode
-omninode task run task-xxxxxx
-omninode task status task-xxxxxx
-omninode task list
-```
-
-Orchestrate several AI systems with a pipeline (§14):
-
-```yaml
-project:
-  pipelines:
-    - id: repo-audit
-      steps:
-        - id: research
-          kind: research
-          agents: [kimi, gemini, qwen]
-        - id: plan
-          kind: plan
-          model: my-gateway:chatgpt
-        - id: execute
-          kind: execute
-          agent: opencode
-```
-
-```bash
-omninode pipeline run repo-audit "Audit the authentication module"
-omninode report combined          # the aggregated intelligence of that run
-omninode report show combined-xxx # grouped findings with per-source attribution
-omninode plan show plan-xxx       # the implementation plan the planner produced
-```
-
-The planner layer (§18) turns combined intelligence into an ordered,
-actionable implementation plan. Configure it once:
-
-```yaml
-project:
-  planner:
-    kind: model              # or heuristic for offline planning
-    model: my-gateway:chatgpt
-```
-
-```bash
-omninode init
-omninode status
-omninode run repo-audit "Audit the authentication module"   # the whole workflow
-omninode pipeline retry run-xxxx                             # recover a failed run
-omninode task retry task-yyyy --run                          # recover a failed task
-```
-
-Persistent memory (§19–§20) — opt in with `memory: { provider: local }` or
-`provider: remembera` in `omninode.yaml`:
-
-```bash
-omninode memory status                      # provider + entry counts
-omninode memory query "authentication jwt"  # what the agents will see
-omninode memory write "Decision: use rotating JWT secrets" --scope project --tags architecture
-```
-
-See [omninode.yaml.example](omninode.yaml.example) for a full configuration.
-
-### Configuration
-
-OmniNode reads `omninode.yaml` (or `.yml` / `.json`) from the working directory.
-Two rules matter:
-
-1. **Credentials never live in the file.** Reference environment variables with
-   `api_key_env_var: MY_API_KEY`; `${VAR}` / `${VAR:-fallback}` references anywhere
-   in the file are expanded at load time and unset variables abort loading.
-2. **Unknown keys are rejected.** Typos fail loudly instead of being ignored.
-
-## Development
-
-```bash
-npm run build        # bundle with tsup (library + CLI)
-npm test             # run tests once
-npm run test:watch   # watch mode
-npm run lint         # eslint
-npm run typecheck    # tsc --noEmit
-npm run format       # prettier
-```
+| Document | What it covers |
+| --- | --- |
+| [Configuration](docs/CONFIGURATION.md) | source precedence, profiles, secrets, diagnostics |
+| [CLI](docs/CLI.md) | command groups, output modes, exit codes, recipes |
+| [Agents](docs/AGENTS.md) | registering agents, input modes, process handling, native adapters |
+| [Pipelines](docs/PIPELINES.md) | pipeline definitions, step kinds, scheduling, results |
+| [Agent Protocol v2](docs/PROTOCOL.md) | the interoperability spec external agents implement |
+| [Providers](docs/PROVIDERS.md) | the provider contract, metadata, error normalization |
+| [Memory](docs/MEMORY.md) | the memory contract, categories, retrieval, migration |
+| [Reports](docs/REPORTS.md) | report schema, validation, aggregation, conflicts |
+| [Persistence](docs/PERSISTENCE.md) | storage interfaces, durability, corruption, migration |
+| [Security](docs/SECURITY.md) | secrets, process execution, trust model, sandbox boundary |
+| [Testing](docs/TESTING.md) | the failure matrix and regression-test discipline |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | symptom → cause → fix |
+| [Migration](docs/MIGRATION.md) | v1 → v2 (compat, storage, config, protocol) |
+| [Contributing](docs/CONTRIBUTING.md) | setup, workflow, release process |
+| [Architecture](docs/ARCHITECTURE.md) | module map, workflow, execution states, audit |
+| [API](docs/API.md) · [API stability](docs/API_STABILITY.md) · [Deprecations](docs/DEPRECATIONS.md) | the public surface and its guarantees |
+| [CHANGELOG](CHANGELOG.md) · [v1 plan](docs/DEVELOPMENT_PLAN.md) · [v2 roadmap](docs/ROADMAP_V2.md) | history and plans |
 
 ## Roadmap
 
-Phases 0–11 are laid out in [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md):
+The v1 plan (phases 0–11) is complete and shipped as **v1.0.0** — see
+[docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md). The v2 roadmap
+(24 phases) is in progress — see [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md):
 
 | Version | Milestone |
 | --- | --- |
-| v0.1.0 | Foundation |
-| v0.2.0 | Provider System |
-| v0.3.0 | OmniHilbras Integration (optional, like every provider) |
-| v0.4.0 | Agent System |
-| v0.5.0 | Roles & Tasks |
-| v0.6.0 | Pipeline Engine |
-| v0.7.0 | Multi-AI Reports |
-| v0.8.0 | Remembera / Memory |
-| v0.9.0 | Planner |
-| v0.10.0 | End-to-End Workflow (current) |
-| **v1.0.0** | **Production Release — Phases 10 + 11 (current, final)** |
+| v0.1.0 – v0.10.0 | Foundation → end-to-end workflow |
+| **v1.0.0** | Production Release (v1 plan complete) |
+| **v2.0.0-alpha.N** | Reliability & interoperability line (phases 1–18 shipped) |
+| v2.0.0 | Phases 19–24: package quality, performance, DX, CI/CD, migration tooling, final hardening |
+
+Install prereleases with:
+
+```bash
+npm install -g @hilbras/omninode@next
+```
 
 Core architectural rule: OmniNode must run successfully with **zero Hilbras
 dependencies**. OmniHilbras and Remembera make it more powerful, but neither is
 required for the core engine.
 
-## Documentation
+## Install
 
-- [Development plan](docs/DEVELOPMENT_PLAN.md) — the full 12-phase roadmap
-- [Architecture](docs/ARCHITECTURE.md) — module map, workflow, local state
-- [Security model](docs/SECURITY.md) — secrets, process execution, env isolation, audit log
-- [API stability policy](docs/API_STABILITY.md) and [public API inventory](docs/API.md)
-- [Configuration](docs/CONFIGURATION.md) · [Testing & failure matrix](docs/TESTING.md) · [CLI guide](docs/CLI.md) · [Agent Protocol v2 spec](docs/PROTOCOL.md) · [Providers](docs/PROVIDERS.md) · [Memory](docs/MEMORY.md) · [Reports](docs/REPORTS.md) · [Persistence](docs/PERSISTENCE.md) · [Deprecations](docs/DEPRECATIONS.md) · [Changelog](CHANGELOG.md) · [v2 roadmap](docs/ROADMAP_V2.md)
-- [Example project](examples/demo/) — a runnable end-to-end demo (`./demo.sh`)
+```bash
+npm install -g @hilbras/omninode          # stable (v1.0.0)
+npm install -g @hilbras/omninode@next     # v2 prereleases
+```
+
+Or as a library: `npm install @hilbras/omninode`. Node.js 20+.
 
 Prefer a container? `docker build -t omninode .` then
 `docker run --rm -v "$PWD:/work" -w /work omninode run my-pipeline "audit the repo"`.
 
-## Install
+## Quick start
 
 ```bash
-npm install -g @hilbras/omninode
+omninode init                                   # writes omninode.yaml
+omninode provider add --name my-gateway \
+  --base-url https://api.example.com/v1 --api-key-env-var MY_API_KEY
+omninode agent add --name researcher --command some-agent --input-mode stdin
 ```
 
-Or use it as a library: `npm install @hilbras/omninode`.
+Describe the work as a pipeline — in `omninode.yaml`:
+
+```yaml
+project:
+  memory:
+    provider: local            # or: remembera
+  planner:
+    kind: model
+    model: my-gateway:chatgpt
+  pipelines:
+    - id: repo-audit
+      steps:
+        - id: research         # independent analyses, run in parallel
+          kind: research
+          agents: [researcher, second-opinion]
+        - id: plan             # findings + memory → typed implementation plan
+          kind: plan
+        - id: execute          # hand the plan to an execution agent
+          kind: execute
+          agent: researcher
+```
+
+…then run the whole loop in one command:
+
+```bash
+omninode run repo-audit "Audit the authentication module"
+```
+
+```
+  [research] completed
+  [plan] completed
+  [execute] completed
+  reports: 2 structured report(s)
+  combined report: combined-m4f2
+  plan: plan-a91
+  result: Fixed JWT verification and added regression tests.
+Pipeline completed. Run id: run-a91
+```
+
+Inspect what happened, in text or JSON:
+
+```bash
+omninode pipeline inspect run-a91
+omninode report combined
+omninode plan show plan-a91
+omninode task inspect task-… --json | jq .
+omninode audit -n 50
+```
+
+Prefer to start from something runnable? [`examples/demo/`](examples/demo/)
+contains a complete project and `./demo.sh` that exercises the full loop with
+agents that need no external tools.
 
 ## Connecting OmniHilbras
 
