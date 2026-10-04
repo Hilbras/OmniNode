@@ -1,0 +1,54 @@
+# OmniNode example project configuration.
+# Copy to omninode.yaml and adjust. `omninode init` creates a minimal template.
+
+project:
+  name: Remembra
+
+  providers:
+    - name: my-gateway
+      type: openai-compatible
+      base_url: https://example.com/v1
+      # The key is read from the environment at runtime — never stored here.
+      api_key_env_var: MY_API_KEY
+    # Other provider types: omnihilbras, openrouter, local, custom
+    # - name: omnihilbras
+    #   type: omnihilbras
+    #   base_url: https://api.omnihilbras.example/v1
+    #   api_key_env_var: OMNIHILBRAS_API_KEY
+
+  agents:
+    - name: opencode
+      type: cli
+      command: opencode
+    - name: kimi
+      type: cli
+      command: kimi
+
+  roles:
+    - id: architecture-reviewer
+      name: Architecture Reviewer
+      responsibilities:
+        - architecture analysis
+        - identify structural problems
+        - recommend improvements
+      expected_outputs:
+        - findings
+        - evidence
+        - recommendations
+
+    - id: security-reviewer
+      name: Security Reviewer
+      responsibilities:
+        - security analysis
+        - identify vulnerabilities
+      expected_outputs:
+        - findings
+        - evidence
+        - recommendations
+
+  # Memory is optional; Remembera is the preferred integration (Phase 7).
+  # memory:
+  #   provider: remembera
+
+logging:
+  level: info

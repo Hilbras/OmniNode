@@ -1,0 +1,159 @@
+/**
+ * Configuration loader: discovers omninode.yaml, expands ${ENV_VAR}
+ * references (so credentials never live in project files, §24), validates it
+ * and maps it onto the core TypeScript contracts.
+ */
+import { existsSync, readFileSync } from "node:fs";
+import { parse as parseYaml } from "yaml";
+import { ConfigError } from "../errors/index.js";
+import type { AgentConfig, AgentIntegrationType } from "../types/agent.js";
+import type { ProviderConfig } from "../types/provider.js";
+import type { RoleDefinition } from "../types/role.js";
+import type { LogLevel } from "../logger/index.js";
+import { appConfigSchema } from "./schema.js";
+import type { AgentConfigYaml, ProviderConfigYaml, RoleConfigYaml } from "./schema.js";
+
+const CONFIG_FILENAMES = ["omninode.yaml", "omninode.yml", "omninode.json"];
+
+export interface AppConfig {
+  project: {
+    name: string;
+    providers: ProviderConfig[];
+    agents: AgentConfig[];
+    roles: RoleDefinition[];
+    memory?: {
+      provider: string;
+    };
+  };
+  logging?: {
+    level: LogLevel;
+  };
+}
+
+export interface LoadConfigOptions {
+  /** Explicit path; otherwise omninode.yaml/yml/json is looked up in the given directory. */
+  path?: string;
+  directory?: string;
+  /** Environment used for ${VAR} expansion; defaults to process.env. */
+  env?: Record<string, string | undefined>;
+}
+
+export function findConfigFile(directory = process.cwd()): string | undefined {
+  for (const filename of CONFIG_FILENAMES) {
+    const candidate = `${directory}/${filename}`;
+    if (existsSync(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+/**
+ * Replaces ${VAR} and ${VAR:-fallback} references. Unset variables without a
+ * fallback abort loading: a half-resolved config could silently misroute
+ * authentication.
+ */
+export function expandEnvRefs(
+  text: string,
+  env: Record<string, string | undefined>,
+  source = "config",
+): string {
+  return text.replace(
+    /\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}/g,
+    (_match, name: string, fallback?: string) => {
+      const value = env[name] ?? fallback;
+      if (value === undefined) {
+        throw new ConfigError(
+          "CONFIG_INVALID",
+          `Environment variable "${name}" is referenced in ${source} but is not set and has no default.`,
+        );
+      }
+      return value;
+    },
+  );
+}
+
+export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
+  const env = options.env ?? process.env;
+  const path = options.path ?? (options.directory ? findConfigFile(options.directory) : findConfigFile());
+  if (!path) {
+    throw new ConfigError(
+      "CONFIG_NOT_FOUND",
+      "No omninode.yaml found. Run `omninode init` to create one, or pass an explicit path.",
+    );
+  }
+
+  const raw = readFileSync(path, "utf8");
+  const expanded = expandEnvRefs(raw, env, path);
+
+  let data: unknown;
+  try {
+    data = parseYaml(expanded);
+  } catch (error) {
+    throw new ConfigError("CONFIG_INVALID", `Failed to parse ${path}.`, { cause: error });
+  }
+
+  const parsed = appConfigSchema.safeParse(data);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map((issue) => {
+      const location = issue.path.length > 0 ? issue.path.join(".") : "(root)";
+      return `${location}: ${issue.message}`;
+    });
+    throw new ConfigError("CONFIG_INVALID", `Invalid configuration in ${path}.`, {
+      details: { issues },
+    });
+  }
+
+  return toAppConfig(parsed.data);
+}
+
+function toAppConfig(yaml: ReturnType<typeof appConfigSchema.parse>): AppConfig {
+  return {
+    project: {
+      name: yaml.project.name,
+      providers: yaml.project.providers.map(toProviderConfig),
+      agents: yaml.project.agents.map(toAgentConfig),
+      roles: yaml.project.roles.map(toRoleDefinition),
+      ...(yaml.project.memory !== undefined ? { memory: yaml.project.memory } : {}),
+    },
+    ...(yaml.logging !== undefined ? { logging: yaml.logging } : {}),
+  };
+}
+
+function toProviderConfig(raw: ProviderConfigYaml): ProviderConfig {
+  return {
+    name: raw.name,
+    type: raw.type,
+    baseUrl: raw.base_url,
+    apiKeyEnvVar: raw.api_key_env_var,
+    headers: raw.headers,
+    enabled: raw.enabled,
+    metadata: raw.metadata,
+  };
+}
+
+function toAgentConfig(raw: AgentConfigYaml): AgentConfig {
+  const integration: AgentIntegrationType =
+    raw.type === "native" ? "native" : "process";
+  return {
+    name: raw.name,
+    integration,
+    command: raw.command,
+    args: raw.args,
+    cwd: raw.cwd,
+    env: raw.env,
+    metadata: raw.metadata,
+  };
+}
+
+function toRoleDefinition(raw: RoleConfigYaml): RoleDefinition {
+  return {
+    id: raw.id,
+    name: raw.name,
+    description: raw.description,
+    responsibilities: raw.responsibilities,
+    expectedOutputs: raw.expected_outputs,
+    preferredAgents: raw.preferred_agents,
+    systemPrompt: raw.system_prompt,
+    metadata: raw.metadata,
+  };
+}
+

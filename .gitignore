@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+*.log
+.env
+.env.*
+
+# Local project configuration may reference secrets and should stay untracked.
+omninode.yaml
+omninode.yml
+omninode.local.yaml
