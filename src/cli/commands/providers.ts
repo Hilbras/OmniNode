@@ -1,12 +1,10 @@
-import { readFileSync, writeFileSync } from "node:fs";
 import type { Command } from "commander";
-import { parseDocument } from "yaml";
-import { appConfigSchema, findConfigFile, loadConfig, providerConfigSchema } from "../../config/index.js";
-import { ConfigError, OmniNodeError, ProviderError } from "../../errors/index.js";
+import { findConfigFile, loadConfig, providerConfigSchema } from "../../config/index.js";
+import { OmniNodeError, ProviderError } from "../../errors/index.js";
 import { createProvider, OmniHilbrasProvider } from "../../providers/index.js";
 import { ModelRegistry } from "../../registry/index.js";
 import type { ProviderStatus } from "../../types/provider.js";
-import { notImplemented } from "./shared.js";
+import { appendToConfigList, notImplemented } from "./shared.js";
 
 interface AddProviderOptions {
   name: string;
@@ -97,35 +95,17 @@ export async function addProvider(options: AddProviderOptions): Promise<void> {
   }
   const newProvider = candidate.data;
 
+  // Existing name check happens before the document is edited.
   const existing = loadConfig();
   if (existing.project.providers.some((p) => p.name === newProvider.name)) {
     throw new OmniNodeError(
       "CLI_USAGE",
-      `Provider "${newProvider.name}" already exists in ${configPath}.`,
+      `Provider "${newProvider.name}" already exists in ${findConfigFile() ?? "omninode.yaml"}.`,
     );
   }
 
-  // Edit as a YAML document so existing comments and formatting survive.
-  const doc = parseDocument(readFileSync(configPath, "utf8"));
-  if (doc.getIn(["project", "providers"]) === undefined) {
-    doc.setIn(["project", "providers"], [newProvider]);
-  } else {
-    doc.addIn(["project", "providers"], newProvider);
-  }
-
-  const validated = appConfigSchema.safeParse(doc.toJS());
-  if (!validated.success) {
-    const issues = validated.error.issues
-      .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
-      .join("; ");
-    throw new ConfigError(
-      "CONFIG_INVALID",
-      `Editing ${configPath} would produce an invalid configuration: ${issues}`,
-    );
-  }
-
-  writeFileSync(configPath, doc.toString(), "utf8");
-  console.log(`Added provider "${newProvider.name}" (${newProvider.type}) to ${configPath}.`);
+  const writtenPath = appendToConfigList("providers", newProvider);
+  console.log(`Added provider "${newProvider.name}" (${newProvider.type}) to ${writtenPath}.`);
   if (newProvider.api_key_env_var) {
     console.log(
       `Set $${newProvider.api_key_env_var} in your environment, then run: omninode provider test ${newProvider.name}`,

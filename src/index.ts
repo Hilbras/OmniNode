@@ -4,4 +4,5 @@ export * from "./logger/index.js";
 export * from "./config/index.js";
 export * from "./providers/index.js";
 export * from "./registry/index.js";
+export * from "./agents/index.js";
 export { OMNINODE_VERSION } from "./version.js";

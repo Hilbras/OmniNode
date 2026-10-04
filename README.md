@@ -18,7 +18,7 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v0.3.0 — Phase 2: OmniHilbras Integration** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
+**v0.4.0 — Phase 3: CLI Agent System** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
 for the full plan and roadmap).
 
 What exists today:
@@ -35,6 +35,15 @@ What exists today:
   - Provider factory mapping config to adapters; `omnihilbras` gets a
     dedicated adapter implementing the plan's connect flow —
     Connect → Authenticate → Fetch Models → Validate Models → Register
+- **Agent system** (`src/agents/`):
+  - Process adapter: spawns CLI agents as child processes with lifecycle
+    management — environment, working directory, exit codes, stderr logs,
+    per-task timeouts (SIGTERM → SIGKILL) and cancellation
+  - Three input modes: `stdin` (composed task text on stdin), `arg` (prompt as
+    last argument) and `protocol` (the §21 JSON-lines task protocol —
+    `TASK`/`ROLE`/`CONTEXT`/`INSTRUCTION` envelopes in, `REPORT`/`COMPLETION`/
+    `ERROR` messages out, parsed into structured reports)
+  - Agent factory and registry (`createAgent`, `AgentRegistry`)
 - Typed error hierarchy (`src/errors/`)
 - Leveled logger with pluggable sink (`src/logger/`)
 - Configuration system: `omninode.yaml` with `${ENV_VAR}` expansion and strict
@@ -76,6 +85,14 @@ omninode agent list
 omninode role list
 ```
 
+Register and verify a CLI agent (anything executable works — `opencode`,
+`kimi`, a custom script):
+
+```bash
+omninode agent add --name opencode --command opencode --input-mode arg
+omninode agent test opencode     # sends a trivial task over the real adapter
+```
+
 See [omninode.yaml.example](omninode.yaml.example) for a full configuration.
 
 ### Configuration
@@ -107,8 +124,8 @@ Phases 0–11 are laid out in [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.m
 | --- | --- |
 | v0.1.0 | Foundation |
 | v0.2.0 | Provider System |
-| **v0.3.0** | **OmniHilbras Integration (current)** |
-| v0.4.0 | Agent System |
+| v0.3.0 | OmniHilbras Integration (optional, like every provider) |
+| **v0.4.0** | **CLI Agent System (current)** |
 | v0.5.0 | Roles & Tasks |
 | v0.6.0 | Pipeline Engine |
 | v0.7.0 | Multi-AI Reports |

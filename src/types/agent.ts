@@ -1,4 +1,5 @@
 /** Agent abstraction: CLI agents and custom agents plug in via adapters (§9–§10). */
+import type { Report } from "./report.js";
 import type { RoleDefinition } from "./role.js";
 
 export type AgentIntegrationType = "native" | "process" | "custom";
@@ -11,6 +12,9 @@ export type AgentStatus =
   | "stopped"
   | "error";
 
+/** How the task payload reaches a process agent (§9). */
+export type AgentInputMode = "stdin" | "arg" | "protocol";
+
 export interface AgentConfig {
   name: string;
   integration: AgentIntegrationType;
@@ -19,6 +23,10 @@ export interface AgentConfig {
   args?: string[];
   cwd?: string;
   env?: Record<string, string>;
+  /** How the task is delivered: prompt on stdin, as last argument, or the §21 JSON-lines protocol. */
+  inputMode?: AgentInputMode;
+  /** Per-task timeout in milliseconds; the process is killed when exceeded. */
+  timeoutMs?: number;
   /** Models (as "provider:model-id") this agent may use, if restricted. */
   allowedModels?: string[];
   metadata?: Record<string, unknown>;
@@ -52,6 +60,8 @@ export interface AgentTaskOutput {
   rawOutput?: string;
   exitCode?: number;
   logs?: string[];
+  /** Structured reports extracted from protocol-mode runs (§16, §21). */
+  reports?: Report[];
   error?: string;
 }
 

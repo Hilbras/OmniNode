@@ -26,6 +26,8 @@ export const agentConfigSchema = z
     args: z.array(z.string()).optional(),
     cwd: z.string().optional(),
     env: z.record(z.string()).optional(),
+    input_mode: z.enum(["stdin", "arg", "protocol"]).default("stdin"),
+    timeout_ms: z.number().int().positive().optional(),
     metadata: z.record(z.unknown()).optional(),
   })
   .strict();

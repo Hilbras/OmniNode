@@ -140,6 +140,8 @@ function toAgentConfig(raw: AgentConfigYaml): AgentConfig {
     args: raw.args,
     cwd: raw.cwd,
     env: raw.env,
+    inputMode: raw.input_mode,
+    timeoutMs: raw.timeout_ms,
     metadata: raw.metadata,
   };
 }
