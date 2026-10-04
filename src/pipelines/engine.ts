@@ -21,7 +21,9 @@ import type {
   PipelineStep,
   PipelineStepRun,
 } from "../types/pipeline.js";
-import type { ChatMessage } from "../types/chat.js";
+import type { ChatFn } from "../types/chat.js";
+// Re-exported for v1 compatibility: ChatFn now lives in the neutral types layer.
+export type { ChatFn };
 import type { Plan } from "../types/plan.js";
 import type { Report } from "../types/report.js";
 import type { ReportService } from "../reports/index.js";
@@ -32,8 +34,6 @@ import { HeuristicPlanner } from "../planner/heuristic.js";
 import { ModelPlanner } from "../planner/model.js";
 import type { TaskEngine } from "../tasks/index.js";
 import type { PipelineRunStore } from "./store.js";
-
-export type ChatFn = (modelRef: string, messages: ChatMessage[]) => Promise<string>;
 
 export interface PipelineEngineOptions {
   tasks: TaskEngine;

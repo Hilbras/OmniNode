@@ -18,12 +18,23 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v1.0.0 — Phases 10 + 11: Production Release.** The plan is complete: the
+**v2.0.0-alpha.1 — v2 Phase 1: Architecture & API Stabilization** (the v2
+roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the v1 plan is complete:
+the
 full loop from §28 runs in one command —
 `User → project context → memory → research agents → reports → aggregation →
 planner → plan → execution → result` — with audit logging, error recovery and
 production hardening (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
 for the plan and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design).
+
+### What changed in v2 Phase 1
+
+- All local stores now build on one shared `JsonFileStore` (atomic writes,
+  serialized read-modify-write, schema-versioned files, corruption tolerance)
+  with a `ProjectStores` facade.
+- Dependency direction corrected (adapters no longer import engine modules).
+- API surface stabilized and guarded: [API_STABILITY.md](docs/API_STABILITY.md),
+  [API.md](docs/API.md), [DEPRECATIONS.md](docs/DEPRECATIONS.md).
 
 ### What's in v1.0
 
@@ -284,6 +295,8 @@ required for the core engine.
 - [Development plan](docs/DEVELOPMENT_PLAN.md) — the full 12-phase roadmap
 - [Architecture](docs/ARCHITECTURE.md) — module map, workflow, local state
 - [Security model](docs/SECURITY.md) — secrets, process execution, env isolation, audit log
+- [API stability policy](docs/API_STABILITY.md) and [public API inventory](docs/API.md)
+- [Deprecations](docs/DEPRECATIONS.md) · [Changelog](CHANGELOG.md) · [v2 roadmap](docs/ROADMAP_V2.md)
 - [Example project](examples/demo/) — a runnable end-to-end demo (`./demo.sh`)
 
 Prefer a container? `docker build -t omninode .` then

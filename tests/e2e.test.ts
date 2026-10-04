@@ -87,7 +87,9 @@ function outputOf(log: ReturnType<typeof capture>): string {
 
 function readStore<T>(file: string): T[] {
   const path_ = path.join(workDir, ".omninode", file);
-  return existsSync(path_) ? (JSON.parse(readFileSync(path_, "utf8")) as T[]) : [];
+  if (!existsSync(path_)) return [];
+  const parsed = JSON.parse(readFileSync(path_, "utf8")) as T[] | { items: T[] };
+  return Array.isArray(parsed) ? parsed : parsed.items;
 }
 
 const ECHO_SCRIPT = (marker: string) =>

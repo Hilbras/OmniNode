@@ -4,8 +4,7 @@
  * Relevance is scored by keyword overlap and tag matches — deterministic and
  * dependency-free.
  */
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { JsonFileStore } from "../persistence/json-file-store.js";
 import type { IMemoryProvider, MemoryEntry, MemoryQuery } from "../types/memory.js";
 
 const STOPWORDS = new Set([
@@ -39,45 +38,40 @@ function relevanceScore(queryKeywords: Set<string>, entry: MemoryEntry): number 
   return overlap * 2 + tagMatches * 1.5;
 }
 
-export class LocalMemoryProvider implements IMemoryProvider {
+export class LocalMemoryProvider extends JsonFileStore<MemoryEntry> implements IMemoryProvider {
   readonly name = "local";
-  private readonly filePath: string;
-  private queue: Promise<unknown> = Promise.resolve();
 
-  constructor(directory = `${process.cwd()}/.omninode`) {
-    this.filePath = `${directory}/memory.json`;
+  constructor(directory?: string) {
+    super({ ...(directory !== undefined ? { directory } : {}), fileName: "memory.json" });
   }
 
   async query(query: MemoryQuery): Promise<MemoryEntry[]> {
-    return this.synchronized(async () => {
-      const entries = await this.load();
-      const filtered = entries
-        .filter((entry) => (query.scope ? entry.scope === query.scope : true))
-        .filter((entry) =>
-          query.tags && query.tags.length > 0
-            ? query.tags.every((tag) => (entry.tags ?? []).includes(tag))
-            : true,
-        );
+    const entries = await this.readAll();
+    const filtered = entries
+      .filter((entry) => (query.scope ? entry.scope === query.scope : true))
+      .filter((entry) =>
+        query.tags && query.tags.length > 0
+          ? query.tags.every((tag) => (entry.tags ?? []).includes(tag))
+          : true,
+      );
 
-      if (!query.text || query.text.trim().length === 0) {
-        return filtered
-          .sort((a, b) => (b.updatedAt ?? b.createdAt ?? "").localeCompare(a.updatedAt ?? a.createdAt ?? ""))
-          .slice(0, query.limit ?? 10);
-      }
-
-      const queryKeywords = keywords(query.text);
+    if (!query.text || query.text.trim().length === 0) {
       return filtered
-        .map((entry) => ({ entry, score: relevanceScore(queryKeywords, entry) }))
-        .filter(({ score }) => score > 0)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, query.limit ?? 10)
-        .map(({ entry }) => entry);
-    });
+        .sort((a, b) => (b.updatedAt ?? b.createdAt ?? "").localeCompare(a.updatedAt ?? a.createdAt ?? ""))
+        .slice(0, query.limit ?? 10);
+    }
+
+    const queryKeywords = keywords(query.text);
+    return filtered
+      .map((entry) => ({ entry, score: relevanceScore(queryKeywords, entry) }))
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, query.limit ?? 10)
+      .map(({ entry }) => entry);
   }
 
-  async write(entry: MemoryEntry): Promise<void> {
-    return this.synchronized(async () => {
-      const entries = await this.load();
+  write(entry: MemoryEntry): Promise<void> {
+    return this.mutate((entries) => {
       const index = entries.findIndex((e) => e.key === entry.key);
       const stamped: MemoryEntry = {
         ...entry,
@@ -86,37 +80,11 @@ export class LocalMemoryProvider implements IMemoryProvider {
       };
       if (index >= 0) entries[index] = stamped;
       else entries.push(stamped);
-      await this.saveAll(entries);
+      return [entries, undefined];
     });
   }
 
   async count(): Promise<number> {
-    return (await this.load()).length;
-  }
-
-  private synchronized<T>(operation: () => Promise<T>): Promise<T> {
-    const result = this.queue.then(operation, operation);
-    this.queue = result.then(
-      () => undefined,
-      () => undefined,
-    );
-    return result;
-  }
-
-  private async load(): Promise<MemoryEntry[]> {
-    try {
-      const raw = await readFile(this.filePath, "utf8");
-      const parsed: unknown = JSON.parse(raw);
-      return Array.isArray(parsed) ? (parsed as MemoryEntry[]) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  private async saveAll(entries: MemoryEntry[]): Promise<void> {
-    const tmp = `${this.filePath}.tmp`;
-    await mkdir(dirname(this.filePath), { recursive: true });
-    await writeFile(tmp, `${JSON.stringify(entries, null, 2)}\n`, "utf8");
-    await rename(tmp, this.filePath);
+    return (await this.readAll()).length;
   }
 }

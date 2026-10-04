@@ -9,8 +9,8 @@ import { z } from "zod";
 import { PlannerError } from "../errors/index.js";
 import { logger, type Logger } from "../logger/index.js";
 import type { Plan, PlanStep } from "../types/plan.js";
-import type { ChatMessage } from "../types/chat.js";
-import type { ChatFn } from "../pipelines/index.js";
+import type { ChatFn, ChatMessage } from "../types/chat.js";
+
 import { buildPlannerContext } from "./context.js";
 import type { IPlanner, PlanRequest } from "./types.js";
 

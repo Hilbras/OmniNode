@@ -1,7 +1,7 @@
 /** Planner factory from project configuration (§18 — planner provider support). */
 import { ConfigError } from "../errors/index.js";
 import type { AppConfig } from "../config/index.js";
-import type { ChatFn } from "../pipelines/index.js";
+import type { ChatFn } from "../types/chat.js";
 import { HeuristicPlanner } from "./heuristic.js";
 import { ModelPlanner } from "./model.js";
 import type { IPlanner } from "./types.js";

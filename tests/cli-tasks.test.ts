@@ -1,9 +1,19 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProgram } from "../src/cli/index.js";
 import { loadConfig } from "../src/config/index.js";
+
+
+type StoredTask = { id: string; status?: string };
+
+function readStore<T>(file: string): T[] {
+  const path_ = path.join(workDir, ".omninode", file);
+  if (!existsSync(path_)) return [];
+  const parsed = JSON.parse(readFileSync(path_, "utf8")) as T[] | { items: T[] };
+  return Array.isArray(parsed) ? parsed : parsed.items;
+}
 
 let workDir: string;
 let previousCwd: string;
@@ -86,7 +96,7 @@ describe("CLI task commands", () => {
     ]);
     capture();
     await createProgram().parseAsync(["node", "omninode", "task", "create", "doomed", "--agent", "bad"]);
-    const tasks = JSON.parse(readFileSync(path.join(workDir, ".omninode/tasks.json"), "utf8")) as Array<{ id: string }>;
+    const tasks = readStore<StoredTask>("tasks.json");
     expect(tasks).toHaveLength(1);
     // The command sets process.exitCode = 1; parseAsync itself resolves.
     const previousExit = process.exitCode;
@@ -132,7 +142,7 @@ describe("CLI task commands", () => {
     await setupProjectWithAgentAndRole();
     capture();
     await createProgram().parseAsync(["node", "omninode", "task", "create", "to be cancelled", "--agent", "worker"]);
-    const tasks = JSON.parse(readFileSync(path.join(workDir, ".omninode/tasks.json"), "utf8")) as Array<{ id: string }>;
+    const tasks = readStore<StoredTask>("tasks.json");
     const log = capture();
     await createProgram().parseAsync(["node", "omninode", "task", "cancel", tasks[0]!.id]);
     expect(outputOf(log)).toContain('is now "cancelled"');

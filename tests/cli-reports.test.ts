@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProgram } from "../src/cli/index.js";
 
+
 let workDir: string;
 let previousCwd: string;
 

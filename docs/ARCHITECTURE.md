@@ -54,6 +54,36 @@ written back afterwards (findings of high/critical severity become project-level
 | `memory.json` | Local memory provider entries |
 | `audit.jsonl` | Append-only lifecycle events |
 
+## v2 additions (Phase 1)
+
+```
+src/persistence/         JsonFileStore<T> — the single local persistence base
+  ├── tasks (FileTaskStore)
+  ├── pipelines (FilePipelineRunStore)
+  ├── reports (FileReportStore)
+  ├── planner (FilePlanStore)
+  └── memory (LocalMemoryProvider)
+ProjectStores            one facade over every store for a project directory
+```
+
+Rules (enforced by review and the API inventory test):
+
+1. **Dependency direction is one-way**: `types` ← engines ← adapters ← CLI.
+   Adapters never import engine modules — shared contracts live in
+   `src/types` (e.g. `ChatFn`).
+2. **Engines never touch `fs`** — they go through store interfaces; the
+   atomic write, serialization and schema envelope live in one place.
+3. **Extension points are interfaces only**: `IProvider`, `IAgent`,
+   `IPlanner`, `IMemoryProvider`, the store family, `AuditSink`.
+
+Persisted files use a versioned envelope:
+
+```json
+{ "schemaVersion": 1, "items": [ … ] }
+```
+
+v1 bare-array files remain readable (schema migrations land in v2 Phase 12).
+
 ## Design principles (from the plan)
 
 1. **Provider agnostic** — the core imports no vendor SDK.

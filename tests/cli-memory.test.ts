@@ -68,7 +68,10 @@ describe("CLI memory commands", () => {
       "node", "omninode", "task", "create", "investigate the caching layer performance", "--agent", "worker",
     ]);
     capture();
-    const tasks = JSON.parse(readFileSync(path.join(workDir, ".omninode/tasks.json"), "utf8")) as Array<{ id: string }>;
+    const parsed = JSON.parse(readFileSync(path.join(workDir, ".omninode/tasks.json"), "utf8")) as
+      | Array<{ id: string }>
+      | { items: Array<{ id: string }> };
+    const tasks = Array.isArray(parsed) ? parsed : parsed.items;
     await createProgram().parseAsync(["node", "omninode", "task", "run", tasks[0]!.id]);
 
     const log = capture();

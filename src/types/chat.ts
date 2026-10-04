@@ -32,3 +32,9 @@ export interface ChatResponse {
   /** Verbatim provider response body for advanced consumers. */
   raw?: unknown;
 }
+
+/**
+ * Model-backed chat used by the planner layer. Lives in the neutral types
+ * layer so adapters (e.g. planner) never depend on engine modules.
+ */
+export type ChatFn = (model: string, messages: ChatMessage[]) => Promise<string>;
