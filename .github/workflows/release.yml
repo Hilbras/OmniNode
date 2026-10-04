@@ -30,7 +30,14 @@ jobs:
       - run: npm test
       - run: npm run build
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        # Prereleases (v2.0.0-alpha.1) go to the `next` tag; stable releases
+        # to `latest`.
+        run: |
+          if [[ "${{ github.ref_name }}" == *-* ]]; then
+            npm publish --provenance --access public --tag next
+          else
+            npm publish --provenance --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Create GitHub release
