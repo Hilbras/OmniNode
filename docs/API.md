@@ -55,7 +55,8 @@ for `loadConfig`/`AppConfig`/schemas; helpers Experimental.
 | `OmniHilbrasProvider` | OmniHilbras adapter (optional) | Stable |
 | `createProvider`, `OPENAI_COMPATIBLE_TYPES` | config→adapter factory | Stable |
 | `resolveApiKey`, `authHeaders`, `AuthRef` | credential resolution from env | Stable |
-| `requestJson` | internal HTTP helper | Experimental |
+| `providerHttpError`, `providerTransportError`, `kindFromStatus`, `isTimeoutError`, `isNetworkError`, `isRetryable`, `extractMessage`, `parseRetryAfter`, `ProviderErrorKind` | error normalization (§10) | Stable |
+| `requestJson`, `HttpResponseError` | transport-level HTTP helper | Experimental |
 
 ## Registry, agents, roles (`src/registry`, `src/agents`, `src/roles`)
 

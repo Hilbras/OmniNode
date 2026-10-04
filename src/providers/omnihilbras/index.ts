@@ -29,7 +29,7 @@ export class OmniHilbrasProvider extends OpenAICompatibleProvider {
    * Run the full connect flow. Throws on authentication or transport failure
    * (use healthCheck() for a non-throwing probe).
    */
-  async connect(registry?: ModelRegistry): Promise<OmniHilbrasConnectionResult> {
+  async connectAndRegister(registry?: ModelRegistry): Promise<OmniHilbrasConnectionResult> {
     // Authenticate — throws PROVIDER_AUTH_FAILED when the referenced env var is unset.
     const apiKey = resolveApiKey(this.config);
 

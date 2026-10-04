@@ -9,6 +9,12 @@ function model(provider: string, id: string, capabilities?: ModelInfo["capabilit
 
 const failingProvider: IProvider = {
   config: { name: "bad", type: "custom", baseUrl: "http://localhost:1" },
+  providerId: "bad",
+  authentication: { method: "none", configured: true },
+  connect: async () => {
+    throw new Error("connection refused");
+  },
+  getModel: async () => undefined,
   listModels: async () => {
     throw new Error("connection refused");
   },
@@ -25,6 +31,10 @@ const failingProvider: IProvider = {
 function providerNamed(name: string, models: ModelInfo[]): IProvider {
   return {
     config: { name, type: "openai-compatible", baseUrl: "http://localhost:0" },
+    providerId: name,
+    authentication: { method: "none", configured: true },
+    connect: async () => models,
+    getModel: async (id: string) => models.find((m) => m.id === id),
     listModels: async () => models,
     healthCheck: async () => ({
       name,

@@ -39,7 +39,7 @@ describe("OmniHilbrasProvider", () => {
 
     const provider = new OmniHilbrasProvider(config);
     const registry = new ModelRegistry();
-    const result = await provider.connect(registry);
+    const result = await provider.connectAndRegister(registry);
 
     // Bearer authentication was attempted with the referenced env var.
     const headers = fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>;
@@ -70,7 +70,7 @@ describe("OmniHilbrasProvider", () => {
   it("connect works without an API key configured", async () => {
     mockFetch({ data: [{ id: "m" }] });
     const provider = new OmniHilbrasProvider({ ...config, apiKeyEnvVar: undefined });
-    const result = await provider.connect();
+    const result = await provider.connectAndRegister();
     expect(result.status.message).toContain("no API key configured");
     expect(result.registered).toBe(0);
   });
@@ -79,7 +79,7 @@ describe("OmniHilbrasProvider", () => {
     vi.stubEnv("OMNIHILBRAS_API_KEY", "hb-secret");
     mockFetch({ data: [{ id: "kimi-k2" }, { id: "kimi-k2" }, { id: "gemini-flash" }] });
     const provider = new OmniHilbrasProvider(config);
-    const result = await provider.connect();
+    const result = await provider.connectAndRegister();
 
     expect(result.models.map((m) => m.id)).toEqual(["kimi-k2", "gemini-flash"]);
     expect(result.duplicates).toEqual(["kimi-k2"]);
@@ -88,7 +88,7 @@ describe("OmniHilbrasProvider", () => {
 
   it("connect throws PROVIDER_AUTH_FAILED when the env var is unset", async () => {
     const provider = new OmniHilbrasProvider(config);
-    await expect(provider.connect()).rejects.toMatchObject({
+    await expect(provider.connectAndRegister()).rejects.toMatchObject({
       code: "PROVIDER_AUTH_FAILED",
       message: expect.stringContaining("OMNIHILBRAS_API_KEY"),
     });
@@ -98,7 +98,7 @@ describe("OmniHilbrasProvider", () => {
     vi.stubEnv("OMNIHILBRAS_API_KEY", "hb-secret");
     mockFetch({ error: "boom" }, 503);
     const provider = new OmniHilbrasProvider(config);
-    await expect(provider.connect()).rejects.toMatchObject({ code: "PROVIDER_UNAVAILABLE" });
+    await expect(provider.connectAndRegister()).rejects.toMatchObject({ code: "PROVIDER_UNAVAILABLE" });
   });
 
   it("healthCheck still works as a non-throwing probe", async () => {

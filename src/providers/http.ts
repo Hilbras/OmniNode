@@ -3,7 +3,13 @@
  * the caller, not thrown — provider methods interpret them; only transport
  * failures (network, timeout, unparseable body) throw.
  */
-import { ProviderError } from "../errors/index.js";
+/** Raised for malformed provider responses so adapters can classify them. */
+export class HttpResponseError extends Error {
+  constructor(message: string, readonly status: number, cause?: unknown) {
+    super(message, { cause });
+    this.name = "HttpResponseError";
+  }
+}
 
 export interface HttpRequestOptions {
   method?: "GET" | "POST";
@@ -25,9 +31,9 @@ export async function requestJson(
 ): Promise<HttpResponse> {
   const { method = "GET", headers = {}, body, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
+  // Transport failures propagate raw: adapters normalize them into provider
+  // error kinds (roadmap §10).
+  const response: Response = await fetch(url, {
       method,
       headers: {
         accept: "application/json",
@@ -35,28 +41,14 @@ export async function requestJson(
         ...headers,
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-  } catch (error) {
-    const reason =
-      error instanceof Error && error.name === "TimeoutError"
-        ? `timed out after ${timeoutMs}ms`
-        : error instanceof Error
-          ? error.message
-          : String(error);
-    throw new ProviderError("PROVIDER_UNAVAILABLE", `Request to ${url} failed: ${reason}.`, {
-      cause: error,
-    });
-  }
+    signal: AbortSignal.timeout(timeoutMs),
+  });
 
   let parsed: unknown;
   try {
     parsed = await response.json();
   } catch (error) {
-    throw new ProviderError("PROVIDER_UNAVAILABLE", `Response from ${url} was not valid JSON.`, {
-      cause: error,
-      details: { status: response.status },
-    });
+    throw new HttpResponseError(`Response from ${url} was not valid JSON.`, response.status, error);
   }
 
   return { status: response.status, body: parsed };

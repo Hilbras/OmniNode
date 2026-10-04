@@ -4,6 +4,38 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.6] — v2 Phase 6 (Provider Infrastructure v2)
+
+### Added
+
+- **Standardized provider interface** (§10): `providerId`, secret-free
+  `authentication` summary (`{ method, envVar, configured }`), declared
+  `capabilities`, and the discovery surface `connect()` / `getModel()`
+  alongside `listModels()` / `healthCheck()`.
+- **Model metadata** (§10): context window, input/output modalities, and
+  tool / structured-output / streaming support derived from
+  `supported_parameters`, when a gateway reports them.
+- **Provider error normalization** (§10): every failure carries a stable
+  `details.kind` — AUTHENTICATION_ERROR, RATE_LIMIT_ERROR, INVALID_REQUEST,
+  MODEL_NOT_FOUND, TIMEOUT, NETWORK_ERROR, SERVER_ERROR, UNKNOWN_ERROR —
+  with `retryable`, `retryAfterMs` (from `Retry-After`) and actionable
+  fallback messages. Legacy stable `error.code` values preserved.
+- `HttpResponseError` distinguishes malformed provider responses from
+  transport failures; the HTTP layer now stays transport-level and adapters
+  own the semantics.
+- docs/PROVIDERS.md: contract, configuration, metadata, error matrix,
+  extension guide.
+- Tests: 331 (was 311) — full status→kind matrix, retryability, metadata
+  mapping, connect/getModel caching, secret-free auth summary.
+
+### Fixed
+
+- Providers now resolve auth through the environment captured at
+  construction (consistent with the `authentication` summary).
+- `OmniHilbrasProvider.connect(registry)` renamed to
+  `connectAndRegister(registry)` to align with the base `connect()`
+  contract; the CLI `--connect` path uses it.
+
 ## [2.0.0-alpha.5] — v2 Phase 5 (Pipeline Lifecycle v2)
 
 ### Added

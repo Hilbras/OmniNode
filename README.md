@@ -18,9 +18,9 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v2.0.0-alpha.5 — v2 Phase 5: Pipeline Lifecycle v2**
+**v2.0.0-alpha.6 — v2 Phase 6: Provider Infrastructure v2**
 (the reliability & interoperability line: architecture → execution →
-protocol → adapters → pipelines) (the v2
+protocol → adapters → pipelines → providers) (the v2
 roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the v1 plan is complete:
 the
 full loop from §28 runs in one command —
@@ -31,6 +31,14 @@ for the plan and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design).
 
 ### What's new in v2 (so far)
 
+- **Phase 6 — Provider Infrastructure v2**: standardized provider contract
+  (`providerId`, secret-free `authentication`, declared `capabilities`,
+  `connect()` / `getModel()` discovery), richer model metadata (context
+  window, input/output modalities, tool/vision/structured-output/streaming
+  support), and **unified error normalization** — every provider failure now
+  carries a stable `kind` (auth, rate limit, invalid request, model not
+  found, timeout, network, server, unknown) plus `retryable` and
+  `retryAfterMs`. Details: [PROVIDERS.md](docs/PROVIDERS.md).
 - **Phase 5 — Pipeline Lifecycle**: first-class pipeline cancellation
   (`omninode pipeline cancel <run-id>`: stop scheduling → cancel running
   tasks → terminate agent processes → persist a `cancelled` run), `pipeline
@@ -319,7 +327,7 @@ required for the core engine.
 - [Architecture](docs/ARCHITECTURE.md) — module map, workflow, local state
 - [Security model](docs/SECURITY.md) — secrets, process execution, env isolation, audit log
 - [API stability policy](docs/API_STABILITY.md) and [public API inventory](docs/API.md)
-- [Agent Protocol v2 spec](docs/PROTOCOL.md) · [Deprecations](docs/DEPRECATIONS.md) · [Changelog](CHANGELOG.md) · [v2 roadmap](docs/ROADMAP_V2.md)
+- [Agent Protocol v2 spec](docs/PROTOCOL.md) · [Providers](docs/PROVIDERS.md) · [Deprecations](docs/DEPRECATIONS.md) · [Changelog](CHANGELOG.md) · [v2 roadmap](docs/ROADMAP_V2.md)
 - [Example project](examples/demo/) — a runnable end-to-end demo (`./demo.sh`)
 
 Prefer a container? `docker build -t omninode .` then

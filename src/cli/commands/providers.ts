@@ -135,7 +135,7 @@ export async function testProvider(
   if (options.connect && provider instanceof OmniHilbrasProvider) {
     const registry = new ModelRegistry();
     try {
-      const result = await provider.connect(registry);
+      const result = await provider.connectAndRegister(registry);
       printProviderStatus(result.status);
       console.log(`  registered: ${result.registered}`);
     } catch (error) {

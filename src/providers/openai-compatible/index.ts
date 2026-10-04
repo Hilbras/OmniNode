@@ -6,15 +6,23 @@
 import { ProviderError } from "../../errors/index.js";
 import { logger, type Logger } from "../../logger/index.js";
 import type { ChatRequest, ChatResponse } from "../../types/chat.js";
-import type { ModelInfo } from "../../types/model.js";
+import type { Modality, ModelInfo } from "../../types/model.js";
 import type { IChatProvider, ProviderConfig, ProviderStatus } from "../../types/provider.js";
 import { authHeaders } from "../auth.js";
 import { requestJson } from "../http.js";
+import { providerHttpError, providerTransportError } from "../errors.js";
+import type { ProviderAuthentication } from "../../types/provider.js";
 
 interface OpenAIModelEntry {
   id?: unknown;
+  name?: unknown;
   owned_by?: unknown;
   created?: unknown;
+  context_length?: unknown;
+  context_window?: unknown;
+  input_modalities?: unknown;
+  output_modalities?: unknown;
+  supported_parameters?: unknown;
 }
 
 interface OpenAIChatResponse {
@@ -25,22 +33,57 @@ interface OpenAIChatResponse {
 
 export class OpenAICompatibleProvider implements IChatProvider {
   readonly config: ProviderConfig;
+  readonly providerId: string;
+  readonly authentication: ProviderAuthentication;
   private readonly log: Logger;
+  /** Discovered models, so getModel() answers without another round-trip. */
+  private discovered?: ModelInfo[];
 
-  constructor(config: ProviderConfig, log: Logger = logger) {
+  private readonly env: Record<string, string | undefined>;
+
+  constructor(config: ProviderConfig, log: Logger = logger, env: Record<string, string | undefined> = process.env) {
     this.config = { ...config, baseUrl: normalizeBaseUrl(config.baseUrl) };
+    this.env = env;
+    this.providerId = config.providerId ?? config.name;
+    this.authentication = {
+      method: config.apiKeyEnvVar ? "bearer" : "none",
+      ...(config.apiKeyEnvVar ? { envVar: config.apiKeyEnvVar } : {}),
+      configured: config.apiKeyEnvVar ? Boolean(env[config.apiKeyEnvVar]) : true,
+    };
     this.log = log.child({ provider: config.name });
   }
 
+  /** Authenticate + discover (roadmap §10, Model Discovery). */
+  async connect(): Promise<ModelInfo[]> {
+    authHeaders(this.config, this.env); // throws PROVIDER_AUTH_FAILED when the env var is unset
+    const models = await this.listModels();
+    this.discovered = models;
+    return models;
+  }
+
+  async getModel(modelId: string): Promise<ModelInfo | undefined> {
+    const models = this.discovered ?? (await this.connect());
+    return models.find((m) => m.id === modelId);
+  }
+
   async listModels(): Promise<ModelInfo[]> {
-    const { status, body } = await requestJson(`${this.config.baseUrl}/models`, {
-      headers: authHeaders(this.config),
-    });
-    if (status === 401 || status === 403) {
-      throw authFailed(this.config, status);
+    let response: { status: number; body: unknown };
+    try {
+      response = await requestJson(`${this.config.baseUrl}/models`, {
+        headers: authHeaders(this.config, this.env),
+      });
+    } catch (error) {
+      if (error instanceof ProviderError) throw error; // auth problem — keep the precise error
+      throw providerTransportError({ provider: this.config.name, operation: "listModels", cause: error });
     }
+    const { status, body } = response;
     if (status !== 200) {
-      throw unavailable(this.config, `Model discovery returned HTTP ${status}.`, status);
+      throw providerHttpError({
+        provider: this.config.name,
+        operation: "listModels",
+        status,
+        body,
+      });
     }
 
     const entries = extractModelEntries(body, this.config);
@@ -51,21 +94,49 @@ export class OpenAICompatibleProvider implements IChatProvider {
         skipped += 1;
         continue;
       }
-      models.push({
-        provider: this.config.name,
-        id: entry.id,
-        displayName: entry.id,
-        status: "available",
-        metadata: {
-          ...(typeof entry.owned_by === "string" ? { ownedBy: entry.owned_by } : {}),
-          ...(typeof entry.created === "number" ? { createdAt: entry.created } : {}),
-        },
-      });
+      models.push(this.toModelInfo(entry as OpenAIModelEntry & { id: string }));
     }
     if (skipped > 0) {
       this.log.warn(`Skipped ${skipped} model entr(y/ies) without a valid id.`);
     }
     return models;
+  }
+
+  /** Maps a raw model entry onto the normalized metadata shape (§10). */
+  private toModelInfo(entry: OpenAIModelEntry & { id: string }): ModelInfo {
+    const parameters = Array.isArray(entry.supported_parameters)
+      ? (entry.supported_parameters.filter((p): p is string => typeof p === "string") as string[])
+      : undefined;
+    const contextWindow =
+      typeof entry.context_length === "number"
+        ? entry.context_length
+        : typeof entry.context_window === "number"
+          ? entry.context_window
+          : undefined;
+    const inputTypes = normalizeModalities(entry.input_modalities);
+    const outputTypes = normalizeModalities(entry.output_modalities);
+    return {
+      provider: this.config.name,
+      id: entry.id,
+      displayName: entry.id,
+      ...(typeof entry.name === "string" ? { name: entry.name } : {}),
+      status: "available",
+      ...(contextWindow !== undefined ? { contextWindow } : {}),
+      ...(inputTypes !== undefined ? { inputTypes } : {}),
+      ...(outputTypes !== undefined ? { outputTypes } : {}),
+      ...(parameters !== undefined
+        ? {
+            supportsTools: parameters.includes("tools") || parameters.includes("tool_choice"),
+            supportsStructuredOutput: parameters.includes("response_format"),
+            supportsStreaming: parameters.includes("stream"),
+          }
+        : {}),
+      metadata: {
+        ...(typeof entry.owned_by === "string" ? { ownedBy: entry.owned_by } : {}),
+        ...(typeof entry.created === "number" ? { createdAt: entry.created } : {}),
+        ...(parameters !== undefined ? { supportedParameters: parameters } : {}),
+      },
+    };
   }
 
   async healthCheck(): Promise<ProviderStatus> {
@@ -98,28 +169,37 @@ export class OpenAICompatibleProvider implements IChatProvider {
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
-    const { status, body } = await requestJson(`${this.config.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: authHeaders(this.config),
-      body: {
+    let response: { status: number; body: unknown };
+    try {
+      response = await requestJson(`${this.config.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: authHeaders(this.config, this.env),
+        body: {
         model: request.model,
         messages: request.messages,
         ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
         ...(request.maxTokens !== undefined ? { max_tokens: request.maxTokens } : {}),
-        ...(request.stop !== undefined ? { stop: request.stop } : {}),
-      },
-    });
-
-    if (status === 401 || status === 403) throw authFailed(this.config, status);
-    if (status === 404) {
-      throw new ProviderError(
-        "MODEL_NOT_FOUND",
-        `Model "${request.model}" or the chat endpoint was not found on provider "${this.config.name}" (HTTP 404).`,
-        { details: { status } },
-      );
+          ...(request.stop !== undefined ? { stop: request.stop } : {}),
+        },
+      });
+    } catch (error) {
+      if (error instanceof ProviderError) throw error;
+      throw providerTransportError({ provider: this.config.name, operation: "chat", cause: error });
     }
+    const { status, body } = response;
+
     if (status !== 200) {
-      throw unavailable(this.config, `Chat completion returned HTTP ${status}.`, status);
+      throw providerHttpError({
+        provider: this.config.name,
+        operation: "chat",
+        status,
+        body,
+        ...(status === 404
+          ? {
+              code: "MODEL_NOT_FOUND" as const,
+            }
+          : {}),
+      });
     }
 
     const payload = body as OpenAIChatResponse;
@@ -150,6 +230,15 @@ export class OpenAICompatibleProvider implements IChatProvider {
   }
 }
 
+/** Normalizes provider modality lists ("text", ["text","image"], …). */
+function normalizeModalities(value: unknown): Modality[] | undefined {
+  const list = Array.isArray(value) ? value : typeof value === "string" ? [value] : undefined;
+  if (!list) return undefined;
+  const allowed = new Set<Modality>(["text", "image", "audio", "video", "embedding"]);
+  const modalities = list.filter((m): m is Modality => typeof m === "string" && allowed.has(m as Modality));
+  return modalities.length > 0 ? modalities : undefined;
+}
+
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
 }
@@ -163,17 +252,6 @@ function extractModelEntries(body: unknown, config: ProviderConfig): OpenAIModel
     "PROVIDER_UNAVAILABLE",
     `Provider "${config.name}" returned an unrecognized model list shape.`,
     { details: { endpoint: "models" } },
-  );
-}
-
-function authFailed(config: ProviderConfig, status: number): ProviderError {
-  const envHint = config.apiKeyEnvVar
-    ? ` Check that $${config.apiKeyEnvVar} is set and valid.`
-    : " The provider requires authentication; configure api_key_env_var for it.";
-  return new ProviderError(
-    "PROVIDER_AUTH_FAILED",
-    `Authentication with provider "${config.name}" failed (HTTP ${status}).${envHint}`,
-    { details: { status } },
   );
 }
 
