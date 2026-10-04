@@ -197,7 +197,9 @@ describe("End-to-end workflow (§28)", () => {
     expect(memory.filter((m) => m.scope === "task").length).toBeGreaterThanOrEqual(2);
 
     // The plan is inspectable.
-    const planId = /plan-[a-z0-9-]+/.exec(runOutput)?.[0]!;
+    const planMatch = /plan-[a-z0-9-]+/.exec(runOutput);
+    expect(planMatch).not.toBeNull();
+    const planId = planMatch![0];
     log = capture();
     await createProgram().parseAsync(["node", "omninode", "plan", "show", planId]);
     const planOutput = outputOf(log);
