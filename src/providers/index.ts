@@ -3,3 +3,5 @@ export { requestJson } from "./http.js";
 export type { HttpRequestOptions, HttpResponse } from "./http.js";
 export { createProvider, OPENAI_COMPATIBLE_TYPES } from "./factory.js";
 export { OpenAICompatibleProvider } from "./openai-compatible/index.js";
+export { OmniHilbrasProvider } from "./omnihilbras/index.js";
+export type { OmniHilbrasConnectionResult } from "./omnihilbras/index.js";

@@ -159,4 +159,20 @@ describe("CLI provider commands", () => {
     expect(output).toContain("local:test-model-a");
     expect(output).toContain("local:test-model-b");
   });
+
+  it("provider test --connect runs the OmniHilbras connect flow", async () => {
+    await createProgram().parseAsync(["node", "omninode", "init"]);
+    await createProgram().parseAsync([
+      "node", "omninode", "provider", "add",
+      "--name", "hb",
+      "--type", "omnihilbras",
+      "--base-url", `http://127.0.0.1:${port}/v1`,
+    ]);
+    const log = silenceLog();
+    await createProgram().parseAsync(["node", "omninode", "provider", "test", "hb", "--connect"]);
+    const output = outputOf(log);
+    expect(output).toContain("health:    healthy");
+    expect(output).toContain("registered: 2");
+    expect(output).toContain("validated 2 unique model(s)");
+  });
 });

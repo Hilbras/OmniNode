@@ -3,7 +3,9 @@ import type { Command } from "commander";
 import { parseDocument } from "yaml";
 import { appConfigSchema, findConfigFile, loadConfig, providerConfigSchema } from "../../config/index.js";
 import { ConfigError, OmniNodeError, ProviderError } from "../../errors/index.js";
-import { createProvider } from "../../providers/index.js";
+import { createProvider, OmniHilbrasProvider } from "../../providers/index.js";
+import { ModelRegistry } from "../../registry/index.js";
+import type { ProviderStatus } from "../../types/provider.js";
 import { notImplemented } from "./shared.js";
 
 interface AddProviderOptions {
@@ -61,7 +63,11 @@ export function registerProviderCommands(program: Command): void {
   provider
     .command("test <name>")
     .description("Test connectivity, authentication and model discovery for a configured provider.")
-    .action(async (name: string) => testProvider(name));
+    .option(
+      "--connect",
+      "Run the full provider connect flow (authenticate, fetch, validate, register) where the adapter supports it.",
+    )
+    .action(async (name: string, options: { connect?: boolean }) => testProvider(name, options));
 
   provider
     .command("remove <name>")
@@ -129,7 +135,10 @@ export async function addProvider(options: AddProviderOptions): Promise<void> {
   }
 }
 
-export async function testProvider(name: string): Promise<void> {
+export async function testProvider(
+  name: string,
+  options: { connect?: boolean } = {},
+): Promise<void> {
   const config = loadConfig();
   const providerConfig = config.project.providers.find((p) => p.name === name);
   if (!providerConfig) {
@@ -142,10 +151,28 @@ export async function testProvider(name: string): Promise<void> {
 
   const provider = createProvider(providerConfig);
   console.log(`Testing provider "${name}" (${providerConfig.type}) at ${provider.config.baseUrl}`);
+
+  if (options.connect && provider instanceof OmniHilbrasProvider) {
+    const registry = new ModelRegistry();
+    try {
+      const result = await provider.connect(registry);
+      printProviderStatus(result.status);
+      console.log(`  registered: ${result.registered}`);
+    } catch (error) {
+      console.log(`  connect failed: ${error instanceof Error ? error.message : String(error)}`);
+      process.exitCode = 1;
+    }
+    return;
+  }
+
   const health = await provider.healthCheck();
-  console.log(`  health:    ${health.health}`);
-  console.log(`  connected: ${health.connected}`);
-  console.log(`  models:    ${health.modelCount}`);
-  if (health.message) console.log(`  detail:    ${health.message}`);
+  printProviderStatus(health);
   if (!health.connected) process.exitCode = 1;
+}
+
+function printProviderStatus(status: ProviderStatus): void {
+  console.log(`  health:    ${status.health}`);
+  console.log(`  connected: ${status.connected}`);
+  console.log(`  models:    ${status.modelCount}`);
+  if (status.message) console.log(`  detail:    ${status.message}`);
 }

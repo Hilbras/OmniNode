@@ -3,6 +3,7 @@ import { ProviderError } from "../src/errors/index.js";
 import { authHeaders, resolveApiKey } from "../src/providers/auth.js";
 import { createProvider, OPENAI_COMPATIBLE_TYPES } from "../src/providers/factory.js";
 import { OpenAICompatibleProvider } from "../src/providers/openai-compatible/index.js";
+import { OmniHilbrasProvider } from "../src/providers/omnihilbras/index.js";
 import type { ProviderConfig, ProviderType } from "../src/types/provider.js";
 
 afterEach(() => {
@@ -204,12 +205,8 @@ describe("createProvider", () => {
     expect(provider).toBeInstanceOf(OpenAICompatibleProvider);
   });
 
-  it("defers omnihilbras to Phase 2", () => {
-    expect(() => createProvider({ ...baseConfig, type: "omnihilbras" })).toThrow(
-      expect.objectContaining({
-        code: "NOT_IMPLEMENTED",
-        message: expect.stringContaining("Phase 2"),
-      }),
-    );
+  it("builds the dedicated OmniHilbras adapter", () => {
+    const provider = createProvider({ ...baseConfig, type: "omnihilbras" });
+    expect(provider).toBeInstanceOf(OmniHilbrasProvider);
   });
 });

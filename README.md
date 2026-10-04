@@ -18,7 +18,7 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v0.2.0 — Phase 1: Provider Infrastructure** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
+**v0.3.0 — Phase 2: OmniHilbras Integration** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
 for the full plan and roadmap).
 
 What exists today:
@@ -32,8 +32,9 @@ What exists today:
   - Health checks: connectivity, authentication and server-error classification
   - Authentication from environment variables only — keys never touch config files
   - Chat completions (`IChatProvider`) — the foundation for the planner phases
-  - Provider factory mapping config to adapters (OmniHilbras gets a dedicated
-    adapter in Phase 2)
+  - Provider factory mapping config to adapters; `omnihilbras` gets a
+    dedicated adapter implementing the plan's connect flow —
+    Connect → Authenticate → Fetch Models → Validate Models → Register
 - Typed error hierarchy (`src/errors/`)
 - Leveled logger with pluggable sink (`src/logger/`)
 - Configuration system: `omninode.yaml` with `${ENV_VAR}` expansion and strict
@@ -105,8 +106,8 @@ Phases 0–11 are laid out in [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.m
 | Version | Milestone |
 | --- | --- |
 | v0.1.0 | Foundation |
-| **v0.2.0** | **Provider System (current)** |
-| v0.3.0 | OmniHilbras Integration (optional, like every provider) |
+| v0.2.0 | Provider System |
+| **v0.3.0** | **OmniHilbras Integration (current)** |
 | v0.4.0 | Agent System |
 | v0.5.0 | Roles & Tasks |
 | v0.6.0 | Pipeline Engine |
@@ -127,6 +128,24 @@ npm install -g @hilbras/omninode
 ```
 
 Or use it as a library: `npm install @hilbras/omninode`.
+
+## Connecting OmniHilbras
+
+OmniHilbras is one provider source among many — always optional. The core
+architectural rule stands: OmniNode runs with **zero Hilbras dependencies**.
+
+The dedicated adapter implements the plan's connect flow on top of the
+gateway's OpenAI-compatible API surface and tags discovered models with
+`gateway: omnihilbras` metadata:
+
+```bash
+omninode provider add --name omnihilbras --type omnihilbras \
+  --base-url https://your-omnihbras-host/v1 \
+  --api-key-env-var OMNIHILBRAS_API_KEY
+
+omninode provider test omnihilbras --connect   # full connect flow + registration
+omninode models omnihilbras                    # list the gateway's models
+```
 
 ## License
 
