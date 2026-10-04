@@ -5,5 +5,5 @@ export { validateWorkingDirectory } from "./cwd.js";
 export type { CwdValidation } from "./cwd.js";
 export { AgentAdapterRegistry, ProcessAgentAdapter } from "./adapters.js";
 export type { IAgentAdapter } from "./adapters.js";
-export { createAgent, buildAgentRegistry } from "./factory.js";
+export { createAgent, buildAgentRegistry, defaultAgentAdapters } from "./factory.js";
 export { AgentRegistry } from "./registry.js";

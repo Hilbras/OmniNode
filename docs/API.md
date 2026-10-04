@@ -1,5 +1,18 @@
 # Public API Inventory
 
+The package root (`@hilbras/omninode`) is the entire public surface. Only
+intentional APIs are exported from it; implementation details live in their
+modules and are not reachable by consumers (the package `exports` map exposes
+the root only).
+
+Two CI guards keep it that way:
+
+- `tests/api-surface.test.ts` — every documented export still exists.
+- `tests/public-api.test.ts` — internal helpers (`keywords`, `applyDefaults`,
+  `decodeStream`, …) stay unexported, the surface stays within its expected
+  size, and `createProvider` / `createAgent` / `createMemoryProvider` validate
+  their arguments at runtime for callers who bypass the configuration schema.
+
 Everything exported from the package root, grouped by subsystem, with the
 stability tier from [API_STABILITY.md](API_STABILITY.md).
 

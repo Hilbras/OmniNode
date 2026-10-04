@@ -142,6 +142,7 @@ describe("separation: OmniNode works without OmniHilbras (§11 exit criterion)",
         const source = readFileSync(full, "utf8");
         const referencesHilbras = source.includes("omnihilbras") || source.includes("OmniHilbras");
         const allowed =
+          full === path.join(root, "index.ts") || // public barrel re-exports the adapter
           full.includes(path.join("providers", "omnihilbras")) ||
           full.endsWith(path.join("providers", "factory.ts")) ||
           full.includes(path.join("config", "schema.ts")) || // the type union + config schema

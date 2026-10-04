@@ -3,7 +3,7 @@
  * Custom and local gateways ride the OpenAI-compatible adapter unless a
  * dedicated one exists.
  */
-import { OmniNodeError } from "../errors/index.js";
+import { ConfigError, OmniNodeError } from "../errors/index.js";
 import type { AuditSink } from "../audit/index.js";
 import type { IChatProvider, ProviderConfig, ProviderType } from "../types/provider.js";
 import { OmniHilbrasProvider } from "./omnihilbras/index.js";
@@ -23,7 +23,23 @@ export interface CreateProviderOptions {
   env?: Record<string, string | undefined>;
 }
 
+function assertProviderConfig(config: ProviderConfig): void {
+  // Library consumers bypass the config schema — validate here (§23).
+  if (!config.name || config.name.trim().length === 0) {
+    throw new ConfigError("CONFIG_INVALID", "Provider name must not be empty.");
+  }
+  if (!config.baseUrl || config.baseUrl.trim().length === 0) {
+    throw new ConfigError("CONFIG_INVALID", `Provider "${config.name}" needs a baseUrl.`);
+  }
+  try {
+    new URL(config.baseUrl);
+  } catch {
+    throw new ConfigError("CONFIG_INVALID", `Provider "${config.name}" has an invalid baseUrl: ${config.baseUrl}`);
+  }
+}
+
 export function createProvider(config: ProviderConfig, options: CreateProviderOptions = {}): IChatProvider {
+  assertProviderConfig(config);
   const shared = {
     ...(options.env !== undefined ? { env: options.env } : {}),
     ...(options.audit !== undefined ? { audit: options.audit } : {}),

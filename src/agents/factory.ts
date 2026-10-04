@@ -3,7 +3,7 @@
  * "cli" agent configs are mapped to the process integration by the loader.
  */
 import type { AppConfig } from "../config/index.js";
-import { OmniNodeError } from "../errors/index.js";
+import { ConfigError, OmniNodeError } from "../errors/index.js";
 import { logger, type Logger } from "../logger/index.js";
 import type { AgentConfig, IAgent } from "../types/agent.js";
 import { ProcessAgent } from "./process/index.js";
@@ -17,7 +17,18 @@ import { AgentAdapterRegistry, ProcessAgentAdapter } from "./adapters.js";
 export const defaultAgentAdapters = new AgentAdapterRegistry();
 defaultAgentAdapters.register(new ProcessAgentAdapter((config) => new ProcessAgent(config)));
 
+function assertAgentConfig(config: AgentConfig): void {
+  if (!config.name || config.name.trim().length === 0) {
+    throw new ConfigError("CONFIG_INVALID", "Agent name must not be empty.");
+  }
+  if (config.integration === "process" && (!config.command || config.command.trim().length === 0)) {
+    // Programmatic callers bypass the config schema — validate here (§23).
+    throw new ConfigError("CONFIG_INVALID", `Agent "${config.name}" needs a command for the process adapter.`);
+  }
+}
+
 export function createAgent(config: AgentConfig, adapters: AgentAdapterRegistry = defaultAgentAdapters): IAgent {
+  assertAgentConfig(config);
   const registered = adapters.get(config.integration);
   if (registered) return registered.create(config);
   if (config.integration === "native") {

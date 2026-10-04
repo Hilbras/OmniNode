@@ -4,6 +4,33 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.19] — v2 Phase 19 (API & Package Quality)
+
+### Changed
+
+- **Curated public API** (§23): the package root now exports an explicit,
+  intentional surface instead of `export *` from every module. Domain types
+  remain fully public; granular internals (memory scoring helpers, config
+  composition internals, protocol session plumbing) are no longer reachable by
+  consumers — the `exports` map exposes the root only.
+- **Runtime validation at external boundaries**: `createProvider`,
+  `createAgent` and `createMemoryProvider` validate their arguments for
+  library callers who bypass the configuration schema (empty names, invalid or
+  missing `baseUrl`, process agents without a command, memory providers
+  without `base_url`, unknown providers).
+- The OmniHilbras separation guard now treats the public barrel as an
+  allowed reference (the barrel legitimately re-exports the adapter; leaks are
+  covered by the new public-API guard).
+
+### Added
+
+- `tests/public-api.test.ts`: asserts withheld internals stay withheld, the
+  surface stays within its documented size, and boundary validation fires.
+- Verified package contents and metadata: the tarball ships `dist/` plus
+  LICENSE, README and package.json — no tests, sources or local state — with
+  complete metadata (repository, homepage, bugs, license, engines, exports,
+  types, files).
+
 ## [2.0.0-alpha.18] — v2 Phase 18 (Documentation Overhaul)
 
 ### Added

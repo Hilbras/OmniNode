@@ -58,8 +58,8 @@ release — is in progress**, shipping as tagged prereleases (`v2.0.0-alpha.N`).
 | 16 | Configuration v2 | precedence, profiles, `OMNINODE_*`, diagnostics |
 | 17 | Testing expansion | explicit failure matrix + regression tests |
 | 18 | Documentation overhaul | complete document set, rewritten README |
-| 19 | Package quality | public exports, runtime validation, npm contents (next) |
-| 20–24 | Performance · developer experience · CI/CD · migration tooling · final hardening | planned |
+| 19 | API & package quality | curated public surface with CI guards, boundary validation, verified package contents |
+| 20–24 | Performance · developer experience · CI/CD · migration tooling · final hardening | next: performance |
 
 The roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the completed v1 plan is
 [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md).

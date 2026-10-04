@@ -88,6 +88,8 @@ interface StepContext {
   pipelineRunId?: string;
 }
 
+export type { IPipelineExecutor };
+
 export class PipelineEngine implements IPipelineExecutor {
   private readonly log: Logger;
   /** Runs executing in THIS process — cancellation can terminate them directly. */
