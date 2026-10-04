@@ -6,6 +6,7 @@ import { isOmniNodeError } from "../errors/index.js";
 import { registerInitCommand } from "./commands/init.js";
 import { registerProjectCommands } from "./commands/project.js";
 import { registerProviderCommands } from "./commands/providers.js";
+import { registerModelsCommand } from "./commands/models.js";
 import { registerAgentCommands } from "./commands/agents.js";
 import { registerRoleCommands } from "./commands/roles.js";
 import { registerTaskCommands } from "./commands/tasks.js";
@@ -29,6 +30,7 @@ export function createProgram(): Command {
   registerRoleCommands(program);
   registerTaskCommands(program);
   registerReportCommands(program);
+  registerModelsCommand(program);
 
   return program;
 }

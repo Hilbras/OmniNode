@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { loadConfig } from "../../config/index.js";
-import { notImplemented } from "./providers.js";
+import { notImplemented } from "./shared.js";
 
 export function registerAgentCommands(program: Command): void {
   const agent = program

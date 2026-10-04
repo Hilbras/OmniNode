@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { notImplemented } from "./providers.js";
+import { notImplemented } from "./shared.js";
 
 export function registerReportCommands(program: Command): void {
   const report = program

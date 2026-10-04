@@ -18,22 +18,29 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v0.1.0 — Phase 0: Foundation** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
+**v0.2.0 — Phase 1: Provider Infrastructure** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
 for the full plan and roadmap).
 
 What exists today:
 
 - Core type contracts: provider, model, agent, role, task, report, pipeline,
   protocol, memory (`src/types/`)
+- **Provider system** (`src/providers/`, `src/registry/`):
+  - OpenAI-compatible adapter — works with OpenAI, OpenRouter, local runtimes
+    (Ollama, LM Studio, vLLM) and custom gateways exposing `/models` and `/chat/completions`
+  - Model discovery with normalization into the model registry (`provider:model` keys)
+  - Health checks: connectivity, authentication and server-error classification
+  - Authentication from environment variables only — keys never touch config files
+  - Chat completions (`IChatProvider`) — the foundation for the planner phases
+  - Provider factory mapping config to adapters (OmniHilbras gets a dedicated
+    adapter in Phase 2)
 - Typed error hierarchy (`src/errors/`)
 - Leveled logger with pluggable sink (`src/logger/`)
 - Configuration system: `omninode.yaml` with `${ENV_VAR}` expansion and strict
   validation (`src/config/`)
-- CLI with `init`, `provider list`, `agent list`, `role list`, and honest
-  stubs for the phase-dependent commands (`src/cli/`)
+- CLI: `init`, `provider add/list/test`, `models`, `agent list`, `role list`,
+  and honest stubs for the phase-dependent commands (`src/cli/`)
 - Test infrastructure (Vitest) and CI (GitHub Actions)
-
-Nothing here depends on any provider or agent — that is the point of Phase 0.
 
 ## Requirements
 
@@ -53,8 +60,17 @@ npm run omninode -- --help
 Start a project:
 
 ```bash
-omninode init            # writes omninode.yaml in the current directory
-omninode provider list   # validates and lists configured providers
+omninode init                 # writes omninode.yaml in the current directory
+
+# Register a provider and verify it end to end
+omninode provider add --name my-gateway --type openai-compatible \
+  --base-url https://example.com/v1 --api-key-env-var MY_API_KEY
+omninode provider test my-gateway
+
+# Discover models into the registry
+omninode models
+omninode models my-gateway --capability chat
+
 omninode agent list
 omninode role list
 ```
@@ -88,8 +104,8 @@ Phases 0–11 are laid out in [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.m
 
 | Version | Milestone |
 | --- | --- |
-| v0.1.0 | Foundation (this release) |
-| v0.2.0 | Provider System |
+| v0.1.0 | Foundation |
+| **v0.2.0** | **Provider System (current)** |
 | v0.3.0 | OmniHilbras Integration (optional, like every provider) |
 | v0.4.0 | Agent System |
 | v0.5.0 | Roles & Tasks |

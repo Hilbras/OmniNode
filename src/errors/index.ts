@@ -3,6 +3,7 @@
 export type OmniNodeErrorCode =
   | "CONFIG_NOT_FOUND"
   | "CONFIG_INVALID"
+  | "PROVIDER_NOT_FOUND"
   | "PROVIDER_UNAVAILABLE"
   | "PROVIDER_AUTH_FAILED"
   | "MODEL_NOT_FOUND"
@@ -48,7 +49,11 @@ export class ConfigError extends OmniNodeError {
 
 export class ProviderError extends OmniNodeError {
   constructor(
-    code: "PROVIDER_UNAVAILABLE" | "PROVIDER_AUTH_FAILED" | "MODEL_NOT_FOUND",
+    code:
+      | "PROVIDER_NOT_FOUND"
+      | "PROVIDER_UNAVAILABLE"
+      | "PROVIDER_AUTH_FAILED"
+      | "MODEL_NOT_FOUND",
     message: string,
     options: OmniNodeErrorOptions = {},
   ) {

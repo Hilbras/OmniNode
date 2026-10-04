@@ -1,4 +1,5 @@
 export * from "./agent.js";
+export * from "./chat.js";
 export * from "./memory.js";
 export * from "./model.js";
 export * from "./pipeline.js";

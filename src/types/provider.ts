@@ -2,6 +2,7 @@
  * Provider abstraction. OmniNode is provider-agnostic: any AI gateway or local
  * runtime plugs in through this interface (DEVELOPMENT_PLAN.md §5–§7).
  */
+import type { ChatRequest, ChatResponse } from "./chat.js";
 import type { ModelInfo } from "./model.js";
 
 export type ProviderType =
@@ -46,4 +47,9 @@ export interface IProvider {
   listModels(): Promise<ModelInfo[]>;
   /** Check connectivity and authentication. */
   healthCheck(): Promise<ProviderStatus>;
+}
+
+/** Contract for providers that can run chat completions (foundation for planning). */
+export interface IChatProvider extends IProvider {
+  chat(request: ChatRequest): Promise<ChatResponse>;
 }
