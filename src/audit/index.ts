@@ -3,7 +3,7 @@
  * (task/pipeline transitions) in the project's .omninode directory. Useful
  * for compliance reviews and debugging multi-agent runs.
  */
-import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rename, stat } from "node:fs/promises";
 import { dirname } from "node:path";
 import { logger, type Logger } from "../logger/index.js";
 
@@ -49,19 +49,41 @@ export interface AuditSink {
   record(event: AuditEvent): Promise<void>;
 }
 
+/** Default rotation threshold: the audit log is rotated past this size (§24). */
+export const DEFAULT_AUDIT_MAX_BYTES = 5 * 1024 * 1024;
+
 /** Append-only JSONL sink. Failures are logged, never propagated. */
+
 export class FileAuditLog implements AuditSink {
   private readonly filePath: string;
+  private readonly maxBytes: number;
   private readonly log: Logger;
 
-  constructor(directory = `${process.cwd()}/.omninode`, log: Logger = logger) {
+  constructor(
+    directory = `${process.cwd()}/.omninode`,
+    log: Logger = logger,
+    maxBytes: number = DEFAULT_AUDIT_MAX_BYTES,
+  ) {
     this.filePath = `${directory}/audit.jsonl`;
+    this.maxBytes = maxBytes;
     this.log = log.child({ component: "audit" });
+  }
+
+  /** Rotates the log once it passes the size budget, keeping one backup. */
+  private async rotateIfNeeded(): Promise<void> {
+    try {
+      const stats = await stat(this.filePath);
+      if (stats.size <= this.maxBytes) return;
+      await rename(this.filePath, `${this.filePath}.1`);
+    } catch {
+      // No log yet, or rotation raced — nothing to do.
+    }
   }
 
   async record(event: AuditEvent): Promise<void> {
     try {
       await mkdir(dirname(this.filePath), { recursive: true });
+      await this.rotateIfNeeded();
       // Append-only: a crash can tear the last line, which `recent()` skips.
       // fsync-per-event would make every execution wait on the disk.
       await appendFile(this.filePath, `${JSON.stringify(event)}\n`, "utf8");

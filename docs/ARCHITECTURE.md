@@ -77,6 +77,24 @@ PipelineDefinition ──run()──▶ PipelineRun (attempt, cancellationReques
   reported as interrupted; `omninode pipeline retry <run-id>` re-runs it.
   This is state understanding, not replay.
 
+## Resource limits (v2 Phase 20)
+
+Every unbounded-growth path has a budget:
+
+| Resource | Limit | Where |
+| --- | --- | --- |
+| Agent stdout / stderr | 5 MiB per stream (agent is killed past it) | `max_output_bytes` |
+| Single report | 256 KiB (rejected with diagnostics) | `MAX_REPORT_BYTES` |
+| Findings per combined report | 200 groups (excess counted in `metadata.findingsTruncated`) | `MAX_COMBINED_FINDINGS` |
+| Protocol message | 1 MiB | `MAX_MESSAGE_BYTES` |
+| Injected memory context | 4 000 chars | `MAX_CONTEXT_CHARS` |
+| Pipeline combined context | 20 000 chars (oldest trimmed, marked) | `budgetContext` |
+| Concurrent steps per wave | 8 | `maxParallelSteps` |
+| Audit log on disk | 5 MiB, then rotated (one backup) | `DEFAULT_AUDIT_MAX_BYTES` |
+
+Child pipes are destroyed when a run settles, and store/audit writes are
+serialized, so long-lived CLI processes do not accumulate handles.
+
 ## Audit & observability (v2 Phase 14)
 
 Audit events are append-only JSONL in `.omninode/audit.jsonl`, each carrying

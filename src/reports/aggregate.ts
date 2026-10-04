@@ -26,12 +26,17 @@ const SEVERITY_RANK: Record<FindingSeverity, number> = {
   critical: 4,
 };
 
+/** Default cap on retained finding groups per combined report (§24, memory). */
+export const MAX_COMBINED_FINDINGS = 200;
+
 export interface AggregateOptions {
   objective?: string;
   pipelineRunId?: string;
   taskIds?: string[];
   /** Token-set Jaccard similarity above which findings are merged. */
   similarityThreshold?: number;
+  /** Cap on retained finding groups; excess is counted in metadata. */
+  maxFindings?: number;
 }
 
 export function aggregateReports(reports: Report[], options: AggregateOptions = {}): CombinedReport {
@@ -59,6 +64,11 @@ export function aggregateReports(reports: Report[], options: AggregateOptions = 
       group.severity !== undefined &&
       new Set(Object.values(group.severityBySource ?? {})).size === 1,
   );
+  // Bound memory: keep the highest-severity groups, count the rest (§24).
+  const maxFindings = options.maxFindings ?? MAX_COMBINED_FINDINGS;
+  const orderedFindings = findingGroups.sort((a, b) => rank(b) - rank(a));
+  const retainedFindings = orderedFindings.slice(0, maxFindings);
+  const droppedFindings = orderedFindings.length - retainedFindings.length;
   const disputed = conflicts.length;
   const summary =
     `${reports.length} report(s) from ${sources.length > 0 ? sources.join(", ") : "no agents"}: ` +
@@ -73,7 +83,7 @@ export function aggregateReports(reports: Report[], options: AggregateOptions = 
     ...(options.pipelineRunId !== undefined ? { pipelineRunId: options.pipelineRunId } : {}),
     taskIds: options.taskIds ?? [],
     summary,
-    findings: findingGroups.sort((a, b) => rank(b) - rank(a)),
+    findings: retainedFindings,
     agreements,
     conflicts,
     recommendations: recommendationGroups,
@@ -87,6 +97,7 @@ export function aggregateReports(reports: Report[], options: AggregateOptions = 
       findingGroups: findingGroups.length,
       agreements: agreements.length,
       conflicts: conflicts.length,
+      findingsTruncated: droppedFindings,
     },
   };
 }

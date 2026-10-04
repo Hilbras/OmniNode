@@ -106,7 +106,15 @@ export type {
 } from "./tasks/index.js";
 
 // Pipelines
-export { PipelineEngine, buildPipelineEngine, createDefaultChatFn, FilePipelineRunStore } from "./pipelines/index.js";
+export {
+  PipelineEngine,
+  buildPipelineEngine,
+  createDefaultChatFn,
+  FilePipelineRunStore,
+  budgetContext,
+  DEFAULT_MAX_PARALLEL_STEPS,
+  MAX_COMBINED_CONTEXT_CHARS,
+} from "./pipelines/index.js";
 export type {
   PipelineRunStore,
   PipelineRunFilter,
@@ -126,6 +134,7 @@ export {
   normalizeFinding,
   FileReportStore,
   MAX_REPORT_BYTES,
+  MAX_COMBINED_FINDINGS,
 } from "./reports/index.js";
 export type { ReportStore, ReportFilter, CombinedReportFilter } from "./reports/index.js";
 
@@ -167,7 +176,7 @@ export type {
 } from "./memory/index.js";
 
 // Audit & persistence
-export { FileAuditLog } from "./audit/index.js";
+export { FileAuditLog, DEFAULT_AUDIT_MAX_BYTES } from "./audit/index.js";
 export type { AuditEvent, AuditAction, AuditSink } from "./audit/index.js";
 export {
   JsonFileStore,

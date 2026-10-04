@@ -145,6 +145,11 @@ export class ProcessAgent implements IAgent {
         clearTimeout(timer);
         this.running.delete(input.taskId);
         GLOBAL_RUNNING.delete(child);
+        // Release the pipes deterministically so long-lived CLI processes
+        // (watch mode, servers) do not accumulate handles (§24).
+        child.stdin?.destroy();
+        child.stdout?.destroy();
+        child.stderr?.destroy();
         finish();
       };
 

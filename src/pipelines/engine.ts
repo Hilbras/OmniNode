@@ -29,7 +29,7 @@ export type { ChatFn };
 import type { Plan } from "../types/plan.js";
 import type { Report } from "../types/report.js";
 import type { ReportService } from "../reports/index.js";
-import { aggregateReports } from "../reports/aggregate.js";
+import { aggregateReports, MAX_COMBINED_FINDINGS } from "../reports/aggregate.js";
 import type { AuditSink } from "../audit/index.js";
 import type { IPlanner } from "../planner/index.js";
 import type { PlanStore } from "../planner/store.js";
@@ -53,6 +53,10 @@ export interface PipelineEngineOptions {
   audit?: AuditSink;
   /** When present, finished runs have their reports collected, stored and combined (§16–§17). */
   reports?: ReportService;
+  /** Max steps executed concurrently within one wave (§24 execution-storm guard). */
+  maxParallelSteps?: number;
+  /** Combined-context budget in characters (§24 memory bound). */
+  maxContextChars?: number;
   log?: Logger;
 }
 
@@ -78,6 +82,7 @@ interface StepOutcome {
 
 interface StepContext {
   objective: string;
+  maxContextChars?: number;
   runId?: string;
   /** Definition id (correlates events with the pipeline, not just the run). */
   pipelineDefId?: string;
@@ -89,6 +94,22 @@ interface StepContext {
 }
 
 export type { IPipelineExecutor };
+
+/** Default cap on steps running concurrently in one wave (§24). */
+export const DEFAULT_MAX_PARALLEL_STEPS = 8;
+
+/** Default combined-context budget for downstream steps (§24). */
+export const MAX_COMBINED_CONTEXT_CHARS = 20_000;
+
+/** Keeps the most recent context within budget, marking what was dropped. */
+export function budgetContext(
+  context: string,
+  maxChars = MAX_COMBINED_CONTEXT_CHARS,
+): string {
+  if (context.length <= maxChars) return context;
+  const marker = "\n[earlier context trimmed]\n";
+  return marker + context.slice(context.length - (maxChars - marker.length));
+}
 
 export class PipelineEngine implements IPipelineExecutor {
   private readonly log: Logger;
@@ -305,24 +326,35 @@ export class PipelineEngine implements IPipelineExecutor {
         throw new PipelineError("PIPELINE_FAILED", `Pipeline "${def.id}" scheduling stalled.`);
       }
 
-      const settled = await Promise.all(
-        ready.map(async (step): Promise<StepOutcome> => {
+      const settled: StepOutcome[] = [];
+      const limit = Math.max(1, this.options.maxParallelSteps ?? DEFAULT_MAX_PARALLEL_STEPS);
+      for (let offset = 0; offset < ready.length; offset += limit) {
+        const batch = ready.slice(offset, offset + limit);
+        settled.push(
+          ...(await Promise.all(
+            batch.map(async (step): Promise<StepOutcome> => {
           if (!this.shouldRun(step, deps.get(step.id) ?? [], outcomes)) {
             return { status: "skipped", summary: "", taskIds: [], reports: [] };
           }
           const ctx: StepContext = {
+            maxContextChars: this.options.maxContextChars,
             objective,
             ...(role ? { role } : {}),
-            combinedContext: contextParts.join("\n\n"),
+            combinedContext: budgetContext(
+              contextParts.join("\n\n"),
+              this.options.maxContextChars ?? MAX_COMBINED_CONTEXT_CHARS,
+            ),
             reports: [...allReports],
             pipelineRunId: run.id,
             runId: run.id,
             pipelineDefId: def.id,
             taskId: run.id,
           };
-          return this.executeStep(step, ctx);
-        }),
-      );
+              return this.executeStep(step, ctx);
+            }),
+          )),
+        );
+      }
 
       ready.forEach((step, index) => {
         const outcome = settled[index]!;
@@ -602,7 +634,14 @@ export class PipelineEngine implements IPipelineExecutor {
   private async runPlan(step: PipelineStep, ctx: StepContext): Promise<StepOutcome> {
     // §15 Planner Input: task, reports, aggregated findings (consensus +
     // conflicts), context, role and step constraints.
-    const aggregated = ctx.reports.length > 0 ? aggregateReports(ctx.reports) : undefined;
+    const aggregated =
+      ctx.reports.length > 0
+        ? aggregateReports(ctx.reports, {
+            ...(step.constraints !== undefined && step.constraints.length > 0
+              ? { maxFindings: MAX_COMBINED_FINDINGS }
+              : {}),
+          })
+        : undefined;
     const request = {
       objective: ctx.objective,
       reports: ctx.reports,

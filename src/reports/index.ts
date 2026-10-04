@@ -4,7 +4,7 @@ export type { CollectionDiagnostics } from "./service.js";
 export type { CombinedMeta } from "./service.js";
 export { extractReportFromText } from "./extract.js";
 export type { ExtractionMeta } from "./extract.js";
-export { aggregateReports, similar, detectConflicts } from "./aggregate.js";
+export { aggregateReports, similar, detectConflicts, MAX_COMBINED_FINDINGS } from "./aggregate.js";
 export { validateReport, normalizeEvidence, normalizeFinding } from "./schema.js";
 export type { ReportValidationIssue, ReportValidationResult } from "./schema.js";
 export type { AggregateOptions } from "./aggregate.js";

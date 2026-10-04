@@ -4,6 +4,31 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.20] — v2 Phase 20 (Performance & Resource Management)
+
+### Added
+
+- **Bounded combined reports** (§24): at most `MAX_COMBINED_FINDINGS` (200)
+  finding groups are retained — highest severity first — and the excess is
+  counted in `metadata.findingsTruncated` instead of growing without limit.
+- **Bounded pipeline context**: `budgetContext()` keeps the most recent
+  20 000 characters (`MAX_COMBINED_CONTEXT_CHARS`), marking trimmed earlier
+  context so nothing silently disappears without a trace.
+- **Bounded scheduling**: at most `maxParallelSteps` (default 8) steps run
+  concurrently per wave — an execution storm is throttled rather than
+  spawned.
+- **Bounded audit log** (`§24`): the JSONL log rotates to
+  `audit.jsonl.1` once it passes `DEFAULT_AUDIT_MAX_BYTES` (5 MiB).
+- **Deterministic resource release**: child stdin/stdout/stderr are destroyed
+  when a run settles, so long-lived CLI processes do not accumulate handles.
+
+### Tests
+
+472 (was 465): report cap + truncation metadata, context budgeting, audit
+rotation, a four-step wave throttled to two concurrent steps, handle growth
+over 25 sequential agent runs, and serialized audit/store writes under
+concurrent writers.
+
 ## [2.0.0-alpha.19] — v2 Phase 19 (API & Package Quality)
 
 ### Changed
