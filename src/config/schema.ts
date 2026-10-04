@@ -65,6 +65,8 @@ export const pipelineStepConfigSchema = z
     depends_on: z.array(z.string()).optional(),
     retries: z.number().int().min(0).max(10).optional(),
     condition: z.enum(["always", "on-success", "on-failure"]).optional(),
+    /** Constraints passed to the planner for plan steps (§15). */
+    constraints: z.array(z.string()).optional(),
   })
   .strict();
 

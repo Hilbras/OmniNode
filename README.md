@@ -18,7 +18,7 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v2.0.0-alpha.10 — v2 Phase 10: Aggregation Improvements**
+**v2.0.0-alpha.11 — v2 Phase 11: Planner v2**
 (the reliability & interoperability line: architecture → execution →
 protocol → adapters → pipelines → providers → OmniHilbras → memory → reports) (the v2
 roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the v1 plan is complete:
@@ -31,6 +31,13 @@ for the plan and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design).
 
 ### What's new in v2 (so far)
 
+- **Phase 11 — Planner v2**: the planner now receives the full §15 input —
+  task, project context, agent reports, **aggregated findings (consensus and
+  conflicts included)**, memory and **constraints** (settable per pipeline
+  step). Plans carry an explicit goal, every generated plan is **schema
+  validated**, invalid output produces a **structured error** or falls back to
+  heuristic planning, and a guard test proves the planner module depends on no
+  specific provider.
 - **Phase 10 — Aggregation Improvements**: when agents disagree,
   OmniNode now says so instead of flattening the answer — **conflict
   detection** preserves every position (severity spread, divergent

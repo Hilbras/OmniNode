@@ -29,6 +29,7 @@ export type { ChatFn };
 import type { Plan } from "../types/plan.js";
 import type { Report } from "../types/report.js";
 import type { ReportService } from "../reports/index.js";
+import { aggregateReports } from "../reports/aggregate.js";
 import type { AuditSink } from "../audit/index.js";
 import type { IPlanner } from "../planner/index.js";
 import type { PlanStore } from "../planner/store.js";
@@ -588,11 +589,18 @@ export class PipelineEngine implements IPipelineExecutor {
   }
 
   private async runPlan(step: PipelineStep, ctx: StepContext): Promise<StepOutcome> {
+    // §15 Planner Input: task, reports, aggregated findings (consensus +
+    // conflicts), context, role and step constraints.
+    const aggregated = ctx.reports.length > 0 ? aggregateReports(ctx.reports) : undefined;
     const request = {
       objective: ctx.objective,
       reports: ctx.reports,
+      ...(aggregated !== undefined ? { aggregated } : {}),
       ...(ctx.combinedContext.length > 0 ? { context: ctx.combinedContext } : {}),
       ...(ctx.role ? { role: ctx.role } : {}),
+      ...(step.constraints !== undefined && step.constraints.length > 0
+        ? { constraints: step.constraints }
+        : {}),
       ...(ctx.pipelineRunId !== undefined ? { pipelineRunId: ctx.pipelineRunId } : {}),
     };
 

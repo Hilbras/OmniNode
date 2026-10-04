@@ -162,6 +162,7 @@ function toPipelineDefinition(raw: PipelineConfigYaml): PipelineDefinition {
       dependsOn: step.depends_on,
       retries: step.retries,
       condition: step.condition,
+      constraints: step.constraints,
     })),
   };
 }

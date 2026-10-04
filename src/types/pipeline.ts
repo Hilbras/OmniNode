@@ -25,6 +25,8 @@ export interface PipelineStep {
   dependsOn?: string[];
   condition?: PipelineStepCondition;
   retries?: number;
+  /** Constraints handed to the planner for plan steps (§15). */
+  constraints?: string[];
 }
 
 export interface PipelineDefinition {

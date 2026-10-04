@@ -17,6 +17,8 @@ export interface PlanStep {
 export interface Plan {
   id: string;
   objective: string;
+  /** Explicit goal statement (§15, Planner Output). */
+  goal?: string;
   summary: string;
   steps: PlanStep[];
   risks?: string[];

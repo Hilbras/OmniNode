@@ -4,6 +4,34 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.11] — v2 Phase 11 (Planner v2)
+
+### Added
+
+- **Full planner input** (§15): task, project context, agent reports,
+  **aggregated findings** (consensus + conflicts made explicit in the prompt),
+  relevant memory and **constraints**. Plan steps accept `constraints:` in
+  configuration; the pipeline engine aggregates upstream reports and hands
+  the combined findings to the planner.
+- **Plan goal**: plans (and model output) carry an explicit `goal`.
+- **Plan validation** (§15): `validatePlan()` checks steps, duplicate ids,
+  unknown dependencies and summary; every generated plan is validated before
+  it is accepted.
+- **Structured rejection**: invalid model output yields a `PLAN_INVALID`
+  PlannerError carrying `details.reason` + `details.issues`; with a fallback
+  configured the heuristic planner takes over instead.
+- **Planner independence**: a guard test fails if the planner module gains a
+  dependency on any specific provider.
+- Tests: 375 (was 366) — context assembly, validation accept/reject, fallback
+  vs structured error, conflicts-as-risks in heuristic plans, independence
+  guard, and an end-to-end pipeline asserting the planner receives aggregated
+  findings and constraints.
+
+### Changed
+
+- Model planner output contract now requires `goal`; heuristic plans derive a
+  goal and surface unresolved agent disagreements as risks.
+
 ## [2.0.0-alpha.10] — v2 Phase 10 (Aggregation Improvements)
 
 ### Added

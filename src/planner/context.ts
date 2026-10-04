@@ -1,14 +1,17 @@
 /**
- * Planner context builder (§18): assembles everything the planner needs —
- * the objective, the combined findings from the AI reports (with source
- * attribution), relevant memory and the role definition — into one
- * structured text.
+ * Planner context builder (§15, Planner Input): assembles the original task,
+ * project context, agent reports, aggregated findings, relevant memory and
+ * constraints into one structured input, in that order.
  */
 import type { PlanRequest } from "./types.js";
 import type { Report } from "../types/report.js";
 
 export function buildPlannerContext(request: PlanRequest): string {
-  const parts: string[] = [`# Objective\n${request.objective}`];
+  const parts: string[] = [`# Task\n${request.objective}`];
+
+  if (request.projectContext) {
+    parts.push(`# Project context\n${request.projectContext}`);
+  }
 
   if (request.role) {
     const roleLines = [`# Role\n${request.role.name} (${request.role.id})`];
@@ -31,7 +34,7 @@ export function buildPlannerContext(request: PlanRequest): string {
       ),
     );
     parts.push(
-      `# Findings (${request.reports.length} report(s) by ${agents})\n` +
+      `# Agent reports (${request.reports.length} by ${agents})\n` +
         (findingLines.length > 0 ? findingLines.join("\n") : "(no findings reported)"),
     );
 
@@ -41,9 +44,21 @@ export function buildPlannerContext(request: PlanRequest): string {
     if (recommendationLines.length > 0) {
       parts.push(`# Recommendations\n${recommendationLines.join("\n")}`);
     }
+  }
 
-    const summaryLines = request.reports.map((report) => `- [${report.agent}] ${report.summary}`);
-    parts.push(`# Report summaries\n${summaryLines.join("\n")}`);
+  if (request.aggregated) {
+    const aggregatedLines = [
+      `- findings: ${request.aggregated.findings.length} (agreements: ${request.aggregated.agreements.length}, conflicts: ${request.aggregated.conflicts.length})`,
+      ...request.aggregated.findings.map(
+        (finding) =>
+          `- [${finding.severity ?? "info"}] ${finding.title} (x${finding.occurrences})`,
+      ),
+      // Conflicts stay visible to the planner — it must plan around disagreement.
+      ...request.aggregated.conflicts.map(
+        (conflict) => `- CONFLICT (${conflict.type}) on "${conflict.findingTitle}": ${conflict.note}`,
+      ),
+    ];
+    parts.push(`# Aggregated findings\n${aggregatedLines.join("\n")}`);
   }
 
   if (request.memory && request.memory.length > 0) {
@@ -53,7 +68,11 @@ export function buildPlannerContext(request: PlanRequest): string {
     );
   }
 
-  if (request.context && request.context.length > 0) {
+  if (request.constraints && request.constraints.length > 0) {
+    parts.push(`# Constraints\n${request.constraints.map((c) => `- ${c}`).join("\n")}`);
+  }
+
+  if (request.context) {
     parts.push(`# Research context\n${request.context}`);
   }
 

@@ -5,8 +5,8 @@
  * heuristic fallback rather than failing the pipeline.
  */
 import { randomBytes } from "node:crypto";
-import { z } from "zod";
 import { PlannerError } from "../errors/index.js";
+import { planJsonSchema, validatePlan } from "./schema.js";
 import { logger, type Logger } from "../logger/index.js";
 import type { Plan, PlanStep } from "../types/plan.js";
 import type { ChatFn, ChatMessage } from "../types/chat.js";
@@ -23,28 +23,6 @@ export interface ModelPlannerOptions {
   fallback?: IPlanner;
   log?: Logger;
 }
-
-const planStepJsonSchema = z
-  .object({
-    id: z.string().optional(),
-    title: z.string().min(1),
-    description: z.string().optional(),
-    order: z.number().int().optional(),
-    targets: z.array(z.string()).optional(),
-    acceptance_criteria: z.array(z.string()).optional(),
-    depends_on: z.array(z.string()).optional(),
-    source_findings: z.array(z.string()).optional(),
-  })
-  .strict();
-
-const planJsonSchema = z
-  .object({
-    summary: z.string().min(1),
-    steps: z.array(planStepJsonSchema).min(1),
-    risks: z.array(z.string()).optional(),
-    notes: z.array(z.string()).optional(),
-  })
-  .strict();
 
 export class ModelPlanner implements IPlanner {
   readonly name = "model";
@@ -63,7 +41,7 @@ export class ModelPlanner implements IPlanner {
           "You are the OmniNode planner. Given the objective and the combined research context, " +
           "produce a final analysis and a prioritized, actionable implementation plan. " +
           "Respond with JSON ONLY (no prose, no code fences) matching exactly this shape: " +
-          '{"summary": string, "steps": [{"id": string, "title": string, "description": string, ' +
+          '{"goal": string, "summary": string, "steps": [{"id": string, "title": string, "description": string, ' +
           '"order": number, "targets": string[], "acceptance_criteria": string[], "source_findings": string[]}], ' +
           '"risks": string[], "notes": string[]}. ' +
           (this.options.instruction ?? ""),
@@ -79,49 +57,87 @@ export class ModelPlanner implements IPlanner {
     }
 
     const parsed = parsePlanJson(responseText);
-    if (!parsed) {
-      return this.degrade(request, "planner model output was not valid plan JSON");
+    if (!parsed.ok) {
+      return this.degrade(request, `planner model output rejected: ${parsed.reason}`, parsed.issues);
     }
 
     const plan: Plan = {
       id: `plan-${Date.now().toString(36)}-${randomBytes(3).toString("hex")}`,
       objective: request.objective,
+      goal: parsed.goal,
       summary: parsed.summary,
       steps: parsed.steps,
       ...(parsed.risks !== undefined ? { risks: parsed.risks } : {}),
       ...(parsed.notes !== undefined ? { notes: parsed.notes } : {}),
+      ...(request.constraints !== undefined && request.constraints.length > 0
+        ? { constraints: request.constraints }
+        : {}),
       generatedBy: `model:${this.options.model}`,
       model: this.options.model,
       ...(request.taskId !== undefined ? { taskId: request.taskId } : {}),
       ...(request.pipelineRunId !== undefined ? { pipelineRunId: request.pipelineRunId } : {}),
       createdAt: new Date().toISOString(),
     };
-    return plan;
+
+    // §15 Validation: every generated plan passes schema validation.
+    const validation = validatePlan(plan);
+    if (!validation.valid) {
+      return this.degrade(request, `generated plan rejected: ${validation.reason}`, validation.issues);
+    }
+    return validation.plan;
   }
 
-  private async degrade(request: PlanRequest, reason: string): Promise<Plan> {
+  private async degrade(
+    request: PlanRequest,
+    reason: string,
+    issues: Array<{ path: string; message: string }> = [],
+  ): Promise<Plan> {
     if (this.options.fallback) {
       this.log.warn(`${reason} — using the heuristic fallback planner.`);
       return this.options.fallback.plan(request);
     }
-    throw new PlannerError("PLANNER_FAILED", `Planner failed: ${reason}.`);
+    // Structured error: the caller sees exactly what was rejected (§15).
+    throw new PlannerError("PLAN_INVALID", `Planner failed: ${reason}.`, {
+      details: { reason, issues },
+    });
   }
 }
 
-/** Extracts and validates the plan JSON from arbitrary model output. */
-export function parsePlanJson(
-  text: string,
-): { summary: string; steps: PlanStep[]; risks?: string[]; notes?: string[] } | undefined {
+export type PlanJsonResult =
+  | { ok: true; goal: string; summary: string; steps: PlanStep[]; risks?: string[]; notes?: string[] }
+  | { ok: false; reason: string; issues: Array<{ path: string; message: string }> };
+
+/** Extracts and validates plan JSON from arbitrary model output (§15). */
+export function parsePlanJson(text: string): PlanJsonResult {
   const unfenced = text.replace(/```(?:json)?/gi, "");
   const start = unfenced.indexOf("{");
   const end = unfenced.lastIndexOf("}");
-  if (start < 0 || end <= start) return undefined;
+  if (start < 0 || end <= start) {
+    return { ok: false, reason: "planner output contained no JSON object", issues: [] };
+  }
+  let json: unknown;
   try {
-    const json: unknown = JSON.parse(unfenced.slice(start, end + 1));
-    const parsed = planJsonSchema.safeParse(json);
-    if (!parsed.success) return undefined;
-
-    const steps: PlanStep[] = parsed.data.steps.map((step, index) => ({
+    json = JSON.parse(unfenced.slice(start, end + 1));
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `planner output was not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+      issues: [],
+    };
+  }
+  const parsed = planJsonSchema.safeParse(json);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      reason: "planner output did not match the plan schema",
+      issues: parsed.error.issues.map((issue) => ({
+        path: issue.path.join(".") || "(root)",
+        message: issue.message,
+      })),
+    };
+  }
+  const steps: PlanStep[] = parsed.data.steps
+    .map((step, index) => ({
       id: step.id ?? `step-${index + 1}`,
       title: step.title,
       description: step.description,
@@ -130,16 +146,16 @@ export function parsePlanJson(
       acceptanceCriteria: step.acceptance_criteria,
       dependsOn: step.depends_on,
       sourceFindings: step.source_findings,
-    }));
-    return {
-      summary: parsed.data.summary,
-      steps: steps.sort((a, b) => a.order - b.order),
-      risks: parsed.data.risks,
-      notes: parsed.data.notes,
-    };
-  } catch {
-    return undefined;
-  }
+    }))
+    .sort((a, b) => a.order - b.order);
+  return {
+    ok: true,
+    goal: parsed.data.goal,
+    summary: parsed.data.summary,
+    steps,
+    risks: parsed.data.risks,
+    notes: parsed.data.notes,
+  };
 }
 
 function describe(error: unknown): string {

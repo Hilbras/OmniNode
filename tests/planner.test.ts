@@ -62,7 +62,7 @@ function chatReturning(text: string) {
 describe("buildPlannerContext", () => {
   it("includes objective, role, findings with sources, and memory", () => {
     const context = buildPlannerContext(request);
-    expect(context).toContain("# Objective\nharden the authentication module");
+    expect(context).toContain("# Task\nharden the authentication module");
     expect(context).toContain("# Role\nPlanner (planner)");
     expect(context).toContain("[critical] Broken JWT validation (source: kimi, finding: f1)");
     expect(context).toContain("Add signature verification middleware (source: gemini)");
@@ -94,10 +94,13 @@ describe("HeuristicPlanner", () => {
 describe("parsePlanJson", () => {
   it("parses fenced JSON and maps snake_case fields", () => {
     const parsed = parsePlanJson(
-      '```json\n{"summary":"s","steps":[{"title":"t","acceptance_criteria":["a"],"source_findings":["f1"]}]}\n```',
+      '```json\n{"goal":"g","summary":"s","steps":[{"title":"t","acceptance_criteria":["a"],"source_findings":["f1"]}]}\n```',
     );
-    expect(parsed?.summary).toBe("s");
-    expect(parsed?.steps[0]).toMatchObject({
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.goal).toBe("g");
+    expect(parsed.summary).toBe("s");
+    expect(parsed.steps[0]).toMatchObject({
       id: "step-1",
       title: "t",
       acceptanceCriteria: ["a"],
@@ -105,16 +108,24 @@ describe("parsePlanJson", () => {
     });
   });
 
-  it("returns undefined for prose or invalid shapes", () => {
-    expect(parsePlanJson("no json here")).toBeUndefined();
-    expect(parsePlanJson('{"steps": []}')).toBeUndefined();
+  it("reports structured errors for prose or invalid shapes", () => {
+    const prose = parsePlanJson("no json here");
+    expect(prose.ok).toBe(false);
+    if (!prose.ok) expect(prose.reason).toContain("no JSON object");
+
+    const empty = parsePlanJson('{"goal":"g","summary":"s","steps": []}');
+    expect(empty.ok).toBe(false);
+
+    const missingGoal = parsePlanJson('{"summary":"s","steps":[{"title":"t"}]}');
+    expect(missingGoal.ok).toBe(false);
+    if (!missingGoal.ok) expect(missingGoal.issues[0]?.path).toContain("goal");
   });
 });
 
 describe("ModelPlanner", () => {
   it("parses a valid JSON plan from the model", async () => {
     const chat = chatReturning(
-      '{"summary":"Final analysis: auth is broken.","steps":[{"id":"s1","title":"Verify signatures","order":1}],"risks":["regression risk"]}',
+      '{"goal":"harden auth","summary":"Final analysis: auth is broken.","steps":[{"id":"s1","title":"Verify signatures","order":1}],"risks":["regression risk"]}',
     );
     const plan = await new ModelPlanner({ model: "gw:gpt", chat }).plan(request);
     expect(plan.generatedBy).toBe("model:gw:gpt");
@@ -141,8 +152,9 @@ describe("ModelPlanner", () => {
         throw new Error("gateway down");
       }),
     });
+    // Transport failures are PLANNER_FAILED; schema failures are PLAN_INVALID (§15).
     await expect(planner.plan(request)).rejects.toMatchObject({
-      code: "PLANNER_FAILED",
+      code: "PLAN_INVALID",
       message: expect.stringContaining("gateway down"),
     });
   });

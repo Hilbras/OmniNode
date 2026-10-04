@@ -18,6 +18,7 @@ let server: Server;
 let port: number;
 
 const PLAN_JSON = JSON.stringify({
+  goal: "harden the authentication module",
   summary: "Final analysis: authentication weaknesses require prioritized fixes.",
   steps: [
     {
