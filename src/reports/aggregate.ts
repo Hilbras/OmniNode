@@ -13,6 +13,7 @@ import type {
   FindingSource,
   Report,
 } from "../types/report.js";
+import { normalizeEvidence } from "./schema.js";
 
 const SEVERITY_RANK: Record<FindingSeverity, number> = {
   info: 0,
@@ -78,7 +79,7 @@ function mergeFinding(groups: AggregatedFinding[], finding: Finding, report: Rep
     group.occurrences += 1;
     group.details.push(finding.detail);
     group.sources.push(source);
-    group.evidence.push(...(finding.evidence ?? []));
+    group.evidence.push(...(normalizeEvidence(finding.evidence) ?? []));
     if (finding.severity && (!group.severity || SEVERITY_RANK[finding.severity] > SEVERITY_RANK[group.severity])) {
       group.severity = finding.severity;
     }
@@ -90,7 +91,7 @@ function mergeFinding(groups: AggregatedFinding[], finding: Finding, report: Rep
     sources: [source],
     occurrences: 1,
     ...(finding.severity ? { severity: finding.severity } : {}),
-    evidence: [...(finding.evidence ?? [])],
+    evidence: [...(normalizeEvidence(finding.evidence) ?? [])],
   });
 }
 

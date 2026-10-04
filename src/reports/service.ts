@@ -8,6 +8,7 @@ import type { Task } from "../types/task.js";
 import type { Report, CombinedReport } from "../types/report.js";
 import { aggregateReports, type AggregateOptions } from "./aggregate.js";
 import { extractReportFromText } from "./extract.js";
+import { validateReport } from "./schema.js";
 import type { ReportStore } from "./store.js";
 
 export interface CombinedMeta {
@@ -16,8 +17,16 @@ export interface CombinedMeta {
   taskIds?: string[];
 }
 
+export interface CollectionDiagnostics {
+  collected: number;
+  accepted: number;
+  rejected: Array<{ key: string; reason: string; issues: string[] }>;
+}
+
 export class ReportService {
   private readonly log: Logger;
+  /** Rejected reports from the last collection (§13 — malformed never enters aggregation). */
+  lastDiagnostics: CollectionDiagnostics = { collected: 0, accepted: 0, rejected: [] };
 
   constructor(
     private readonly store: ReportStore,
@@ -30,24 +39,42 @@ export class ReportService {
     return this.store;
   }
 
-  /** Normalizes finished tasks into reports (§17 — normalizer). */
+  /** Normalizes finished tasks into reports (§17 — normalizer), validating each
+   *  one so malformed reports never reach aggregation (§13). */
   async collectFromTasks(tasks: Task[]): Promise<Report[]> {
-    const reports: Report[] = [];
+    const candidates: Report[] = [];
     for (const task of tasks) {
       const structured = task.result?.reports ?? [];
       if (structured.length > 0) {
-        reports.push(...structured);
+        candidates.push(...structured);
         continue;
       }
       const text = task.result?.rawOutput ?? task.result?.summary ?? "";
       if (text.trim().length === 0) continue;
-      reports.push(
+      candidates.push(
         extractReportFromText(text, {
           taskId: task.id,
           agent: task.agent ?? "unknown",
         }),
       );
     }
+
+    const reports: Report[] = [];
+    const rejected: CollectionDiagnostics["rejected"] = [];
+    for (const candidate of candidates) {
+      const result = validateReport(candidate);
+      if (result.valid) {
+        reports.push(result.report);
+      } else {
+        rejected.push({
+          key: (candidate as { id?: string })?.id ?? "(unknown)",
+          reason: result.reason,
+          issues: result.issues.map((issue) => `${issue.path}: ${issue.message}`),
+        });
+        this.log.warn(`Rejected malformed report: ${result.reason}`);
+      }
+    }
+    this.lastDiagnostics = { collected: candidates.length, accepted: reports.length, rejected };
     return reports;
   }
 

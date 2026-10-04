@@ -76,6 +76,7 @@ export function extractReportFromText(raw: string, meta: ExtractionMeta): Report
     id: `${meta.taskId}-f-${index + 1}`,
     title: truncate(text, 120),
     detail: text,
+    description: text,
     severity: guessSeverity(text),
   }));
 
@@ -87,7 +88,10 @@ export function extractReportFromText(raw: string, meta: ExtractionMeta): Report
     summary,
     findings,
     recommendations: recommendationTexts.map((t) => truncate(t, 200)),
-    metadata: evidenceTexts.length > 0 ? { evidence: evidenceTexts } : undefined,
+    ...(evidenceTexts.length > 0
+      ? { evidence: evidenceTexts.map((excerpt) => ({ kind: "observation" as const, excerpt })) }
+      : {}),
+    metadata: evidenceTexts.length > 0 ? { evidenceCount: evidenceTexts.length } : undefined,
     createdAt: new Date().toISOString(),
   };
 }

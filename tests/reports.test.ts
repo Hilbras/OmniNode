@@ -49,7 +49,12 @@ The auth module needs work.
     });
     expect(extracted.findings[1]?.severity).toBe("low");
     expect(extracted.recommendations).toEqual(["Use parameterized queries"]);
-    expect(extracted.metadata?.evidence).toEqual(["logs/auth.log lines 40-55"]);
+    // v2: evidence is typed (roadmap §13), not a bare string array.
+    expect(extracted.evidence).toEqual([
+      { kind: "observation", excerpt: "logs/auth.log lines 40-55" },
+    ]);
+    expect(extracted.metadata?.evidenceCount).toBe(1);
+    expect(extracted.findings[0]?.description).toBe(extracted.findings[0]?.detail);
   });
 
   it("falls back to a summary-only report for unstructured output", () => {
@@ -106,7 +111,7 @@ describe("aggregateReports", () => {
     });
     expect(injection?.sources.map((s) => s.agent).sort()).toEqual(["gemini", "kimi"]);
     expect(injection?.details).toHaveLength(2);
-    expect(injection?.evidence).toEqual(["logs/auth.log:40"]);
+    expect(injection?.evidence).toEqual([{ kind: "observation", excerpt: "logs/auth.log:40" }]);
   });
 
   it("merges duplicate recommendations", () => {

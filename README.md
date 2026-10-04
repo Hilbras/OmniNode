@@ -18,9 +18,9 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v2.0.0-alpha.8 — v2 Phase 8: Remembera Integration v2**
+**v2.0.0-alpha.9 — v2 Phase 9: Report System v2**
 (the reliability & interoperability line: architecture → execution →
-protocol → adapters → pipelines → providers → OmniHilbras → memory) (the v2
+protocol → adapters → pipelines → providers → OmniHilbras → memory → reports) (the v2
 roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the v1 plan is complete:
 the
 full loop from §28 runs in one command —
@@ -31,6 +31,13 @@ for the plan and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design).
 
 ### What's new in v2 (so far)
 
+- **Phase 9 — Report System v2**: reports are validated machine-readable
+  objects — `validateReport()` runs on everything entering the system and
+  malformed reports are rejected with diagnostics instead of poisoning
+  aggregation. Findings gain description/confidence/source/recommendation,
+  evidence is typed (`file`, `line`, `url`, `command`, `observation`,
+  `artifact`), and reports carry artifacts and run provenance.
+  Details: [REPORTS.md](docs/REPORTS.md).
 - **Phase 8 — Remembera / Memory v2**: the memory contract is formalized
   (`retrieve` / `store` / `search` / `metadata` with v1 `query` / `write`
   aliases kept working), memory gains structured **categories** (decisions,
@@ -339,7 +346,7 @@ required for the core engine.
 - [Architecture](docs/ARCHITECTURE.md) — module map, workflow, local state
 - [Security model](docs/SECURITY.md) — secrets, process execution, env isolation, audit log
 - [API stability policy](docs/API_STABILITY.md) and [public API inventory](docs/API.md)
-- [Agent Protocol v2 spec](docs/PROTOCOL.md) · [Providers](docs/PROVIDERS.md) · [Memory](docs/MEMORY.md) · [Deprecations](docs/DEPRECATIONS.md) · [Changelog](CHANGELOG.md) · [v2 roadmap](docs/ROADMAP_V2.md)
+- [Agent Protocol v2 spec](docs/PROTOCOL.md) · [Providers](docs/PROVIDERS.md) · [Memory](docs/MEMORY.md) · [Reports](docs/REPORTS.md) · [Deprecations](docs/DEPRECATIONS.md) · [Changelog](CHANGELOG.md) · [v2 roadmap](docs/ROADMAP_V2.md)
 - [Example project](examples/demo/) — a runnable end-to-end demo (`./demo.sh`)
 
 Prefer a container? `docker build -t omninode .` then

@@ -4,6 +4,31 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.9] — v2 Phase 9 (Report System v2)
+
+### Added
+
+- **Report validation** (§13): `validateReport()` (zod) runs on every report
+  entering the system. `ReportService.collectFromTasks()` drops malformed
+  reports and records `lastDiagnostics` (`collected` / `accepted` /
+  `rejected[]` with per-issue paths) — malformed reports can no longer enter
+  aggregation.
+- **Typed evidence** (§13): `file`, `line`, `url`, `command`, `observation`,
+  `artifact` with ref/line/excerpt/agent. Plain strings still accepted and
+  normalized to observation evidence.
+- **Richer findings**: `description`, `confidence`, `source` provenance
+  (agent/reportId/pipelineRunId) and `recommendation`.
+- **Report-level additions**: `agentId`, `pipelineRunId`, `evidence[]`,
+  `artifacts[]`.
+- docs/REPORTS.md: schema, validation, provenance, CLI, authoring.
+- Tests: 358 (was 351).
+
+### Changed
+
+- Text-extracted reports now emit `description` alongside `detail`, and
+  extracted evidence is typed rather than a raw string array.
+- Aggregation normalizes evidence from both legacy strings and objects.
+
 ## [2.0.0-alpha.8] — v2 Phase 8 (Remembera Integration v2)
 
 ### Added
