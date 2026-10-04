@@ -3,6 +3,8 @@ import type { AppConfig } from "../config/index.js";
 import { buildAgentRegistry } from "../agents/index.js";
 import { buildRoleRegistry } from "../roles/index.js";
 import { logger, type Logger } from "../logger/index.js";
+import { ReportService } from "../reports/index.js";
+import { FileReportStore } from "../reports/store.js";
 import { TaskEngine } from "../tasks/index.js";
 import { FileTaskStore } from "../tasks/store.js";
 import { PipelineEngine, createDefaultChatFn } from "./engine.js";
@@ -24,6 +26,7 @@ export function buildPipelineEngine(config: AppConfig, log: Logger = logger): Pi
     providers: config.project.providers,
     store: new FilePipelineRunStore(),
     chat: createDefaultChatFn(config.project.providers),
+    reports: new ReportService(new FileReportStore(), log),
     log,
   });
 }

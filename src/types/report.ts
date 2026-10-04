@@ -29,3 +29,44 @@ export interface Report {
   createdAt: string;
   metadata?: Record<string, unknown>;
 }
+
+/** Source attribution for an aggregated finding (§17). */
+export interface FindingSource {
+  agent: string;
+  reportId: string;
+}
+
+export interface AggregatedFinding {
+  title: string;
+  /** Distinct details contributed across reports. */
+  details: string[];
+  sources: FindingSource[];
+  /** How many reports reported this (or a similar) finding. */
+  occurrences: number;
+  /** Highest severity seen across merged duplicates. */
+  severity?: FindingSeverity;
+  evidence: string[];
+}
+
+export interface AggregatedRecommendation {
+  text: string;
+  sources: FindingSource[];
+  occurrences: number;
+}
+
+/** Combined intelligence produced from several independent reports (§17). */
+export interface CombinedReport {
+  id: string;
+  title: string;
+  objective?: string;
+  pipelineRunId?: string;
+  taskIds: string[];
+  summary: string;
+  findings: AggregatedFinding[];
+  recommendations: AggregatedRecommendation[];
+  /** Distinct agent names that contributed. */
+  sources: string[];
+  reportIds: string[];
+  createdAt: string;
+  metadata?: Record<string, unknown>;
+}

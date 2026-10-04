@@ -18,6 +18,7 @@ export type OmniNodeErrorCode =
   | "PIPELINE_FAILED"
   | "PROTOCOL_VIOLATION"
   | "MEMORY_UNAVAILABLE"
+  | "REPORT_NOT_FOUND"
   | "NOT_IMPLEMENTED"
   | "CLI_USAGE"
   | "INTERNAL";

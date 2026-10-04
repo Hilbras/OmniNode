@@ -56,4 +56,6 @@ export interface PipelineRun {
   stepRuns: PipelineStepRun[];
   /** Structured reports gathered across all steps (Phase 6 builds on this). */
   reports?: Report[];
+  /** Set when the report system generated a combined report for this run. */
+  combinedReportId?: string;
 }

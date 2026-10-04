@@ -23,6 +23,7 @@ import type {
 } from "../types/pipeline.js";
 import type { ChatMessage } from "../types/chat.js";
 import type { Report } from "../types/report.js";
+import type { ReportService } from "../reports/index.js";
 import type { TaskEngine } from "../tasks/index.js";
 import type { PipelineRunStore } from "./store.js";
 
@@ -35,6 +36,8 @@ export interface PipelineEngineOptions {
   providers: AppConfig["project"]["providers"];
   store: PipelineRunStore;
   chat?: ChatFn;
+  /** When present, finished runs have their reports collected, stored and combined (§16–§17). */
+  reports?: ReportService;
   log?: Logger;
 }
 
@@ -241,11 +244,33 @@ export class PipelineEngine {
 
     const failed = [...outcomes.values()].some((o) => o.status === "failed");
     const finalStatus: PipelineRunStatus = failed ? "failed" : "completed";
+
+    // Report system (§16–§17): collect, store and combine reports from all tasks.
+    let combinedReportId: string | undefined;
+    if (this.options.reports) {
+      const taskIds = [...outcomes.values()].flatMap((o) => o.taskIds);
+      const tasks = (
+        await Promise.all(taskIds.map((id) => this.options.tasks.get(id)))
+      ).filter((task): task is NonNullable<typeof task> => task !== undefined);
+      const collected = await this.options.reports.collectFromTasks(tasks);
+      await this.options.reports.saveReports(collected);
+      const combined = await this.options.reports.generateCombined(collected, {
+        objective,
+        pipelineRunId: run.id,
+        taskIds,
+      });
+      combinedReportId = combined?.id;
+      if (collected.length > 0) {
+        run.reports = collected;
+      }
+    }
+
     const finished: PipelineRun = {
       ...run,
       status: finalStatus,
       finishedAt: new Date().toISOString(),
-      ...(allReports.length > 0 ? { reports: allReports } : {}),
+      ...(run.reports !== undefined && run.reports.length > 0 ? { reports: run.reports } : {}),
+      ...(combinedReportId !== undefined ? { combinedReportId } : {}),
     };
     await this.options.store.save(finished);
     this.log.info(`Pipeline ${def.id} finished: ${finalStatus}.`);

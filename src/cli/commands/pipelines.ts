@@ -47,6 +47,9 @@ export function registerPipelineCommands(program: Command): void {
       if (finished.reports && finished.reports.length > 0) {
         console.log(`  reports: ${finished.reports.length} structured report(s)`);
       }
+      if (finished.combinedReportId) {
+        console.log(`  combined report: ${finished.combinedReportId}`);
+      }
       console.log(`Pipeline ${finished.status}. Run id: ${finished.id}`);
       if (finished.status !== "completed") process.exitCode = 1;
     });

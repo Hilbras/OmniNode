@@ -11,6 +11,10 @@ export function notImplemented(command: string, when: string): OmniNodeError {
   );
 }
 
+export function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
 /**
  * Appends an item to a list in omninode.yaml, preserving comments and
  * formatting, and validates the resulting document before writing.

@@ -26,6 +26,8 @@ export interface TaskResult {
   reportId?: string;
   /** Structured reports produced by protocol-mode agents (Phase 6 builds on this). */
   reports?: Report[];
+  /** Truncated verbatim agent output, kept for report extraction and audit. */
+  rawOutput?: string;
   error?: string;
   finishedAt?: string;
 }

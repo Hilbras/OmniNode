@@ -81,11 +81,11 @@ describe("CLI", () => {
   });
 
   it("phase-dependent commands explain when they will arrive", async () => {
+    await createProgram().parseAsync(["node", "omninode", "init"]);
     await expect(
-      createProgram().parseAsync(["node", "omninode", "report", "list"]),
+      createProgram().parseAsync(["node", "omninode", "provider", "remove", "ghost"]),
     ).rejects.toMatchObject({
       code: "NOT_IMPLEMENTED",
-      message: expect.stringContaining("Phase 6"),
     });
   });
 });

@@ -18,7 +18,7 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v0.6.0 — Phase 5: Pipeline Engine** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
+**v0.7.0 — Phase 6: Multi-AI Report System** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
 for the full plan and roadmap).
 
 What exists today:
@@ -66,6 +66,14 @@ What exists today:
   - Failure handling: retries per step, `on-success`/`on-failure`/`always`
     conditions, combined context threaded downstream; every task runs through
     the TaskEngine and every run is persisted to `.omninode/pipelines.json`
+- **Multi-AI report system** (`src/reports/`):
+  - Report collection from finished tasks — structured protocol reports pass
+    through; plain text output is normalized via deterministic extraction
+    (findings/recommendations/evidence sections, severity guessing)
+  - Persistence in `.omninode/reports.json` with full source attribution
+  - Aggregation (§17): duplicate/similar findings merged via deterministic
+    token-set similarity, sources preserved, highest severity kept
+  - Combined reports generated automatically at the end of every pipeline run
 - Typed error hierarchy (`src/errors/`)
 - Leveled logger with pluggable sink (`src/logger/`)
 - Configuration system: `omninode.yaml` with `${ENV_VAR}` expansion and strict
@@ -144,6 +152,8 @@ project:
 
 ```bash
 omninode pipeline run repo-audit "Audit the authentication module"
+omninode report combined          # the aggregated intelligence of that run
+omninode report show combined-xxx # grouped findings with per-source attribution
 ```
 
 See [omninode.yaml.example](omninode.yaml.example) for a full configuration.
@@ -180,8 +190,7 @@ Phases 0–11 are laid out in [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.m
 | v0.3.0 | OmniHilbras Integration (optional, like every provider) |
 | v0.4.0 | Agent System |
 | v0.5.0 | Roles & Tasks |
-| **v0.6.0** | **Pipeline Engine (current)** |
-| v0.7.0 | Multi-AI Reports |
+| **v0.7.0** | **Multi-AI Reports (current)** |
 | v0.8.0 | Remembera (optional memory integration) |
 | v0.9.0 | Planner |
 | v0.10.0 | End-to-End Runtime |
