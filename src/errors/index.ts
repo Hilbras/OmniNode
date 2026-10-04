@@ -13,6 +13,7 @@ export type OmniNodeErrorCode =
   | "TASK_INVALID"
   | "TASK_NOT_FOUND"
   | "TASK_FAILED"
+  | "PIPELINE_NOT_FOUND"
   | "PIPELINE_INVALID"
   | "PIPELINE_FAILED"
   | "PROTOCOL_VIOLATION"
@@ -84,7 +85,7 @@ export class TaskError extends OmniNodeError {
 
 export class PipelineError extends OmniNodeError {
   constructor(
-    code: "PIPELINE_INVALID" | "PIPELINE_FAILED",
+    code: "PIPELINE_NOT_FOUND" | "PIPELINE_INVALID" | "PIPELINE_FAILED",
     message: string,
     options: OmniNodeErrorOptions = {},
   ) {

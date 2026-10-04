@@ -20,30 +20,50 @@ export interface TaskStore {
 
 export class FileTaskStore implements TaskStore {
   private readonly filePath: string;
+  /**
+   * Read-modify-write operations are serialized: parallel pipeline tasks
+   * would otherwise race on the JSON file (last writer wins).
+   */
+  private queue: Promise<unknown> = Promise.resolve();
 
   constructor(directory = `${process.cwd()}/.omninode`) {
     this.filePath = `${directory}/tasks.json`;
   }
 
   async save(task: Task): Promise<void> {
-    const tasks = await this.load();
-    const index = tasks.findIndex((t) => t.id === task.id);
-    if (index >= 0) tasks[index] = task;
-    else tasks.push(task);
-    await this.write(tasks);
+    return this.synchronized(async () => {
+      const tasks = await this.load();
+      const index = tasks.findIndex((t) => t.id === task.id);
+      if (index >= 0) tasks[index] = task;
+      else tasks.push(task);
+      await this.write(tasks);
+    });
   }
 
   async get(id: string): Promise<Task | undefined> {
-    const tasks = await this.load();
-    return tasks.find((t) => t.id === id);
+    return this.synchronized(async () => {
+      const tasks = await this.load();
+      return tasks.find((t) => t.id === id);
+    });
   }
 
   async list(filter: TaskStoreFilter = {}): Promise<Task[]> {
-    const tasks = await this.load();
-    return tasks
-      .filter((task) => (filter.status ? task.status === filter.status : true))
-      .filter((task) => (filter.project ? task.project === filter.project : true))
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return this.synchronized(async () => {
+      const tasks = await this.load();
+      return tasks
+        .filter((task) => (filter.status ? task.status === filter.status : true))
+        .filter((task) => (filter.project ? task.project === filter.project : true))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    });
+  }
+
+  private synchronized<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.queue.then(operation, operation);
+    this.queue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
   }
 
   private async load(): Promise<Task[]> {

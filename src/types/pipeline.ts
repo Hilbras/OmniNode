@@ -1,4 +1,5 @@
-/** Pipeline engine: coordinating multiple AI operations (§14). */
+/** Pipeline engine: coordinating multiple AI operations (§14, §15). */
+import type { Report } from "./report.js";
 import type { TaskStatus } from "./task.js";
 
 export type PipelineStepKind =
@@ -16,8 +17,11 @@ export interface PipelineStep {
   kind: PipelineStepKind;
   /** Agents fanned out for research steps. */
   agents?: string[];
-  /** Model used for plan steps, e.g. "my-gateway:chatgpt". */
+  /** Single agent for analyze/execute/custom steps. */
+  agent?: string;
+  /** Model used for plan steps, as "provider:model-id". */
   model?: string;
+  /** Defaults to the previous step (implicit sequential chain). */
   dependsOn?: string[];
   condition?: PipelineStepCondition;
   retries?: number;
@@ -26,6 +30,10 @@ export interface PipelineStep {
 export interface PipelineDefinition {
   id: string;
   name?: string;
+  /** Default objective; can be overridden at run time. */
+  objective?: string;
+  /** Optional role applied to research/execute tasks. */
+  role?: string;
   steps: PipelineStep[];
 }
 
@@ -33,8 +41,10 @@ export type PipelineRunStatus = "pending" | "running" | "completed" | "failed" |
 
 export interface PipelineStepRun {
   stepId: string;
-  taskId?: string;
   status: TaskStatus;
+  /** Tasks created for this step (research fans out to several). */
+  taskIds?: string[];
+  error?: string;
 }
 
 export interface PipelineRun {
@@ -44,4 +54,6 @@ export interface PipelineRun {
   startedAt?: string;
   finishedAt?: string;
   stepRuns: PipelineStepRun[];
+  /** Structured reports gathered across all steps (Phase 6 builds on this). */
+  reports?: Report[];
 }

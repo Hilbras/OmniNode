@@ -48,12 +48,39 @@ export const roleConfigSchema = z
   })
   .strict();
 
+export const pipelineStepConfigSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: z.enum(["research", "collect", "analyze", "plan", "execute", "custom"]),
+    agents: z.array(z.string()).optional(),
+    agent: z.string().optional(),
+    model: z.string().optional(),
+    depends_on: z.array(z.string()).optional(),
+    retries: z.number().int().min(0).max(10).optional(),
+    condition: z.enum(["always", "on-success", "on-failure"]).optional(),
+  })
+  .strict();
+
+export const pipelineConfigSchema = z
+  .object({
+    id: z
+      .string()
+      .min(1)
+      .regex(/^[a-z0-9][a-z0-9-]*$/, "pipeline id must be kebab-case"),
+    name: z.string().optional(),
+    objective: z.string().optional(),
+    role: z.string().optional(),
+    steps: z.array(pipelineStepConfigSchema).min(1),
+  })
+  .strict();
+
 export const projectConfigSchema = z
   .object({
     name: z.string().min(1),
     providers: z.array(providerConfigSchema).default([]),
     agents: z.array(agentConfigSchema).default([]),
     roles: z.array(roleConfigSchema).default([]),
+    pipelines: z.array(pipelineConfigSchema).default([]),
     memory: z
       .object({ provider: z.string().min(1) })
       .strict()
@@ -74,5 +101,7 @@ export const appConfigSchema = z
 export type ProviderConfigYaml = z.infer<typeof providerConfigSchema>;
 export type AgentConfigYaml = z.infer<typeof agentConfigSchema>;
 export type RoleConfigYaml = z.infer<typeof roleConfigSchema>;
+export type PipelineConfigYaml = z.infer<typeof pipelineConfigSchema>;
+export type PipelineStepConfigYaml = z.infer<typeof pipelineStepConfigSchema>;
 export type ProjectConfigYaml = z.infer<typeof projectConfigSchema>;
 export type AppConfigYaml = z.infer<typeof appConfigSchema>;

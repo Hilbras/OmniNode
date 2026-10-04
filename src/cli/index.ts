@@ -11,6 +11,7 @@ import { registerAgentCommands } from "./commands/agents.js";
 import { registerRoleCommands } from "./commands/roles.js";
 import { registerTaskCommands } from "./commands/tasks.js";
 import { registerReportCommands } from "./commands/reports.js";
+import { registerPipelineCommands } from "./commands/pipelines.js";
 
 export function createProgram(): Command {
   const program = new Command();
@@ -31,6 +32,7 @@ export function createProgram(): Command {
   registerTaskCommands(program);
   registerReportCommands(program);
   registerModelsCommand(program);
+  registerPipelineCommands(program);
 
   return program;
 }

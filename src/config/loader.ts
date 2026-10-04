@@ -11,7 +11,8 @@ import type { ProviderConfig } from "../types/provider.js";
 import type { RoleDefinition } from "../types/role.js";
 import type { LogLevel } from "../logger/index.js";
 import { appConfigSchema } from "./schema.js";
-import type { AgentConfigYaml, ProviderConfigYaml, RoleConfigYaml } from "./schema.js";
+import type { AgentConfigYaml, PipelineConfigYaml, ProviderConfigYaml, RoleConfigYaml } from "./schema.js";
+import type { PipelineDefinition } from "../types/pipeline.js";
 
 const CONFIG_FILENAMES = ["omninode.yaml", "omninode.yml", "omninode.json"];
 
@@ -21,6 +22,7 @@ export interface AppConfig {
     providers: ProviderConfig[];
     agents: AgentConfig[];
     roles: RoleDefinition[];
+    pipelines: PipelineDefinition[];
     memory?: {
       provider: string;
     };
@@ -112,9 +114,29 @@ function toAppConfig(yaml: ReturnType<typeof appConfigSchema.parse>): AppConfig 
       providers: yaml.project.providers.map(toProviderConfig),
       agents: yaml.project.agents.map(toAgentConfig),
       roles: yaml.project.roles.map(toRoleDefinition),
+      pipelines: yaml.project.pipelines.map(toPipelineDefinition),
       ...(yaml.project.memory !== undefined ? { memory: yaml.project.memory } : {}),
     },
     ...(yaml.logging !== undefined ? { logging: yaml.logging } : {}),
+  };
+}
+
+function toPipelineDefinition(raw: PipelineConfigYaml): PipelineDefinition {
+  return {
+    id: raw.id,
+    name: raw.name,
+    objective: raw.objective,
+    role: raw.role,
+    steps: raw.steps.map((step) => ({
+      id: step.id,
+      kind: step.kind,
+      agents: step.agents,
+      agent: step.agent,
+      model: step.model,
+      dependsOn: step.depends_on,
+      retries: step.retries,
+      condition: step.condition,
+    })),
   };
 }
 

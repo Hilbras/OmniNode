@@ -7,4 +7,5 @@ export * from "./registry/index.js";
 export * from "./agents/index.js";
 export * from "./roles/index.js";
 export * from "./tasks/index.js";
+export * from "./pipelines/index.js";
 export { OMNINODE_VERSION } from "./version.js";

@@ -18,7 +18,7 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v0.5.0 — Phase 4: Roles & Tasks** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
+**v0.6.0 — Phase 5: Pipeline Engine** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
 for the full plan and roadmap).
 
 What exists today:
@@ -53,6 +53,19 @@ What exists today:
     results (summary, reports, errors, timestamps)
   - `TaskStore` interface with a local-first JSON implementation in
     `.omninode/tasks.json` (atomic writes; swap in any backend)
+- **Pipeline engine** (`src/pipelines/`):
+  - Pipelines defined in `omninode.yaml` under `project.pipelines`, validated
+    before every run (duplicate ids, unknown dependencies, cycles, missing
+    agents)
+  - Sequential execution by definition order; explicit `depends_on` unlocks
+    parallel branches, and research steps fan out to several agents in
+    parallel (§15)
+  - Step kinds: `research` (multi-agent fan-out), `collect`, `analyze`,
+    `plan` (calls a model as `provider:model-id` via the chat layer),
+    `execute`/`custom` (hand-off to an execution agent)
+  - Failure handling: retries per step, `on-success`/`on-failure`/`always`
+    conditions, combined context threaded downstream; every task runs through
+    the TaskEngine and every run is persisted to `.omninode/pipelines.json`
 - Typed error hierarchy (`src/errors/`)
 - Leveled logger with pluggable sink (`src/logger/`)
 - Configuration system: `omninode.yaml` with `${ENV_VAR}` expansion and strict
@@ -111,6 +124,28 @@ omninode task status task-xxxxxx
 omninode task list
 ```
 
+Orchestrate several AI systems with a pipeline (§14):
+
+```yaml
+project:
+  pipelines:
+    - id: repo-audit
+      steps:
+        - id: research
+          kind: research
+          agents: [kimi, gemini, qwen]
+        - id: plan
+          kind: plan
+          model: my-gateway:chatgpt
+        - id: execute
+          kind: execute
+          agent: opencode
+```
+
+```bash
+omninode pipeline run repo-audit "Audit the authentication module"
+```
+
 See [omninode.yaml.example](omninode.yaml.example) for a full configuration.
 
 ### Configuration
@@ -144,8 +179,8 @@ Phases 0–11 are laid out in [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.m
 | v0.2.0 | Provider System |
 | v0.3.0 | OmniHilbras Integration (optional, like every provider) |
 | v0.4.0 | Agent System |
-| **v0.5.0** | **Roles & Tasks (current)** |
-| v0.6.0 | Pipeline Engine |
+| v0.5.0 | Roles & Tasks |
+| **v0.6.0** | **Pipeline Engine (current)** |
 | v0.7.0 | Multi-AI Reports |
 | v0.8.0 | Remembera (optional memory integration) |
 | v0.9.0 | Planner |
