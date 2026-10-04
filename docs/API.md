@@ -42,8 +42,8 @@ part of the contract.
 
 ## Configuration (`src/config`)
 
-`loadConfig`, `findConfigStore`-style helpers (`findConfigFile`),
-`expandEnvRefs`, the zod schemas (`appConfigSchema`, `providerConfigSchema`,
+`loadConfig`, `findConfigFile`, `expandEnvRefs`, `scanForInlineSecrets`,
+`describeSecretFindings`, the zod schemas (`appConfigSchema`, `providerConfigSchema`,
 `agentConfigSchema`, `roleConfigSchema`, `pipelineConfigSchema`,
 `plannerConfigSchema`), `AppConfig`, and `defaultProjectConfigYaml` — Stable
 for `loadConfig`/`AppConfig`/schemas; helpers Experimental.

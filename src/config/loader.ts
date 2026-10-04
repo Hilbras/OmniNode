@@ -6,6 +6,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
 import { ConfigError } from "../errors/index.js";
+import { describeSecretFindings, scanForInlineSecrets } from "./secrets.js";
 import type { AgentConfig, AgentIntegrationType } from "../types/agent.js";
 import type { ProviderConfig } from "../types/provider.js";
 import type { RoleDefinition } from "../types/role.js";
@@ -92,6 +93,11 @@ export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
   }
 
   const raw = readFileSync(path, "utf8");
+  // §13 Security: refuse inline credentials before anything is persisted.
+  const secretFindings = scanForInlineSecrets(raw);
+  if (secretFindings.length > 0) {
+    throw new ConfigError("CONFIG_INVALID", describeSecretFindings(path, secretFindings));
+  }
   const expanded = expandEnvRefs(raw, env, path);
 
   let data: unknown;

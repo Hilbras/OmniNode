@@ -18,7 +18,7 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v2.0.0-alpha.12 — v2 Phase 12: Persistence Layer v2**
+**v2.0.0-alpha.13 — v2 Phase 13: Security Hardening**
 (the reliability & interoperability line: architecture → execution →
 protocol → adapters → pipelines → providers → OmniHilbras → memory → reports) (the v2
 roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the v1 plan is complete:
@@ -31,6 +31,14 @@ for the plan and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design).
 
 ### What's new in v2 (so far)
 
+- **Phase 13 — Security Hardening**: configuration containing literal
+  credentials is **rejected before parsing** (with a redacted, actionable
+  error); reports over 256 KiB are rejected rather than persisted; static
+  guards keep shell execution out of the codebase; and `omninode security
+  audit` reviews a project's posture (environment exposure, external working
+  directories, credential references) and states the agent trust model
+  plainly — agents run with your OS user's permissions, and OmniNode is not
+  a sandbox.
 - **Phase 12 — Persistence Layer v2**: writes are now **fsynced and atomic**
   (temp → fsync → rename → directory fsync), corrupt store files are
   **quarantined instead of lost**, documents carry a **schema version** with

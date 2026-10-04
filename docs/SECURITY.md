@@ -7,8 +7,14 @@ does not, and how to configure it defensively.
 ## Secrets
 
 - **Credentials never live in project files.** Providers and the memory adapter
-  reference secrets by environment-variable *name* (`api_key_env_var`,
-  `api_key_env_var` for memory) and the value is resolved at run time.
+  reference secrets by environment-variable *name* (`api_key_env_var`) and the
+  value is resolved at run time.
+- **Inline secrets are rejected before parsing** (§17): `omninode.yaml` is
+  scanned for literal `api_key` / `token` / `password` / `secret` /
+  `credential` values. Findings are reported with the line number and a
+  **redacted** excerpt — the value is never echoed — and the config is refused
+  with the fix (`api_key_env_var: MY_API_KEY`). References
+  (`${VAR}`, `$VAR`, `<from-store>`, empty) pass.
   `${VAR}` / `${VAR:-default}` references in `omninode.yaml` are expanded at
   load time; an unset variable without a default aborts loading rather than
   silently misconfiguring authentication.
@@ -82,6 +88,38 @@ contains no secret values.
 - Agent processes are child processes with the same OS user as OmniNode;
   there is no container or VM sandbox. Run untrusted agents inside a
   container or under a dedicated OS user if that matters to you.
+
+## Output limits
+
+| Limit | Default | Where |
+| --- | --- | --- |
+| Agent stdout / stderr per stream | 5 MiB | agent config (`max_output_bytes`) |
+| Protocol message | 1 MiB | `MAX_MESSAGE_BYTES` |
+| Single report | 256 KiB | `MAX_REPORT_BYTES` |
+| Injected memory context | 4 000 chars | `MAX_CONTEXT_CHARS` |
+
+## Agent trust model
+
+> **Agents execute with the permissions of the operating-system user running
+> OmniNode.**
+
+An agent is a child process: it can read the files, use the network and invoke
+tools that user can. OmniNode scopes *what it sends* (environment, context,
+output limits); it does not restrict *what the process can do*.
+
+**OmniNode is not a sandbox.** For untrusted agents, run them in a container or
+under a dedicated OS user. Future isolation mechanisms are out of scope for
+this release and are not claimed anywhere in this document.
+
+## Checking a project's posture
+
+```bash
+omninode security audit
+```
+
+Reports (advisory, changes nothing): agents inheriting the full environment,
+agents allowed outside the project root, explicit per-agent env injection,
+providers/memory without credential references — plus the trust model above.
 
 ## Known limitations (v1.0)
 

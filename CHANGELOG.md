@@ -4,6 +4,28 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.13] — v2 Phase 13 (Security Hardening)
+
+### Added
+
+- **Inline-secret detection** (§17): `omninode.yaml` is scanned before
+  parsing; literal `api_key` / `token` / `password` / `secret` / `credential`
+  values are refused with line numbers and **redacted** excerpts plus the fix
+  (`api_key_env_var: MY_API_KEY`). References (`${VAR}`, `$VAR`, `<store>`,
+  empty) pass.
+- **Report size limit** (§17): reports over `MAX_REPORT_BYTES` (256 KiB) are
+  rejected with diagnostics instead of being persisted.
+- **`omninode security audit`**: advisory review of a project — agents
+  inheriting the full environment, agents allowed outside the project root,
+  explicit per-agent env injection, providers/memory without credential
+  references — followed by the plain trust-model statement.
+- **Static guards**: tests fail the build if shell execution (`exec`,
+  `execSync`, `shell: true`) appears anywhere in `src/`, or if the process
+  adapter stops using `spawn`.
+- SECURITY.md: output-limit table, agent trust model, an explicit "OmniNode is
+  not a sandbox" boundary, and the audit command.
+- Tests: 393 (was 383).
+
 ## [2.0.0-alpha.12] — v2 Phase 12 (Persistence Layer v2)
 
 ### Added

@@ -1,4 +1,5 @@
 export { ReportService } from "./service.js";
+export { MAX_REPORT_BYTES } from "./service.js";
 export type { CollectionDiagnostics } from "./service.js";
 export type { CombinedMeta } from "./service.js";
 export { extractReportFromText } from "./extract.js";

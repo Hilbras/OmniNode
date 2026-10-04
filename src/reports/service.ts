@@ -17,6 +17,9 @@ export interface CombinedMeta {
   taskIds?: string[];
 }
 
+/** Serialized size budget for a single report (roadmap §17 — output limits). */
+export const MAX_REPORT_BYTES = 256 * 1024;
+
 export interface CollectionDiagnostics {
   collected: number;
   accepted: number;
@@ -62,6 +65,16 @@ export class ReportService {
     const reports: Report[] = [];
     const rejected: CollectionDiagnostics["rejected"] = [];
     for (const candidate of candidates) {
+      const size = Buffer.byteLength(JSON.stringify(candidate), "utf8");
+      if (size > MAX_REPORT_BYTES) {
+        rejected.push({
+          key: (candidate as { id?: string })?.id ?? "(unknown)",
+          reason: `report exceeds the ${MAX_REPORT_BYTES} byte limit (${size} bytes)`,
+          issues: [],
+        });
+        this.log.warn(`Rejected oversized report (${size} bytes).`);
+        continue;
+      }
       const result = validateReport(candidate);
       if (result.valid) {
         reports.push(result.report);

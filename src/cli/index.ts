@@ -17,6 +17,7 @@ import { registerPlanCommands } from "./commands/plan.js";
 import { registerStatusCommand } from "./commands/status.js";
 import { registerAuditCommand } from "./commands/audit.js";
 import { registerMigrateCommand } from "./commands/migrate.js";
+import { registerSecurityCommand } from "./commands/security.js";
 
 export function createProgram(): Command {
   const program = new Command();
@@ -43,6 +44,7 @@ export function createProgram(): Command {
   registerStatusCommand(program);
   registerAuditCommand(program);
   registerMigrateCommand(program);
+  registerSecurityCommand(program);
   registerRunAlias(program);
 
   return program;
