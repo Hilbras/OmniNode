@@ -7,7 +7,6 @@ import { HeuristicPlanner } from "../src/planner/heuristic.js";
 import { ModelPlanner, parsePlanJson } from "../src/planner/model.js";
 import { FilePlanStore } from "../src/planner/store.js";
 import { buildPlanner } from "../src/planner/factory.js";
-import { PlannerError } from "../src/errors/index.js";
 import type { Report } from "../src/types/report.js";
 import type { PlanRequest } from "../src/planner/types.js";
 import type { MemoryEntry } from "../src/types/memory.js";
