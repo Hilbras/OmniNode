@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "bin": {
-    "omninode": "./dist/cli/index.js"
+    "omninode": "dist/cli/index.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -49,7 +49,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
-    "omninode": "tsx src/cli/index.ts"
+    "cli": "tsx src/cli/index.ts"
   },
   "dependencies": {
     "commander": "^12.1.0",
