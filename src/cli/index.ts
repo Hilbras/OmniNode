@@ -5,7 +5,7 @@ import { OMNINODE_VERSION } from "../version.js";
 import { isOmniNodeError } from "../errors/index.js";
 import { configureLogger } from "../logger/index.js";
 import { exitCodeFor } from "./exit-codes.js";
-import { findConfigFile, loadConfig } from "../config/index.js";
+import { cliConfigOptions, loadProjectConfig } from "./options.js";
 import { registerInitCommand } from "./commands/init.js";
 import { registerProjectCommands } from "./commands/project.js";
 import { registerProviderCommands } from "./commands/providers.js";
@@ -32,7 +32,13 @@ export function createProgram(): Command {
       "Provider-agnostic multi-AI orchestration platform: coordinate CLI agents, " +
         "AI providers, memory, roles, reports and planning in one execution system.",
     )
-    .version(OMNINODE_VERSION, "-v, --version", "Print the OmniNode version.");
+    .version(OMNINODE_VERSION, "-v, --version", "Print the OmniNode version.")
+    .option("-c, --config <file>", "Use a specific configuration file instead of ./omninode.yaml.")
+    .option("-p, --profile <name>", "Apply a named configuration profile (development/production/testing).")
+    .hook("preAction", (thisCommand) => {
+      cliConfigOptions.path = thisCommand.opts().config;
+      cliConfigOptions.profile = thisCommand.opts().profile;
+    });
 
   registerInitCommand(program);
   registerProjectCommands(program);
@@ -58,10 +64,8 @@ export function createProgram(): Command {
 function applyLoggingConfig(): void {
   // Best effort: `init` and `--help` must work without a valid configuration.
   try {
-    if (findConfigFile()) {
-      const logging = loadConfig().logging;
-      if (logging) configureLogger(logging);
-    }
+    const resolved = loadProjectConfig();
+    if (resolved.logging) configureLogger(resolved.logging);
   } catch {
     // Configuration problems surface when the command actually needs it.
   }

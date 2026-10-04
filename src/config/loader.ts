@@ -7,6 +7,15 @@ import { existsSync, readFileSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
 import { ConfigError } from "../errors/index.js";
 import { describeSecretFindings, scanForInlineSecrets } from "./secrets.js";
+import {
+  applyDefaults,
+  applyEnvOverrides,
+  mergeConfig,
+  resolveProfile,
+  userConfigPath,
+  type AppConfigInput,
+  type ConfigSources,
+} from "./profiles.js";
 import type { AgentConfig, AgentIntegrationType } from "../types/agent.js";
 import type { ProviderConfig } from "../types/provider.js";
 import type { RoleDefinition } from "../types/role.js";
@@ -42,11 +51,13 @@ export interface AppConfig {
 }
 
 export interface LoadConfigOptions {
-  /** Explicit path; otherwise omninode.yaml/yml/json is looked up in the given directory. */
+  /** Explicit path (CLI --config); otherwise the project file is discovered. */
   path?: string;
   directory?: string;
-  /** Environment used for ${VAR} expansion; defaults to process.env. */
+  /** Environment used for ${VAR} expansion and OMNINODE_* overrides; defaults to process.env. */
   env?: Record<string, string | undefined>;
+  /** Profile override (CLI --profile), above environment and file selection. */
+  profile?: string;
 }
 
 export function findConfigFile(directory = process.cwd()): string | undefined {
@@ -82,43 +93,145 @@ export function expandEnvRefs(
   );
 }
 
-export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
+export interface LoadConfigResult {
+  config: AppConfig;
+  sources: ConfigSources;
+}
+
+/**
+ * Composes configuration from every source with the documented precedence
+ * (roadmap §16): CLI → environment → project file → user file → profile
+ * overlay → defaults.
+ */
+export function loadConfigDetailed(options: LoadConfigOptions = {}): LoadConfigResult {
   const env = options.env ?? process.env;
-  const path = options.path ?? (options.directory ? findConfigFile(options.directory) : findConfigFile());
-  if (!path) {
+  const explicitPath = options.path;
+
+  // 1. Files: user config first, project config overrides it.
+  let input: AppConfigInput = {} as AppConfigInput;
+  let projectFile: string | undefined;
+  let userFile: string | undefined;
+
+  if (!explicitPath) {
+    const candidate = userConfigPath(env);
+    if (existsSync(candidate)) {
+      input = mergeConfig(input, readConfigDocument(candidate, env));
+      userFile = candidate;
+    }
+  }
+
+  const resolvedProject =
+    explicitPath ??
+    (options.directory ? findConfigFile(options.directory) : findConfigFile());
+  if (resolvedProject) {
+    input = mergeConfig(input, readConfigDocument(resolvedProject, env));
+    projectFile = resolvedProject;
+  }
+
+  if (!projectFile && !userFile) {
     throw new ConfigError(
       "CONFIG_NOT_FOUND",
       "No omninode.yaml found. Run `omninode init` to create one, or pass an explicit path.",
     );
   }
 
+  // 2. Profile overlay, selected by CLI > env > file.
+  const profile = options.profile ?? resolveProfile(input, env);
+  const overlay = (input as { profiles?: Record<string, unknown> }).profiles?.[profile];
+  if (overlay !== undefined) {
+    const { profiles: _drop, ...base } = input as { profiles?: unknown } & Record<string, unknown>;
+    input = mergeConfig(base, overlay) as AppConfigInput;
+  } else if (profile !== "default" && profile !== "") {
+    throw new ConfigError(
+      "CONFIG_INVALID",
+      `Profile "${profile}" is not defined in this configuration (known: ${Object.keys((input as { profiles?: Record<string, unknown> }).profiles ?? {}).join(", ") || "none"}).`,
+    );
+  }
+
+  // 3. Environment overrides, then defaults.
+  const withEnv = applyEnvOverrides(input, env);
+  const withDefaults = applyDefaults(withEnv.config);
+
+  // 4. Validate the composed document.
+  const parsed = appConfigSchema.safeParse(withDefaults.config);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map((issue) => {
+      const location = issue.path.join(".") || "(root)";
+      return `${location}: ${issue.message}`;
+    });
+    throw new ConfigError(
+      "CONFIG_INVALID",
+      `Invalid configuration:\n  ${issues.join("\n  ")}`,
+      { details: { issues } },
+    );
+  }
+
+  return {
+    config: toAppConfig(parsed.data),
+    sources: {
+      ...(projectFile !== undefined ? { projectFile } : {}),
+      ...(userFile !== undefined ? { userFile } : {}),
+      profile,
+      envOverrides: withEnv.applied,
+      defaults: withDefaults.applied,
+    },
+  };
+}
+
+/** Reads, secret-scans and parses a configuration file. */
+function readConfigDocument(path: string, optionsEnv: Record<string, string | undefined>): AppConfigInput {
   const raw = readFileSync(path, "utf8");
   // §13 Security: refuse inline credentials before anything is persisted.
   const secretFindings = scanForInlineSecrets(raw);
   if (secretFindings.length > 0) {
     throw new ConfigError("CONFIG_INVALID", describeSecretFindings(path, secretFindings));
   }
-  const expanded = expandEnvRefs(raw, env, path);
-
-  let data: unknown;
+  // ${VAR} / ${VAR:-fallback} references are expanded before parsing.
+  const expanded = expandEnvRefs(raw, optionsEnv, path);
   try {
-    data = parseYaml(expanded);
+    return parseYaml(expanded) as AppConfigInput;
   } catch (error) {
     throw new ConfigError("CONFIG_INVALID", `Failed to parse ${path}.`, { cause: error });
   }
+}
 
-  const parsed = appConfigSchema.safeParse(data);
-  if (!parsed.success) {
-    const issues = parsed.error.issues.map((issue) => {
-      const location = issue.path.length > 0 ? issue.path.join(".") : "(root)";
-      return `${location}: ${issue.message}`;
-    });
-    throw new ConfigError("CONFIG_INVALID", `Invalid configuration in ${path}.`, {
-      details: { issues },
-    });
+/** Backwards-compatible wrapper: the composed configuration. */
+export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
+  return loadConfigDetailed(options).config;
+}
+
+/**
+ * Actionable configuration diagnostics (roadmap §16) — the kind of message a
+ * user can act on, rather than a generic schema failure.
+ */
+export function configDiagnostics(config: AppConfig): string[] {
+  const notes: string[] = [];
+  for (const provider of config.project.providers) {
+    if (!provider.apiKeyEnvVar && provider.baseUrl.startsWith("https://")) {
+      notes.push(
+        `Provider "${provider.name}": API key reference is missing — add api_key_env_var: <ENV_VAR> unless this endpoint is intentionally keyless.`,
+      );
+    }
   }
-
-  return toAppConfig(parsed.data);
+  for (const agent of config.project.agents) {
+    if (!agent.command && agent.integration !== "custom") {
+      notes.push(`Agent "${agent.name}": no command configured — the process adapter needs one.`);
+    }
+    if (agent.allowExternalCwd) {
+      notes.push(`Agent "${agent.name}": may run outside the project root (allow_external_cwd).`);
+    }
+  }
+  for (const pipeline of config.project.pipelines) {
+    const ids = new Set(pipeline.steps.map((s) => s.id));
+    for (const step of pipeline.steps) {
+      for (const dep of step.dependsOn ?? []) {
+        if (!ids.has(dep)) {
+          notes.push(`Pipeline "${pipeline.id}": step "${step.id}" depends on unknown step "${dep}".`);
+        }
+      }
+    }
+  }
+  return notes;
 }
 
 function toAppConfig(yaml: ReturnType<typeof appConfigSchema.parse>): AppConfig {

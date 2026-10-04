@@ -18,7 +18,7 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v2.0.0-alpha.15 — v2 Phase 15: CLI v2**
+**v2.0.0-alpha.16 — v2 Phase 16: Configuration v2**
 (the reliability & interoperability line: architecture → execution →
 protocol → adapters → pipelines → providers → OmniHilbras → memory → reports) (the v2
 roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the v1 plan is complete:
@@ -31,6 +31,13 @@ for the plan and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design).
 
 ### What's new in v2 (so far)
 
+- **Phase 16 — Configuration v2**: explicit precedence (CLI → env →
+  project file → user file → profile overlay → defaults), named
+  **profiles** (`development`/`production`/`testing`), `OMNINODE_*`
+  environment overrides, and actionable validation diagnostics
+  ("Provider 'deepseek': API key reference is missing"). `config
+  validate` now reports which sources and defaults produced the
+  effective configuration. Details: [CONFIGURATION.md](docs/CONFIGURATION.md).
 - **Phase 15 — CLI v2**: documented **exit codes** (0 success, 2 invalid
   input, 3 config, 4 provider, 5 agent, 6 timeout, 7 cancelled, 8 not
   found, 9 not implemented), a `config` group (`show` / `path` /
@@ -387,7 +394,7 @@ required for the core engine.
 - [Architecture](docs/ARCHITECTURE.md) — module map, workflow, local state
 - [Security model](docs/SECURITY.md) — secrets, process execution, env isolation, audit log
 - [API stability policy](docs/API_STABILITY.md) and [public API inventory](docs/API.md)
-- [CLI guide](docs/CLI.md) · [Agent Protocol v2 spec](docs/PROTOCOL.md) · [Providers](docs/PROVIDERS.md) · [Memory](docs/MEMORY.md) · [Reports](docs/REPORTS.md) · [Persistence](docs/PERSISTENCE.md) · [Deprecations](docs/DEPRECATIONS.md) · [Changelog](CHANGELOG.md) · [v2 roadmap](docs/ROADMAP_V2.md)
+- [Configuration](docs/CONFIGURATION.md) · [CLI guide](docs/CLI.md) · [Agent Protocol v2 spec](docs/PROTOCOL.md) · [Providers](docs/PROVIDERS.md) · [Memory](docs/MEMORY.md) · [Reports](docs/REPORTS.md) · [Persistence](docs/PERSISTENCE.md) · [Deprecations](docs/DEPRECATIONS.md) · [Changelog](CHANGELOG.md) · [v2 roadmap](docs/ROADMAP_V2.md)
 - [Example project](examples/demo/) — a runnable end-to-end demo (`./demo.sh`)
 
 Prefer a container? `docker build -t omninode .` then

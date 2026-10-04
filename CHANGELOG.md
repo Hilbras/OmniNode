@@ -4,6 +4,30 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.16] — v2 Phase 16 (Configuration v2)
+
+### Added
+
+- **Source precedence** (§16): CLI arguments → environment →
+  project file → user file → profile overlay → defaults, with
+  `loadConfigDetailed()` returning provenance (`projectFile`, `userFile`,
+  `profile`, `envOverrides`, `defaults`). User configuration lives at
+  `~/.omninode/config.yaml` (`OMNINODE_USER_CONFIG` overrides it).
+- **Profiles** (§16): `profile:` in the file plus a `profiles:` block of
+  partial overlays (`development` / `production` / `testing`), selected by
+  `--profile` > `OMNINODE_PROFILE` > file; unknown profiles fail with the
+  known set. `omninode config profiles` lists them.
+- **Environment overrides**: `OMNINODE_CONFIG`, `OMNINODE_PROFILE`,
+  `OMNINODE_LOG_LEVEL`, `OMNINODE_LOG_FORMAT`, `OMNINODE_MEMORY_PROVIDER`,
+  `OMNINODE_MEMORY_REQUIRED`.
+- **Global CLI options** `--config` / `--profile`, honored by every command.
+- **Actionable diagnostics** (§16): `configDiagnostics()` produces messages
+  like `Provider "deepseek": API key reference is missing — add
+  api_key_env_var: <ENV_VAR> …`, printed by `config validate` together
+  with the sources and defaults that were applied.
+- docs/CONFIGURATION.md: precedence table, profiles, secrets, diagnostics.
+- Tests: 427 (was 411).
+
 ## [2.0.0-alpha.15] — v2 Phase 15 (CLI v2)
 
 ### Added

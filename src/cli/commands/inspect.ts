@@ -4,7 +4,6 @@
  * can be understood after the fact. `--json` emits the raw records.
  */
 import type { Command } from "commander";
-import { loadConfig } from "../../config/index.js";
 import { buildAgentRegistry } from "../../agents/index.js";
 import { buildRoleRegistry } from "../../roles/index.js";
 import { createMemoryProvider, MemoryService } from "../../memory/index.js";
@@ -12,7 +11,7 @@ import { OmniNodeError } from "../../errors/index.js";
 import { FilePipelineRunStore } from "../../pipelines/store.js";
 import { FileTaskStore } from "../../tasks/store.js";
 import { resolveEnvPolicy } from "../../agents/env.js";
-
+import { loadProjectConfig } from "../options.js";
 function emit(json: boolean, payload: unknown, render: () => void): void {
   if (json) {
     console.log(JSON.stringify(payload, null, 2));
@@ -106,7 +105,7 @@ export function registerAgentInspect(agentGroup: Command): void {
       .command("inspect <name>")
       .description("Show an agent's effective configuration and recent tasks.")
       .action(async (name: string, options: { json?: boolean }) => {
-        const config = loadConfig();
+        const config = loadProjectConfig();
         const agentConfig = config.project.agents.find((a) => a.name === name);
         if (!agentConfig) throw new OmniNodeError("AGENT_NOT_FOUND", `No agent "${name}" is configured.`);
         const registry = buildAgentRegistry(config);
@@ -144,7 +143,7 @@ export function registerProviderInspect(providerGroup: Command): void {
       .command("inspect <name>")
       .description("Show a provider's authentication status and capabilities.")
       .action(async (name: string, options: { json?: boolean }) => {
-        const config = loadConfig();
+        const config = loadProjectConfig();
         const providerConfig = config.project.providers.find((p) => p.name === name);
         if (!providerConfig) throw new OmniNodeError("PROVIDER_NOT_FOUND", `No provider "${name}" is configured.`);
         const { createProvider } = await import("../../providers/index.js");

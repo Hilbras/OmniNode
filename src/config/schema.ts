@@ -114,6 +114,10 @@ export const projectConfigSchema = z
 
 export const appConfigSchema = z
   .object({
+    /** Active profile; overlays live under `profiles` (§16). */
+    profile: z.string().min(1).optional(),
+    /** Named partial overlays, e.g. development/production/testing. */
+    profiles: z.record(z.unknown()).optional(),
     project: projectConfigSchema,
     logging: z
       .object({

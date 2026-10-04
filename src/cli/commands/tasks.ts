@@ -1,11 +1,10 @@
 import type { Command } from "commander";
-import { loadConfig } from "../../config/index.js";
 import { TaskError } from "../../errors/index.js";
 import { createTaskEngine } from "../../tasks/index.js";
 import type { Task } from "../../types/task.js";
 import { registerTaskInspect } from "./inspect.js";
 import { exitCodeForStatus } from "../exit-codes.js";
-
+import { loadProjectConfig } from "../options.js";
 const collectFiles = (value: string, previous: string[]): string[] => [...previous, value];
 
 export function registerTaskCommands(program: Command): void {
@@ -20,7 +19,7 @@ export function registerTaskCommands(program: Command): void {
     .option("-a, --agent <name>", "Agent name from project.agents (validated at creation).")
     .option("-f, --file <path>", "File or glob relevant to the task (repeatable).", collectFiles)
     .action(async (objective: string, options: { role?: string; agent?: string; file?: string[] }) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const engine = createTaskEngine(config);
       const created = await engine.create({
         objective,
@@ -43,7 +42,7 @@ export function registerTaskCommands(program: Command): void {
     .command("run <task-id>")
     .description("Run a task through its assigned agent.")
     .action(async (taskId: string) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const engine = createTaskEngine(config);
       console.log(`Running task ${taskId}...`);
       const finished = await engine.run(taskId);
@@ -55,7 +54,7 @@ export function registerTaskCommands(program: Command): void {
     .command("status <task-id>")
     .description("Show task details and current status.")
     .action(async (taskId: string) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const engine = createTaskEngine(config);
       const found = await engine.get(taskId);
       if (!found) {
@@ -73,7 +72,7 @@ export function registerTaskCommands(program: Command): void {
     .option("-s, --status <status>", "Filter by status (created, queued, running, completed, failed, cancelled).")
     .option("--json", "Emit tasks as JSON.")
     .action(async (options: { status?: string; json?: boolean }) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const engine = createTaskEngine(config);
       const tasks = await engine.list(
         options.status !== undefined ? { status: options.status as Task["status"] } : {},
@@ -95,7 +94,7 @@ export function registerTaskCommands(program: Command): void {
     .command("cancel <task-id>")
     .description("Cancel a task that has not finished yet.")
     .action(async (taskId: string) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const engine = createTaskEngine(config);
       const cancelled = await engine.cancel(taskId);
       console.log(`Task ${cancelled.id} is now "${cancelled.status}".`);
@@ -106,7 +105,7 @@ export function registerTaskCommands(program: Command): void {
     .description("Reset a failed, timed out, unknown or cancelled task to created; combine with --run to execute it again.")
     .option("--run", "Run the task again immediately after resetting it.")
     .action(async (taskId: string, options: { run?: boolean }) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const engine = createTaskEngine(config);
       const reset = await engine.retry(taskId);
       console.log(`Task ${reset.id} reset to "${reset.status}".`);

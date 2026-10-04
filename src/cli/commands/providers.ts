@@ -1,19 +1,14 @@
 import type { Command } from "commander";
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseDocument } from "yaml";
-import {
-  appConfigSchema,
-  findConfigFile,
-  loadConfig,
-  providerConfigSchema,
-} from "../../config/index.js";
+import { appConfigSchema, providerConfigSchema } from "../../config/index.js";
 import { OmniNodeError, ProviderError } from "../../errors/index.js";
 import { createProvider, OmniHilbrasProvider } from "../../providers/index.js";
 import { ModelRegistry } from "../../registry/index.js";
 import type { ProviderStatus } from "../../types/provider.js";
 import { appendToConfigList } from "./shared.js";
 import { registerProviderInspect } from "./inspect.js";
-
+import { loadProjectConfig, activeConfigPath } from "../options.js";
 interface AddProviderOptions {
   name: string;
   baseUrl: string;
@@ -31,7 +26,7 @@ export function registerProviderCommands(program: Command): void {
     .description("List configured providers.")
     .option("--json", "Emit providers as JSON.")
     .action(async (options: { json?: boolean }) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const providers = config.project.providers;
       if (options.json) {
         console.log(JSON.stringify(providers, null, 2));
@@ -90,7 +85,7 @@ export function registerProviderCommands(program: Command): void {
 }
 
 export async function addProvider(options: AddProviderOptions): Promise<void> {
-  const configPath = findConfigFile();
+  const configPath = activeConfigPath();
   if (!configPath) {
     throw new OmniNodeError("CONFIG_NOT_FOUND", "No omninode.yaml found. Run `omninode init` first.");
   }
@@ -110,11 +105,11 @@ export async function addProvider(options: AddProviderOptions): Promise<void> {
   const newProvider = candidate.data;
 
   // Existing name check happens before the document is edited.
-  const existing = loadConfig();
+  const existing = loadProjectConfig();
   if (existing.project.providers.some((p) => p.name === newProvider.name)) {
     throw new OmniNodeError(
       "CLI_USAGE",
-      `Provider "${newProvider.name}" already exists in ${findConfigFile() ?? "omninode.yaml"}.`,
+      `Provider "${newProvider.name}" already exists in ${activeConfigPath() ?? "omninode.yaml"}.`,
     );
   }
 
@@ -130,11 +125,11 @@ export async function addProvider(options: AddProviderOptions): Promise<void> {
 }
 
 function removeProvider(name: string): void {
-  const configPath = findConfigFile();
+  const configPath = activeConfigPath();
   if (!configPath) {
     throw new OmniNodeError("CONFIG_NOT_FOUND", "No omninode.yaml found.");
   }
-  const config = loadConfig();
+  const config = loadProjectConfig();
   if (!config.project.providers.some((p) => p.name === name)) {
     throw new ProviderError("PROVIDER_NOT_FOUND", `No provider "${name}" is configured.`);
   }
@@ -157,7 +152,7 @@ export async function testProvider(
   name: string,
   options: { connect?: boolean } = {},
 ): Promise<void> {
-  const config = loadConfig();
+  const config = loadProjectConfig();
   const providerConfig = config.project.providers.find((p) => p.name === name);
   if (!providerConfig) {
     const available = config.project.providers.map((p) => p.name).join(", ") || "(none)";

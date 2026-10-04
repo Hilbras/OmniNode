@@ -1,8 +1,7 @@
 import type { Command } from "commander";
-import { loadConfig } from "../../config/index.js";
 import { createMemoryProvider, MemoryService } from "../../memory/index.js";
 import { truncate } from "./shared.js";
-
+import { loadProjectConfig } from "../options.js";
 export function registerMemoryCommands(program: Command): void {
   const memory = program
     .command("memory")
@@ -12,7 +11,7 @@ export function registerMemoryCommands(program: Command): void {
     .command("status")
     .description("Show the active memory provider and how much is stored.")
     .action(async () => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const configured = config.project.memory?.provider ?? "local (default — add a `memory:` section to opt in)";
       const svc = new MemoryService(createMemoryProvider(config.project.memory));
       const entries = await svc.providerRef.query({ limit: 10_000 });
@@ -34,7 +33,7 @@ export function registerMemoryCommands(program: Command): void {
     .option("-n, --limit <count>", "Maximum entries to return.", (value: string) => Number(value), 10)
     .option("--json", "Emit entries as JSON.")
     .action(async (text: string, options: { scope?: string; limit: number; json?: boolean }) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const svc = new MemoryService(createMemoryProvider(config.project.memory));
       const entries = await svc.providerRef.query({
         text,
@@ -64,7 +63,7 @@ export function registerMemoryCommands(program: Command): void {
     )
     .option("-k, --key <key>", "Entry key (defaults to a generated note key).")
     .action(async (text: string, options: { scope: string; tags?: string[]; key?: string }) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const svc = new MemoryService(createMemoryProvider(config.project.memory));
       const key = options.key ?? `note:${Date.now().toString(36)}`;
       await svc.providerRef.write({

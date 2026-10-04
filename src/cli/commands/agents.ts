@@ -1,12 +1,12 @@
 import type { Command } from "commander";
-import { agentConfigSchema, loadConfig } from "../../config/index.js";
+import { agentConfigSchema } from "../../config/index.js";
 import { AgentError, OmniNodeError } from "../../errors/index.js";
 import { createAgent } from "../../agents/index.js";
 import { createTaskEngine } from "../../tasks/index.js";
 import { exitCodeForStatus } from "../exit-codes.js";
 import { appendToConfigList } from "./shared.js";
 import { registerAgentInspect } from "./inspect.js";
-
+import { loadProjectConfig } from "../options.js";
 const collectArgs = (value: string, previous: string[]): string[] => [...previous, value];
 
 interface AddAgentOptions {
@@ -33,7 +33,7 @@ export function registerAgentCommands(program: Command): void {
     .description("List configured agents.")
     .option("--json", "Emit agents as JSON.")
     .action(async (options: { json?: boolean }) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const agents = config.project.agents;
       if (options.json) {
         console.log(JSON.stringify(config.project.agents, null, 2));
@@ -80,7 +80,7 @@ export function registerAgentCommands(program: Command): void {
     .command("run <name> <objective>")
     .description("Run a single task through this agent immediately.")
     .action(async (name: string, objective: string) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const agentConfig = config.project.agents.find((a) => a.name === name);
       if (!agentConfig) {
         throw new AgentError("AGENT_NOT_FOUND", `No agent "${name}" is configured.`);
@@ -129,7 +129,7 @@ export async function addAgent(options: AddAgentOptions): Promise<void> {
   }
   const newAgent = candidate.data;
 
-  const existing = loadConfig();
+  const existing = loadProjectConfig();
   if (existing.project.agents.some((a) => a.name === newAgent.name)) {
     throw new OmniNodeError(
       "CLI_USAGE",
@@ -143,7 +143,7 @@ export async function addAgent(options: AddAgentOptions): Promise<void> {
 }
 
 export async function testAgent(name: string): Promise<void> {
-  const config = loadConfig();
+  const config = loadProjectConfig();
   const agentConfig = config.project.agents.find((a) => a.name === name);
   if (!agentConfig) {
     const available = config.project.agents.map((a) => a.name).join(", ") || "(none)";

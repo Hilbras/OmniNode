@@ -1,6 +1,5 @@
 import type { Command } from "commander";
-import { loadConfig } from "../../config/index.js";
-
+import { loadProjectConfig } from "../options.js";
 export function registerRoleCommands(program: Command): void {
   const role = program
     .command("role")
@@ -11,7 +10,7 @@ export function registerRoleCommands(program: Command): void {
     .description("List configured roles.")
     .option("--json", "Emit roles as JSON.")
     .action(async (options: { json?: boolean }) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const roles = config.project.roles;
       if (options.json) {
         console.log(JSON.stringify(config.project.roles, null, 2));

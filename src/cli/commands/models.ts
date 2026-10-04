@@ -1,10 +1,9 @@
 import type { Command } from "commander";
-import { loadConfig } from "../../config/index.js";
 import { OmniNodeError } from "../../errors/index.js";
 import { createProvider } from "../../providers/index.js";
 import { ModelRegistry } from "../../registry/index.js";
 import type { ModelCapabilities } from "../../types/model.js";
-
+import { loadProjectConfig } from "../options.js";
 const CAPABILITIES: readonly (keyof ModelCapabilities)[] = [
   "chat",
   "coding",
@@ -35,7 +34,7 @@ function registerModelGroup(program: Command, name: "models" | "model"): void {
         );
       }
 
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const selected = config.project.providers.filter((p) =>
         providerName ? p.name === providerName : true,
       );

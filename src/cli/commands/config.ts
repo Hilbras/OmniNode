@@ -3,10 +3,11 @@
  * printed: only environment-variable *references* are shown (roadmap §17).
  */
 import type { Command } from "commander";
-import { findConfigFile, loadConfig, scanForInlineSecrets } from "../../config/index.js";
 import { readFileSync } from "node:fs";
+import { parse as parseYaml } from "yaml";
+import { configDiagnostics, loadConfigDetailed, scanForInlineSecrets } from "../../config/index.js";
 import { OmniNodeError } from "../../errors/index.js";
-
+import { activeConfigPath } from "../options.js";
 export function registerConfigCommands(program: Command): void {
   const config = program
     .command("config")
@@ -16,7 +17,7 @@ export function registerConfigCommands(program: Command): void {
     .command("path")
     .description("Print the path of the configuration file in use.")
     .action(() => {
-      const path = findConfigFile();
+      const path = activeConfigPath();
       console.log(path ?? "no omninode.yaml found");
     });
 
@@ -25,7 +26,7 @@ export function registerConfigCommands(program: Command): void {
     .description("Print the effective configuration (credential references only, never values).")
     .option("--json", "Emit the configuration as JSON.")
     .action((options: { json?: boolean }) => {
-      const resolved = loadConfig();
+      const resolved = loadConfigDetailed().config;
       const payload = {
         project: resolved.project.name,
         providers: resolved.project.providers.map((p) => ({
@@ -53,10 +54,22 @@ export function registerConfigCommands(program: Command): void {
     });
 
   config
+    .command("profiles")
+    .description("List the configuration profiles defined in this project.")
+    .action(() => {
+      const path = activeConfigPath();
+      const raw = path ? (parseYaml(readFileSync(path, "utf8")) as { profile?: string; profiles?: Record<string, unknown> }) : {};
+      const names = Object.keys(raw.profiles ?? {});
+      const active = loadConfigDetailed().sources.profile;
+      console.log(`active:  ${active}`);
+      console.log(`defined: ${names.length > 0 ? names.join(", ") : "none (add a `profiles:` section)"}`);
+    });
+
+  config
     .command("validate")
     .description("Validate the configuration file, including the inline-secret scan.")
     .action(() => {
-      const path = findConfigFile();
+      const path = activeConfigPath();
       if (!path) throw new OmniNodeError("CONFIG_NOT_FOUND", "No omninode.yaml found.");
       const findings = scanForInlineSecrets(readFileSync(path, "utf8"));
       if (findings.length > 0) {
@@ -65,7 +78,22 @@ export function registerConfigCommands(program: Command): void {
           `${path} contains ${findings.length} inline secret(s) (line ${findings.map((f) => f.line).join(", ")}). Use environment-variable references.`,
         );
       }
-      const resolved = loadConfig();
-      console.log(`${path} is valid — project "${resolved.project.name}" with ${resolved.project.providers.length} provider(s), ${resolved.project.agents.length} agent(s), ${resolved.project.pipelines.length} pipeline(s).`);
+      const { config: resolved, sources } = loadConfigDetailed();
+      console.log(
+        `${path} is valid — project "${resolved.project.name}" with ${resolved.project.providers.length} provider(s), ${resolved.project.agents.length} agent(s), ${resolved.project.pipelines.length} pipeline(s).`,
+      );
+      console.log(`  profile:  ${sources.profile}`);
+      if (sources.userFile) console.log(`  user cfg: ${sources.userFile}`);
+      if (sources.envOverrides.length > 0) {
+        console.log(`  env overrides: ${sources.envOverrides.join(", ")}`);
+      }
+      if (sources.defaults.length > 0) {
+        console.log(`  defaults applied: ${sources.defaults.join(", ")}`);
+      }
+      const diagnostics = configDiagnostics(resolved);
+      if (diagnostics.length > 0) {
+        console.log("  diagnostics:");
+        for (const note of diagnostics) console.log(`    - ${note}`);
+      }
     });
 }

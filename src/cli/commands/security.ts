@@ -4,9 +4,8 @@
  * it does not change anything.
  */
 import type { Command } from "commander";
-import { loadConfig } from "../../config/index.js";
 import { resolveEnvPolicy } from "../../agents/env.js";
-
+import { loadProjectConfig } from "../options.js";
 type Severity = "info" | "warn";
 
 interface Finding {
@@ -25,7 +24,7 @@ export function registerSecurityCommand(program: Command): void {
         console.log(`Unknown security action "${action}". Available: audit.`);
         return;
       }
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const findings: Finding[] = [];
 
       // Agents: environment exposure, working-directory reach, shell usage.

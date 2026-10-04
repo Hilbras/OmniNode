@@ -1,12 +1,11 @@
 import type { Command } from "commander";
-import { loadConfig } from "../../config/index.js";
 import { createMemoryProvider, MemoryService } from "../../memory/index.js";
 import { FilePlanStore } from "../../planner/store.js";
 import { FileReportStore } from "../../reports/store.js";
 import { FileTaskStore } from "../../tasks/store.js";
 import { FilePipelineRunStore } from "../../pipelines/store.js";
 import { OMNINODE_VERSION } from "../../version.js";
-
+import { loadProjectConfig } from "../options.js";
 function groupBy<T>(items: T[], key: (item: T) => string): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const item of items) {
@@ -32,7 +31,7 @@ export function registerStatusCommand(program: Command): void {
     .description("Show the project's OmniNode state overview (config, tasks, runs, reports, plans, memory).")
     .option("--json", "Emit machine-readable JSON (for scripts and CI).")
     .action(async (options: { json?: boolean }) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
 
       const tasks = await new FileTaskStore().list();
       const runs = await new FilePipelineRunStore().list();

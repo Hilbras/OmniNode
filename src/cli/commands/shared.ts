@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseDocument } from "yaml";
-import { appConfigSchema, findConfigFile } from "../../config/index.js";
+import { appConfigSchema } from "../../config/index.js";
 import { ConfigError, OmniNodeError } from "../../errors/index.js";
-
+import { activeConfigPath } from "../options.js";
 /** Shared helper for commands whose phase has not landed yet. */
 export function notImplemented(command: string, when: string): OmniNodeError {
   return new OmniNodeError(
@@ -21,7 +21,7 @@ export function truncate(text: string, max: number): string {
  * Returns the config path that was edited.
  */
 export function appendToConfigList(listKey: "providers" | "agents", item: unknown): string {
-  const configPath = findConfigFile();
+  const configPath = activeConfigPath();
   if (!configPath) {
     throw new OmniNodeError("CONFIG_NOT_FOUND", "No omninode.yaml found. Run `omninode init` first.");
   }

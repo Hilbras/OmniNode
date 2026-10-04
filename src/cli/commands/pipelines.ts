@@ -1,14 +1,14 @@
 import type { Command } from "commander";
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseDocument } from "yaml";
-import { appConfigSchema, findConfigFile, loadConfig, pipelineConfigSchema } from "../../config/index.js";
+import { appConfigSchema, loadConfig, pipelineConfigSchema } from "../../config/index.js";
 import { OmniNodeError } from "../../errors/index.js";
 import { PipelineError } from "../../errors/index.js";
 import { buildPipelineEngine } from "../../pipelines/index.js";
 import type { PipelineDefinition } from "../../types/pipeline.js";
 import { registerPipelineInspect } from "./inspect.js";
 import { exitCodeForStatus } from "../exit-codes.js";
-
+import { loadProjectConfig, activeConfigPath } from "../options.js";
 export function registerPipelineCommands(program: Command): void {
   const pipeline = program
     .command("pipeline")
@@ -19,7 +19,7 @@ export function registerPipelineCommands(program: Command): void {
     .description("List configured pipelines.")
     .option("--json", "Emit pipelines as JSON.")
     .action(async (options: { json?: boolean }) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const pipelines = config.project.pipelines;
       if (options.json) {
         console.log(JSON.stringify(config.project.pipelines, null, 2));
@@ -48,7 +48,7 @@ export function registerPipelineCommands(program: Command): void {
       "Error recovery: re-run a recorded pipeline run as a new run, reusing its objective.",
     )
     .action(async (runId: string, objective: string | undefined) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const engine = buildPipelineEngine(config);
       const previous = await engine.get(runId);
       if (!previous) {
@@ -71,7 +71,7 @@ export function registerPipelineCommands(program: Command): void {
     .command("cancel <run-id>")
     .description("Request cancellation of a pipeline run (stops scheduling and cancels running tasks).")
     .action(async (runId: string) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const engine = buildPipelineEngine(config);
       await engine.cancel(runId);
       console.log(`Cancellation requested for run ${runId}.`);
@@ -90,7 +90,7 @@ export function registerPipelineCommands(program: Command): void {
     .command("validate <id>")
     .description("Validate a pipeline definition before running it (§9.5).")
     .action(async (id: string) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const def = findPipeline(config, id);
       const engine = buildPipelineEngine(config);
       engine.validate(def);
@@ -105,7 +105,7 @@ export function registerPipelineCommands(program: Command): void {
     .command("runs <id>")
     .description("List recorded runs of a pipeline.")
     .action(async (id: string) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const engine = buildPipelineEngine(config);
       const runs = await engine.listRuns({ pipelineId: id });
       if (runs.length === 0) {
@@ -122,7 +122,7 @@ export function registerPipelineCommands(program: Command): void {
     .command("status <run-id>")
     .description("Show the recorded state of a pipeline run.")
     .action(async (runId: string) => {
-      const config = loadConfig();
+      const config = loadProjectConfig();
       const engine = buildPipelineEngine(config);
       const run = await engine.get(runId);
       if (!run) {
@@ -155,7 +155,7 @@ export function registerPipelineCommands(program: Command): void {
 }
 
 async function runPipelineAction(id: string, objective: string | undefined): Promise<void> {
-  const config = loadConfig();
+  const config = loadProjectConfig();
   const def = findPipeline(config, id);
   const engine = buildPipelineEngine(config);
   console.log(
@@ -193,7 +193,7 @@ export function registerRunAlias(program: Command): void {
 }
 
 async function createPipelineFromFile(id: string, file: string): Promise<void> {
-  const configPath = findConfigFile();
+  const configPath = activeConfigPath();
   if (!configPath) {
     throw new OmniNodeError("CONFIG_NOT_FOUND", "No omninode.yaml found. Run `omninode init` first.");
   }
@@ -211,7 +211,7 @@ async function createPipelineFromFile(id: string, file: string): Promise<void> {
     throw new PipelineError("PIPELINE_INVALID", `Invalid pipeline definition: ${issues}`);
   }
   // Reject duplicates and structural problems before touching the config.
-  const engine = buildPipelineEngine(loadConfig());
+  const engine = buildPipelineEngine(loadProjectConfig());
   engine.validate({ id, ...(candidate.data as object) } as never);
 
   const doc = parseDocument(readFileSync(configPath, "utf8"));
