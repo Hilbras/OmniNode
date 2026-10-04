@@ -18,7 +18,9 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v2.0.0-alpha.3 — v2 Phase 3: Agent Protocol v2** (after Phase 1: architecture & API stabilization, Phase 2: execution reliability) (the v2
+**v2.0.0-alpha.4 — v2 Phase 4: Agent Adapter Hardening**
+(after Phase 1: architecture & API stabilization, Phase 2: execution reliability,
+Phase 3: agent protocol v2 — the reliability & interoperability line) (the v2
 roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the v1 plan is complete:
 the
 full loop from §28 runs in one command —
@@ -27,14 +29,28 @@ planner → plan → execution → result` — with audit logging, error recover
 production hardening (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
 for the plan and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design).
 
-### What changed in v2 Phase 1
+### What's new in v2 (so far)
 
-- All local stores now build on one shared `JsonFileStore` (atomic writes,
-  serialized read-modify-write, schema-versioned files, corruption tolerance)
-  with a `ProjectStores` facade.
-- Dependency direction corrected (adapters no longer import engine modules).
-- API surface stabilized and guarded: [API_STABILITY.md](docs/API_STABILITY.md),
-  [API.md](docs/API.md), [DEPRECATIONS.md](docs/DEPRECATIONS.md).
+- **Phase 4 — Agent Adapter Hardening**: process-tree cleanup (agents run in
+  their own process group; timeout, cancel and Ctrl-C reap the whole tree, so
+  no orphaned children), explicit environment policies
+  (`inherit` / `allowlist` / `denylist` / `explicit`), working-directory
+  validation against project boundaries, per-stream output limits that kill
+  runaway agents, binary-safe output decoding, human-readable exit/signal
+  reporting, and a native `IAgentAdapter` registry so new integration styles
+  plug in without touching core.
+- **Phase 3 — Agent Protocol v2**: versioned protocol
+  (`omninode-agent-protocol/2`), fully correlated envelopes, the complete
+  message-type set, HELLO handshake, QUESTION/RESPONSE round-trips, and
+  malformed input that can never crash OmniNode. Spec:
+  [PROTOCOL.md](docs/PROTOCOL.md).
+- **Phase 2 — Execution Reliability**: a task killed after dispatch is
+  `unknown`, **not** `failed` — retries never duplicate side effects blindly;
+  bounded retries with backoff, execution identity and history.
+- **Phase 1 — Architecture & API Stabilization**: one shared `JsonFileStore`
+  behind every local store, corrected dependency direction, and a guarded
+  public API ([API_STABILITY.md](docs/API_STABILITY.md), [API.md](docs/API.md),
+  [DEPRECATIONS.md](docs/DEPRECATIONS.md)).
 
 ### What's in v1.0
 

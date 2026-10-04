@@ -60,8 +60,11 @@ for `loadConfig`/`AppConfig`/schemas; helpers Experimental.
 ## Registry, agents, roles (`src/registry`, `src/agents`, `src/roles`)
 
 `ModelRegistry`, `registryKey` (Stable); `ProcessAgent`, `composeTaskText`,
-`buildChildEnv`, `createAgent`, `buildAgentRegistry` (Stable); `RoleRegistry`,
-`buildRoleRegistry` (Stable).
+`createAgent`, `buildAgentRegistry`, `defaultAgentAdapters` (Stable);
+`buildChildEnv`, `resolveEnvPolicy`, `EnvPolicy`, `validateWorkingDirectory`,
+`AgentAdapterRegistry`, `ProcessAgentAdapter`, `IAgentAdapter`, `killTree`,
+`describeExit`, `sanitizeChunk`, `DEFAULT_MAX_OUTPUT_BYTES` (Stable);
+`RoleRegistry`, `buildRoleRegistry` (Stable).
 
 ## Tasks (`src/tasks`)
 

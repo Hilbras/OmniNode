@@ -29,6 +29,11 @@ export const agentConfigSchema = z
     input_mode: z.enum(["stdin", "arg", "protocol"]).default("stdin"),
     timeout_ms: z.number().int().positive().optional(),
     inherit_env: z.boolean().optional(),
+    env_policy: z.enum(["inherit", "allowlist", "denylist", "explicit"]).optional(),
+    env_allowlist: z.array(z.string()).optional(),
+    env_denylist: z.array(z.string()).optional(),
+    max_output_bytes: z.number().int().positive().optional(),
+    allow_external_cwd: z.boolean().optional(),
     metadata: z.record(z.unknown()).optional(),
   })
   .strict();

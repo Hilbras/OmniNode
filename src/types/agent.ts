@@ -29,8 +29,21 @@ export interface AgentConfig {
   inputMode?: AgentInputMode;
   /** Per-task timeout in milliseconds; the process is killed when exceeded. */
   timeoutMs?: number;
-  /** When false, the agent process starts with a minimal environment (PATH + env). */
+  /**
+   * When false, the agent process starts with a minimal environment (PATH +
+   * env). Deprecated in v2 — prefer `envPolicy`.
+   */
   inheritEnv?: boolean;
+  /** Explicit environment policy (roadmap §8). */
+  envPolicy?: "inherit" | "allowlist" | "denylist" | "explicit";
+  /** Variables forwarded from the parent under the `allowlist` policy. */
+  envAllowlist?: string[];
+  /** Variables removed from the parent under the `denylist` policy. */
+  envDenylist?: string[];
+  /** Per-stream byte budget for agent stdout/stderr (default 5 MiB). */
+  maxOutputBytes?: number;
+  /** Allow a working directory outside the project root. */
+  allowExternalCwd?: boolean;
   /** Models (as "provider:model-id") this agent may use, if restricted. */
   allowedModels?: string[];
   metadata?: Record<string, unknown>;

@@ -30,16 +30,43 @@ does not, and how to configure it defensively.
 ## Environment isolation
 
 By default a spawned agent **inherits the full environment** of the OmniNode
-process — including any API keys present in it. To avoid leaking OmniNode's own
-credentials into third-party agents, set `inherit_env: false` on the agent:
+process — including any API keys present in it. Four explicit policies let you
+choose exactly what an agent sees:
 
 ```yaml
 project:
   agents:
-    - name: untrusted-agent
+    - name: inherits-all
+      command: trusted-agent
+      env_policy: inherit          # default (v1 behavior)
+
+    - name: minimal
+      command: untrusted-agent
+      env_policy: explicit         # only PATH, HOME and `env:` entries
+
+    - name: only-allowed
       command: some-agent
-      inherit_env: false     # child receives only PATH, HOME and `env:` entries
+      env_policy: allowlist
+      env_allowlist: [HOME, LANG, CI]
+      env_denylist: []             # (unused for allowlist)
+
+    - name: everything-but-secrets
+      command: some-agent
+      env_policy: denylist
+      env_denylist: [OPENAI_API_KEY, ANTHROPIC_API_KEY, AWS_SECRET_ACCESS_KEY]
 ```
+
+`inherit_env: false` remains supported and maps to `explicit`.
+
+## Process containment
+
+- Agents run in their own process group on POSIX; timeout, cancellation and
+  OmniNode's own SIGINT/SIGTERM terminate the whole group, so agents cannot
+  leave orphaned children behind.
+- Working directories are validated (existence, access, normalization) and
+  confined to the project root unless `allow_external_cwd: true`.
+- Runaway output is capped (5 MiB per stream by default) and the agent is
+  killed when it exceeds the budget.
 
 ## Audit logging
 

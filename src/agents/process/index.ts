@@ -23,27 +23,13 @@ import type {
   IAgent,
 } from "../../types/agent.js";
 import type { Report } from "../../types/report.js";
+import { validateWorkingDirectory } from "../cwd.js";
+import { buildChildEnv } from "../env.js";
 
 const DEFAULT_TIMEOUT_MS = 600_000;
 const KILL_GRACE_MS = 5_000;
-
-/**
- * Builds the child environment. By default the agent inherits the full
- * environment; with `inheritEnv: false` it receives only PATH plus the
- * explicitly configured variables — useful to avoid leaking OmniNode's
- * own secrets (e.g. provider API keys) into third-party agents.
- */
-export function buildChildEnv(config: AgentConfig): NodeJS.ProcessEnv {
-  const configured = config.env ?? {};
-  if (config.inheritEnv !== false) {
-    return { ...process.env, ...configured };
-  }
-  return {
-    PATH: process.env.PATH ?? "",
-    HOME: process.env.HOME ?? "",
-    ...configured,
-  };
-}
+/** Per-stream byte budget before output is truncated and the agent killed. */
+export const DEFAULT_MAX_OUTPUT_BYTES = 5 * 1024 * 1024;
 
 export function composeTaskText(input: AgentTaskInput): string {
   const sections: string[] = [`# Objective\n${input.objective}`];
@@ -110,27 +96,47 @@ export class ProcessAgent implements IAgent {
     const timeoutMs = this.config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
     return new Promise<AgentTaskOutput>((resolve, reject) => {
+      // Validate the working directory BEFORE spawning (roadmap §8): never
+      // silently fall back to the OmniNode cwd.
+      let cwd: string | undefined;
+      try {
+        cwd = validateWorkingDirectory(this.config.cwd, {
+          allowExternal: this.config.allowExternalCwd,
+        })?.cwd;
+      } catch (error) {
+        // Invalid working directory — fail before spawning anything.
+        reject(error);
+        return;
+      }
+
       const child = spawn(
         command,
         [...(this.config.args ?? []), ...(mode === "arg" ? [composeTaskText(input)] : [])],
         {
-          cwd: this.config.cwd,
+          ...(cwd !== undefined ? { cwd } : {}),
           env: buildChildEnv(this.config),
           stdio: ["pipe", "pipe", "pipe"],
+          // Own process group so the whole tree can be terminated together
+          // (roadmap §8: no orphaned children).
+          ...(process.platform === "win32" ? {} : { detached: true }),
         },
       );
       this.running.set(input.taskId, child);
+      GLOBAL_RUNNING.add(child);
+      installSignalForwarding();
 
       let stdout = "";
       let stderr = "";
       let timedOut = false;
+      let outputLimitExceeded = false;
       let settled = false;
+      const maxOutputBytes = this.config.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
 
       const timer = setTimeout(() => {
         timedOut = true;
-        this.log.warn(`Task ${input.taskId} exceeded ${timeoutMs}ms — killing process.`);
-        child.kill("SIGTERM");
-        setTimeout(() => child.kill("SIGKILL"), KILL_GRACE_MS).unref();
+        this.log.warn(`Task ${input.taskId} exceeded ${timeoutMs}ms — killing process tree.`);
+        killTree(child, "SIGTERM");
+        setTimeout(() => killTree(child, "SIGKILL"), KILL_GRACE_MS).unref();
       }, timeoutMs);
 
       const settle = (finish: () => void): void => {
@@ -138,15 +144,35 @@ export class ProcessAgent implements IAgent {
         settled = true;
         clearTimeout(timer);
         this.running.delete(input.taskId);
+        GLOBAL_RUNNING.delete(child);
         finish();
       };
 
-      child.stdout?.on("data", (chunk: Buffer) => {
-        stdout += chunk.toString();
-      });
-      child.stderr?.on("data", (chunk: Buffer) => {
-        stderr += chunk.toString();
-      });
+      // Output protection (roadmap §8): runaway/binary output is truncated at
+      // a byte budget, and a flooding agent is killed rather than allowed to
+      // exhaust memory.
+      const collect = (into: "stdout" | "stderr", chunk: Buffer): void => {
+        if (outputLimitExceeded) return;
+        const text = sanitizeChunk(chunk);
+        if (into === "stdout") {
+          if (stdout.length + text.length > maxOutputBytes) {
+            stdout = (stdout + text).slice(0, maxOutputBytes);
+            outputLimitExceeded = true;
+            this.log.warn(`Agent "${this.config.name}" exceeded the ${maxOutputBytes} byte output limit — killing it.`);
+            killTree(child, "SIGKILL");
+            return;
+          }
+          stdout += text;
+        } else {
+          if (stderr.length + text.length > maxOutputBytes) {
+            stderr = (stderr + text).slice(0, maxOutputBytes);
+            return;
+          }
+          stderr += text;
+        }
+      };
+      child.stdout?.on("data", (chunk: Buffer) => collect("stdout", chunk));
+      child.stderr?.on("data", (chunk: Buffer) => collect("stderr", chunk));
 
       // Agents that exit without reading stdin raise EPIPE on write — that is
       // not an agent failure, so the stream error is ignored.
@@ -228,15 +254,16 @@ export class ProcessAgent implements IAgent {
           const trimmed = stdout.trim();
           resolve({
             taskId: input.taskId,
-            status: code === 0 ? "completed" : "failed",
+            status: code === 0 && !outputLimitExceeded ? "completed" : "failed",
             summary: trimmed.length > 0 ? firstLine(trimmed) : undefined,
             rawOutput: trimmed.length > 0 ? trimmed : undefined,
             exitCode: code ?? undefined,
             logs,
-            error:
-              code === 0
-                ? undefined
-                : `Process exited with code ${code ?? "unknown"}${signal ? ` (signal: ${signal})` : ""}`,
+            ...(outputLimitExceeded
+              ? { error: `Agent exceeded the ${maxOutputBytes} byte output limit and was terminated.` }
+              : code === 0
+                ? {}
+                : { error: describeExit(code, signal) }),
           });
         });
       });
@@ -246,7 +273,7 @@ export class ProcessAgent implements IAgent {
   /** Ask the agent to stop current work (SIGTERM). */
   async cancel(taskId: string): Promise<void> {
     const child = this.running.get(taskId);
-    if (child) child.kill("SIGTERM");
+    if (child) killTree(child, "SIGTERM");
   }
 
   runningTaskIds(): string[] {
@@ -343,6 +370,63 @@ function interpretProtocolRun({
     ...(reports.length > 0 ? { reports } : {}),
     ...(exitCode !== 0 ? { error: `Process exited with code ${exitCode ?? "unknown"}` } : {}),
   };
+}
+
+/**
+ * Every live agent process, so Ctrl-C / SIGTERM on OmniNode reaches the whole
+ * tree instead of orphaning children (roadmap §8, signal handling).
+ */
+const GLOBAL_RUNNING = new Set<ChildProcess>();
+let signalForwardingInstalled = false;
+
+function installSignalForwarding(): void {
+  if (signalForwardingInstalled) return;
+  signalForwardingInstalled = true;
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.on(signal, () => {
+      for (const child of GLOBAL_RUNNING) {
+        killTree(child, "SIGTERM");
+      }
+    });
+  }
+}
+
+/** Kills a child and, on POSIX, its whole process group (roadmap §8 tree cleanup). */
+export function killTree(child: ChildProcess, signal: NodeJS.Signals): void {
+  if (child.pid === undefined) return;
+  if (process.platform !== "win32") {
+    try {
+      process.kill(-child.pid, signal);
+      return;
+    } catch {
+      // Group already gone — fall through to direct kill.
+    }
+  }
+  try {
+    child.kill(signal);
+  } catch {
+    // Process already exited.
+  }
+}
+
+/** Human-readable exit reason, including signal terminations. */
+export function describeExit(code: number | null, signal: NodeJS.Signals | null): string {
+  if (signal !== null) {
+    return signal === "SIGKILL"
+      ? "Process was killed (SIGKILL) — usually an external kill or OOM."
+      : `Process terminated by signal ${signal}.`;
+  }
+  if (code === null) return "Process terminated without an exit code.";
+  return `Process exited with code ${code}.`;
+}
+
+/**
+ * Decodes a stdout/stderr chunk safely: invalid UTF-8 becomes replacement
+ * characters and NUL bytes are stripped, so binary noise cannot poison the
+ * protocol decoder or the terminal (roadmap §8, encoding hardening).
+ */
+export function sanitizeChunk(chunk: Buffer): string {
+  return [...chunk.toString("utf8")].filter((char) => char.charCodeAt(0) !== 0).join("");
 }
 
 /** Normalizes a loose REPORT payload into a strict Report; drops malformed entries. */

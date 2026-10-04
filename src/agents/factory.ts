@@ -8,19 +8,30 @@ import { logger, type Logger } from "../logger/index.js";
 import type { AgentConfig, IAgent } from "../types/agent.js";
 import { ProcessAgent } from "./process/index.js";
 import { AgentRegistry } from "./registry.js";
+import { AgentAdapterRegistry, ProcessAgentAdapter } from "./adapters.js";
 
-export function createAgent(config: AgentConfig): IAgent {
-  if (config.integration === "process") {
-    return new ProcessAgent(config);
-  }
+/**
+ * Registry consulted first so native/API-level integrations plug in without
+ * touching core (roadmap §8, Native Adapters).
+ */
+export const defaultAgentAdapters = new AgentAdapterRegistry();
+defaultAgentAdapters.register(new ProcessAgentAdapter((config) => new ProcessAgent(config)));
+
+export function createAgent(config: AgentConfig, adapters: AgentAdapterRegistry = defaultAgentAdapters): IAgent {
+  const registered = adapters.get(config.integration);
+  if (registered) return registered.create(config);
   if (config.integration === "native") {
     throw new OmniNodeError(
       "NOT_IMPLEMENTED",
-      `Native agent adapters are planned for a later phase. Use input over stdin/stdout (type "cli") for "${config.name}" for now.`,
+      `No native adapter is registered for "${config.name}". Register an IAgentAdapter ` +
+        `(createAgent(config, adapters)) or use input over stdin/stdout (type "cli").`,
     );
   }
   throw new OmniNodeError("NOT_IMPLEMENTED", `Agent integration "${config.integration}" has no adapter yet.`);
 }
+
+export { AgentAdapterRegistry } from "./adapters.js";
+export type { IAgentAdapter } from "./adapters.js";
 
 /** Builds an agent registry from the project configuration, skipping agents that fail to construct. */
 export function buildAgentRegistry(config: AppConfig, log: Logger = logger): AgentRegistry {

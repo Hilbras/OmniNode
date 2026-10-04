@@ -4,6 +4,37 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.4] — v2 Phase 4 (Agent Adapter Hardening)
+
+### Added
+
+- Environment policies (§8): `inherit` (default), `allowlist`, `denylist`,
+  `explicit` via `env_policy` + `env_allowlist` / `env_denylist`; the v1
+  `inherit_env: false` keeps working (maps to `explicit`).
+- Process-tree cleanup: agents run in their own process group on POSIX;
+  timeout, cancel **and OmniNode's own SIGINT/SIGTERM** reap the whole tree
+  (verified by a test where an orphaned grandchild would write a marker).
+- Output protection: per-stream byte budget (`max_output_bytes`, default
+  5 MiB) truncates output and kills a flooding agent instead of exhausting
+  memory; output decoding strips NUL bytes so binary noise cannot poison the
+  protocol decoder.
+- Working-directory validation: existence, directory-ness, access and path
+  normalization, plus project-boundary enforcement (`allow_external_cwd`
+  opt-in).
+- Native adapter interface `IAgentAdapter` + `AgentAdapterRegistry`:
+  `createAgent(config, adapters)` consults the registry, so API-level
+  integrations plug in without modifying core.
+- Exit/signal interpretation (`describeExit`) surfaced in task errors.
+- Tests: 297 (was 282) — env policy matrix, tree-cleanup proof, output-flood
+  kill, cwd validation matrix, adapter registry.
+
+### Changed
+
+- `agent add` gained `--env-policy`, `--allow-env`, `--deny-env`,
+  `--max-output-bytes`, `--allow-external-cwd`.
+- Unregistered `native` integrations now say "no native adapter is
+  registered" and point at the registry API.
+
 ## [2.0.0-alpha.3] — v2 Phase 3 (Agent Protocol v2)
 
 ### Added

@@ -13,6 +13,11 @@ interface AddAgentOptions {
   cwd?: string;
   inputMode: string;
   timeoutMs?: number;
+  envPolicy?: string;
+  allowEnv?: string[];
+  denyEnv?: string[];
+  maxOutputBytes?: number;
+  allowExternalCwd?: boolean;
 }
 
 export function registerAgentCommands(program: Command): void {
@@ -53,6 +58,11 @@ export function registerAgentCommands(program: Command): void {
       "How the task is delivered: stdin (prompt on stdin), arg (prompt as last argument) or protocol (§21 JSON-lines task protocol).",
       "stdin",
     )
+    .option("--env-policy <policy>", "Environment policy: inherit, allowlist, denylist or explicit.")
+    .option("--allow-env <name>", "Variable to forward under the allowlist policy (repeatable).", collectArgs)
+    .option("--deny-env <name>", "Variable to remove under the denylist policy (repeatable).", collectArgs)
+    .option("--max-output-bytes <n>", "Per-stream output budget in bytes (default 5 MiB).", (value: string) => Number(value))
+    .option("--allow-external-cwd", "Allow a working directory outside the project root.")
     .option("--timeout-ms <ms>", "Per-task timeout in milliseconds.", (value: string) =>
       Number(value),
     )
@@ -73,6 +83,15 @@ export async function addAgent(options: AddAgentOptions): Promise<void> {
     ...(options.cwd !== undefined ? { cwd: options.cwd } : {}),
     input_mode: options.inputMode,
     ...(options.timeoutMs !== undefined ? { timeout_ms: options.timeoutMs } : {}),
+    ...(options.envPolicy !== undefined ? { env_policy: options.envPolicy } : {}),
+    ...(options.allowEnv !== undefined && options.allowEnv.length > 0
+      ? { env_allowlist: options.allowEnv }
+      : {}),
+    ...(options.denyEnv !== undefined && options.denyEnv.length > 0
+      ? { env_denylist: options.denyEnv }
+      : {}),
+    ...(options.maxOutputBytes !== undefined ? { max_output_bytes: options.maxOutputBytes } : {}),
+    ...(options.allowExternalCwd !== undefined ? { allow_external_cwd: options.allowExternalCwd } : {}),
   });
   if (!candidate.success) {
     const issues = candidate.error.issues

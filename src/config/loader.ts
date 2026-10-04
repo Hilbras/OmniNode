@@ -189,6 +189,11 @@ function toAgentConfig(raw: AgentConfigYaml): AgentConfig {
     inputMode: raw.input_mode,
     timeoutMs: raw.timeout_ms,
     inheritEnv: raw.inherit_env,
+    envPolicy: raw.env_policy,
+    envAllowlist: raw.env_allowlist,
+    envDenylist: raw.env_denylist,
+    maxOutputBytes: raw.max_output_bytes,
+    allowExternalCwd: raw.allow_external_cwd,
     metadata: raw.metadata,
   };
 }
