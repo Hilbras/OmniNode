@@ -1,43 +1,158 @@
 /**
- * Shared JSON file persistence (v2 Phase 1: duplicated-abstraction cleanup).
+ * Shared JSON file persistence (v2 Phase 12 — Persistence Layer).
  *
- * Every local store in OmniNode is "load array → mutate → atomic write" with
- * serialized read-modify-write cycles. This base owns that once:
- * - writes go to a temp file and are renamed into place (atomic enough)
- * - read-modify-write operations are serialized per store instance, so
- *   parallel fan-out tasks cannot lose updates
- * - corrupt or partially written files degrade to an empty collection and
- *   leave the original file untouched (no destructive auto-repair)
+ * Guarantees:
+ *  - **Atomic writes**: temp file → fsync → rename → directory fsync, so a
+ *    crash never leaves a half-written store.
+ *  - **Corruption detection**: unparseable files are *quarantined* (renamed,
+ *    never deleted) and the store continues empty.
+ *  - **Schema versioning**: documents carry `schemaVersion`; v1 documents are
+ *    migrated on read, future versions are refused rather than misread.
  */
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { open, mkdir, readFile, rename, stat } from "node:fs/promises";
 import { dirname } from "node:path";
 import { logger, type Logger } from "../logger/index.js";
 
+/** Current on-disk schema version. */
+export const SCHEMA_VERSION = 2;
+
 export interface JsonDocument<T> {
-  /** Bumped when the persisted shape changes in a breaking way (v2 Phase 12). */
   schemaVersion?: number;
   items: T[];
 }
 
+export type DocumentState =
+  | { status: "missing" }
+  | { status: "empty" }
+  | { status: "v1-legacy" }
+  | { status: "current"; schemaVersion: number; count: number }
+  | { status: "future"; schemaVersion: number }
+  | { status: "corrupt"; detail: string };
+
 export interface JsonFileStoreOptions {
   directory?: string;
   fileName: string;
+  /** Schema version to write (defaults to the current version). */
   schemaVersion?: number;
-  /** Called when a persisted file cannot be parsed. */
+  /** Called when a persisted file is corrupt (after quarantine). */
   onCorrupt?: (path: string, error: unknown) => void;
+  /** Disable file moves (used by dry runs / tests that inspect in place). */
+  quarantine?: boolean;
+}
+
+/** Durably writes a file: temp → fsync → rename → directory fsync. */
+export async function writeFileAtomic(target: string, contents: string): Promise<void> {
+  const tmp = `${target}.tmp`;
+  await mkdir(dirname(target), { recursive: true });
+  const handle = await open(tmp, "w");
+  try {
+    await handle.writeFile(contents, "utf8");
+    await handle.sync(); // flush data before the rename becomes visible
+  } finally {
+    await handle.close();
+  }
+  await rename(tmp, target);
+  // Sync the directory entry so the rename itself survives a crash.
+  try {
+    const dir = await open(dirname(target), "r");
+    try {
+      await dir.sync();
+    } finally {
+      await dir.close();
+    }
+  } catch {
+    // Directory fsync is unsupported on some platforms — the rename is still atomic.
+  }
+}
+
+/** Reads and classifies a persisted document without modifying it. */
+export async function inspectDocument(path: string): Promise<DocumentState> {
+  let raw: string;
+  try {
+    await stat(path);
+  } catch {
+    return { status: "missing" };
+  }
+  try {
+    raw = await readFile(path, "utf8");
+  } catch (error) {
+    return { status: "corrupt", detail: `unreadable: ${error instanceof Error ? error.message : String(error)}` };
+  }
+  if (raw.trim().length === 0) return { status: "empty" };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    return { status: "corrupt", detail: error instanceof Error ? error.message : "invalid JSON" };
+  }
+  if (Array.isArray(parsed)) return { status: "v1-legacy" }; // v1 stored bare arrays
+  if (parsed === null || typeof parsed !== "object") return { status: "corrupt", detail: "not an object" };
+  const doc = parsed as JsonDocument<unknown>;
+  if (!Array.isArray(doc.items)) return { status: "corrupt", detail: "missing items array" };
+  const version = typeof doc.schemaVersion === "number" ? doc.schemaVersion : 1;
+  if (version > SCHEMA_VERSION) return { status: "future", schemaVersion: version };
+  if (version < SCHEMA_VERSION) return { status: "v1-legacy" };
+  return { status: "current", schemaVersion: version, count: doc.items.length };
+}
+
+/** Reads a document, migrating v1 shapes and quarantining corruption. */
+export async function readDocument<T>(
+  path: string,
+  onCorrupt?: (path: string, error: unknown) => void,
+  quarantine = true,
+): Promise<T[]> {
+  const state = await inspectDocument(path);
+  if (state.status === "missing" || state.status === "empty") return [];
+  if (state.status === "future") {
+    const error = new Error(
+      `${path} was written by a newer OmniNode (schema v${state.schemaVersion} > v${SCHEMA_VERSION})`,
+    );
+    onCorrupt?.(path, error);
+    return [];
+  }
+
+  let raw: string;
+  try {
+    raw = await readFile(path, "utf8");
+  } catch (error) {
+    onCorrupt?.(path, error);
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed as T[]; // v1 legacy: bare array
+    return (parsed as JsonDocument<T>).items ?? [];
+  } catch (error) {
+    // Preserve the damaged file for inspection instead of overwriting it.
+    if (quarantine) {
+      const quarantinePath = `${path}.corrupt-${Date.now()}`;
+      try {
+        await rename(path, quarantinePath);
+        logger.child({ component: "persistence" }).warn(
+          `Quarantined unreadable store file ${path} → ${quarantinePath}`,
+        );
+      } catch {
+        // Quarantine is best effort.
+      }
+    }
+    onCorrupt?.(path, error);
+    return [];
+  }
 }
 
 export class JsonFileStore<T> {
   private readonly filePath: string;
   private readonly schemaVersion: number;
   private readonly onCorrupt?: (path: string, error: unknown) => void;
+  private readonly quarantine: boolean;
   private readonly log: Logger;
   private queue: Promise<unknown> = Promise.resolve();
 
   constructor(options: JsonFileStoreOptions) {
     this.filePath = `${options.directory ?? `${process.cwd()}/.omninode`}/${options.fileName}`;
-    this.schemaVersion = options.schemaVersion ?? 1;
+    this.schemaVersion = options.schemaVersion ?? SCHEMA_VERSION;
     this.onCorrupt = options.onCorrupt;
+    this.quarantine = options.quarantine ?? true;
     this.log = logger.child({ component: "persistence", file: options.fileName });
   }
 
@@ -45,35 +160,14 @@ export class JsonFileStore<T> {
     return this.filePath;
   }
 
-  /** All items, or [] when missing/corrupt. */
+  /** All items, or [] when missing/migrated-from-v1/corrupt. */
   protected async readAll(): Promise<T[]> {
-    let raw: string;
-    try {
-      raw = await readFile(this.filePath, "utf8");
-    } catch {
-      return [];
-    }
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      // Accept both the wrapped document and a bare array (v1 files).
-      if (Array.isArray(parsed)) return parsed as T[];
-      if (parsed !== null && typeof parsed === "object" && Array.isArray((parsed as JsonDocument<T>).items)) {
-        return (parsed as JsonDocument<T>).items;
-      }
-      throw new Error("persisted file has an unrecognized shape");
-    } catch (error) {
-      this.log.warn(`Treating ${this.filePath} as empty — it could not be parsed.`);
-      this.onCorrupt?.(this.filePath, error);
-      return [];
-    }
+    return readDocument<T>(this.filePath, this.onCorrupt, this.quarantine);
   }
 
   protected async writeAll(items: T[]): Promise<void> {
     const document: JsonDocument<T> = { schemaVersion: this.schemaVersion, items };
-    const tmp = `${this.filePath}.tmp`;
-    await mkdir(dirname(this.filePath), { recursive: true });
-    await writeFile(tmp, `${JSON.stringify(document, null, 2)}\n`, "utf8");
-    await rename(tmp, this.filePath);
+    await writeFileAtomic(this.filePath, `${JSON.stringify(document, null, 2)}\n`);
   }
 
   /** Serializes an async operation against this file. */

@@ -101,8 +101,10 @@ Stable.
 
 ## Persistence (`src/persistence`)
 
-`JsonFileStore`, `ProjectStores` — Experimental (v2 work in progress; the
-on-disk schema is versioned but may change until Phase 12).
+`JsonFileStore`, `ProjectStores`, `SCHEMA_VERSION`, `inspectDocument`,
+`readDocument`, `writeFileAtomic`, `migrateProjectStores`, `MigrationReport`,
+`STORE_FILES`, `DocumentState` — Stable (v2). Canonical interface aliases
+(`PipelineStore`, `MemoryStore`, `AuditStore`) in `store-types.ts` — Stable.
 
 ## Logging (`src/logger`)
 

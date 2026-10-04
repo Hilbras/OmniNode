@@ -3,7 +3,7 @@
  * (task/pipeline transitions) in the project's .omninode directory. Useful
  * for compliance reviews and debugging multi-agent runs.
  */
-import { appendFile, mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { logger, type Logger } from "../logger/index.js";
 
@@ -47,7 +47,15 @@ export class FileAuditLog implements AuditSink {
   async record(event: AuditEvent): Promise<void> {
     try {
       await mkdir(dirname(this.filePath), { recursive: true });
-      await appendFile(this.filePath, `${JSON.stringify(event)}\n`, "utf8");
+      // fsync the append so audit entries survive a crash (roadmap §12 durability).
+      const { open } = await import("node:fs/promises");
+      const handle = await open(this.filePath, "a");
+      try {
+        await handle.appendFile(`${JSON.stringify(event)}\n`, "utf8");
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
     } catch (error) {
       this.log.warn(
         `Audit write failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -57,7 +65,6 @@ export class FileAuditLog implements AuditSink {
 
   /** Recent events, oldest first; used by the CLI. */
   async recent(limit = 20): Promise<AuditEvent[]> {
-    const { readFile } = await import("node:fs/promises");
     let raw: string;
     try {
       raw = await readFile(this.filePath, "utf8");

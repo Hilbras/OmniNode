@@ -4,6 +4,30 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.12] — v2 Phase 12 (Persistence Layer v2)
+
+### Added
+
+- **Durable atomic writes** (§16): temp file → fsync → atomic rename →
+  directory fsync for every JSON store, and fsynced appends for the audit log.
+- **Corruption recovery**: unparseable store files are **quarantined**
+  (`<name>.corrupt-<timestamp>`) rather than deleted or silently overwritten —
+  the damaged data stays inspectable and the store continues empty.
+- **Schema versioning**: documents carry `schemaVersion` (current: 2); files
+  written by a newer OmniNode are refused instead of misread.
+- **Migration path**: v1 bare-array documents are migrated in place;
+  `omninode migrate [--check]` and `migrateProjectStores()` report per-file
+  state (`missing`/`empty`/`v1-legacy`/`current`/`future`/`corrupt`) and never
+  touch future or corrupt files.
+- **Canonical storage interfaces** (`src/persistence/store-types.ts`):
+  `PipelineStore`, `MemoryStore`, `AuditStore` aliases documented alongside the
+  v1 names.
+- docs/PERSISTENCE.md: interfaces, durability model, corruption handling,
+  migration, custom backends.
+- Tests: 383 (was 375) — document state classification, future-version
+  refusal, atomic writes leaving no temp files, audit durability, migration
+  (dry run, apply, idempotence), and the `omninode migrate` CLI.
+
 ## [2.0.0-alpha.11] — v2 Phase 11 (Planner v2)
 
 ### Added

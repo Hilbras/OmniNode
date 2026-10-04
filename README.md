@@ -18,7 +18,7 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v2.0.0-alpha.11 — v2 Phase 11: Planner v2**
+**v2.0.0-alpha.12 — v2 Phase 12: Persistence Layer v2**
 (the reliability & interoperability line: architecture → execution →
 protocol → adapters → pipelines → providers → OmniHilbras → memory → reports) (the v2
 roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the v1 plan is complete:
@@ -31,6 +31,12 @@ for the plan and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design).
 
 ### What's new in v2 (so far)
 
+- **Phase 12 — Persistence Layer v2**: writes are now **fsynced and atomic**
+  (temp → fsync → rename → directory fsync), corrupt store files are
+  **quarantined instead of lost**, documents carry a **schema version** with
+  v1 data migrated in place (`omninode migrate [--check]`), and files from a
+  newer OmniNode are refused rather than misread. Details:
+  [PERSISTENCE.md](docs/PERSISTENCE.md).
 - **Phase 11 — Planner v2**: the planner now receives the full §15 input —
   task, project context, agent reports, **aggregated findings (consensus and
   conflicts included)**, memory and **constraints** (settable per pipeline
@@ -359,7 +365,7 @@ required for the core engine.
 - [Architecture](docs/ARCHITECTURE.md) — module map, workflow, local state
 - [Security model](docs/SECURITY.md) — secrets, process execution, env isolation, audit log
 - [API stability policy](docs/API_STABILITY.md) and [public API inventory](docs/API.md)
-- [Agent Protocol v2 spec](docs/PROTOCOL.md) · [Providers](docs/PROVIDERS.md) · [Memory](docs/MEMORY.md) · [Reports](docs/REPORTS.md) · [Deprecations](docs/DEPRECATIONS.md) · [Changelog](CHANGELOG.md) · [v2 roadmap](docs/ROADMAP_V2.md)
+- [Agent Protocol v2 spec](docs/PROTOCOL.md) · [Providers](docs/PROVIDERS.md) · [Memory](docs/MEMORY.md) · [Reports](docs/REPORTS.md) · [Persistence](docs/PERSISTENCE.md) · [Deprecations](docs/DEPRECATIONS.md) · [Changelog](CHANGELOG.md) · [v2 roadmap](docs/ROADMAP_V2.md)
 - [Example project](examples/demo/) — a runnable end-to-end demo (`./demo.sh`)
 
 Prefer a container? `docker build -t omninode .` then

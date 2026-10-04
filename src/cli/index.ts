@@ -16,6 +16,7 @@ import { registerMemoryCommands } from "./commands/memory.js";
 import { registerPlanCommands } from "./commands/plan.js";
 import { registerStatusCommand } from "./commands/status.js";
 import { registerAuditCommand } from "./commands/audit.js";
+import { registerMigrateCommand } from "./commands/migrate.js";
 
 export function createProgram(): Command {
   const program = new Command();
@@ -41,6 +42,7 @@ export function createProgram(): Command {
   registerPlanCommands(program);
   registerStatusCommand(program);
   registerAuditCommand(program);
+  registerMigrateCommand(program);
   registerRunAlias(program);
 
   return program;

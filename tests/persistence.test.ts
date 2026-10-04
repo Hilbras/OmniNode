@@ -3,11 +3,11 @@
  * now builds on — atomic writes, schema envelope, corruption tolerance,
  * serialization of read-modify-write cycles, and v1 file compatibility.
  */
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { JsonFileStore } from "../src/persistence/json-file-store.js";
+import { JsonFileStore, SCHEMA_VERSION } from "../src/persistence/json-file-store.js";
 import { FileTaskStore } from "../src/tasks/store.js";
 import type { Task } from "../src/types/task.js";
 
@@ -56,7 +56,7 @@ describe("JsonFileStore", () => {
       schemaVersion: number;
       items: Item[];
     };
-    expect(raw.schemaVersion).toBe(1);
+    expect(raw.schemaVersion).toBe(SCHEMA_VERSION);
     expect(raw.items).toEqual([{ id: "a", value: "1" }]);
     rmSync(dir, { recursive: true, force: true });
   });
@@ -71,7 +71,7 @@ describe("JsonFileStore", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("treats a corrupt file as empty and reports it without destroying data", async () => {
+  it("quarantines a corrupt file: empty store, data preserved for inspection", async () => {
     const dir = tmp();
     const corruptPath = path.join(dir, "items.json");
     writeFileSync(corruptPath, "{ this is not json", "utf8");
@@ -81,8 +81,11 @@ describe("JsonFileStore", () => {
     });
     expect(await store.peek()).toEqual([]);
     expect(reported).toBe(corruptPath);
-    // The corrupt file is left in place — no silent destructive repair.
-    expect(readFileSync(corruptPath, "utf8")).toBe("{ this is not json");
+    // Corrupt data is quarantined, never silently discarded (v2 behavior).
+    expect(existsSync(corruptPath)).toBe(false);
+    const quarantined = readdirSync(dir).find((name) => name.startsWith("items.json.corrupt-"));
+    expect(quarantined).toBeDefined();
+    expect(readFileSync(path.join(dir, quarantined!), "utf8")).toBe("{ this is not json");
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -116,7 +119,7 @@ describe("JsonFileStore", () => {
     await store.save(task);
     expect((await store.get("t1"))?.objective).toBe("verify persistence");
     const raw = JSON.parse(readFileSync(path.join(dir, "tasks.json"), "utf8")) as { schemaVersion: number };
-    expect(raw.schemaVersion).toBe(1);
+    expect(raw.schemaVersion).toBe(SCHEMA_VERSION);
     rmSync(dir, { recursive: true, force: true });
   });
 });
