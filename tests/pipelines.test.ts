@@ -6,6 +6,7 @@ import { PipelineEngine, type ChatFn } from "../src/pipelines/engine.js";
 import { FilePipelineRunStore, type PipelineRunStore } from "../src/pipelines/store.js";
 import { TaskEngine } from "../src/tasks/engine.js";
 import { FileTaskStore, type TaskStore } from "../src/tasks/store.js";
+import { FilePlanStore, type PlanStore } from "../src/planner/store.js";
 import { AgentRegistry } from "../src/agents/index.js";
 import { RoleRegistry } from "../src/roles/index.js";
 import type { IAgent, AgentInfo, AgentTaskInput, AgentTaskOutput } from "../src/types/agent.js";
@@ -55,16 +56,21 @@ function report(id: string): Report {
   return { id, taskId: "t", agent: "a", summary: `report ${id}`, findings: [], recommendations: [], createdAt: new Date().toISOString() };
 }
 
-function tmpStores(): { tasks: TaskStore; runs: PipelineRunStore } {
+function tmpStores(): { dir: string; tasks: TaskStore; runs: PipelineRunStore; plans: PlanStore } {
   const dir = mkdtempSync(path.join(tmpdir(), "omninode-pipe-"));
-  return { tasks: new FileTaskStore(dir), runs: new FilePipelineRunStore(dir) };
+  return {
+    dir,
+    tasks: new FileTaskStore(dir),
+    runs: new FilePipelineRunStore(dir),
+    plans: new FilePlanStore(dir),
+  };
 }
 
 function makeEngine(
   agents: IAgent[],
   chat?: ChatFn,
   stores = tmpStores(),
-): { engine: PipelineEngine; tasks: TaskEngine } {
+): { engine: PipelineEngine; tasks: TaskEngine; plans: PlanStore } {
   const registry = new AgentRegistry();
   for (const agent of agents) registry.register(agent);
   const roles = new RoleRegistry();
@@ -76,9 +82,10 @@ function makeEngine(
     roles,
     providers: [],
     store: stores.runs,
+    plans: stores.plans,
     ...(chat ? { chat } : {}),
   });
-  return { engine, tasks };
+  return { engine, tasks, plans: stores.plans };
 }
 
 const baseDef: PipelineDefinition = {
@@ -143,7 +150,7 @@ describe("PipelineEngine run", () => {
       chatCalls.push({ modelRef, messages });
       return "FINAL PLAN\n1. do the thing";
     };
-    const { engine } = makeEngine([agentA, agentB, executor], chat);
+    const { engine, plans } = makeEngine([agentA, agentB, executor], chat);
 
     const run = await engine.run(baseDef, { objective: "audit everything" });
 
@@ -164,9 +171,14 @@ describe("PipelineEngine run", () => {
     expect(planInput).toContain("a-summary");
     expect(planInput).toContain("b-summary");
     expect(chatCalls[0]?.modelRef).toBe("gw:gpt-x");
-    // The executor received the full plan text through its context.
-    expect(executor.received[0]?.context).toContain("FINAL PLAN");
+    // The executor received the plan through its context.
+    expect(executor.received[0]?.context).toContain("# Implementation Plan");
     expect(executor.received[0]?.role).toMatchObject({ id: "planner" });
+    // The produced plan was persisted and linked to the run.
+    expect(run.planId).toBeDefined();
+    const stored = await plans.get(run.planId!);
+    expect(stored?.steps.length).toBeGreaterThan(0);
+    expect(stored?.pipelineRunId).toBe(run.id);
   });
 
   it("creates parallel research tasks in the task store", async () => {

@@ -1,6 +1,6 @@
 {
   "name": "@hilbras/omninode",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Provider-agnostic multi-AI orchestration platform: coordinates CLI agents, AI providers, memory, roles, reports and planning into one execution system.",
   "type": "module",
   "license": "MIT",

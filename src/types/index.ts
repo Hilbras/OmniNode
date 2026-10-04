@@ -3,6 +3,7 @@ export * from "./chat.js";
 export * from "./memory.js";
 export * from "./model.js";
 export * from "./pipeline.js";
+export * from "./plan.js";
 export * from "./protocol.js";
 export * from "./project.js";
 export * from "./provider.js";

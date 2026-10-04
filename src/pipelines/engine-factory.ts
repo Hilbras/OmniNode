@@ -1,7 +1,8 @@
-/** Assembles a PipelineEngine from the project configuration (local-first defaults). */
 import type { AppConfig } from "../config/index.js";
 import { buildAgentRegistry } from "../agents/index.js";
 import { createMemoryProvider, MemoryService } from "../memory/index.js";
+import { buildPlanner } from "../planner/index.js";
+import { FilePlanStore } from "../planner/store.js";
 import { buildRoleRegistry } from "../roles/index.js";
 import { logger, type Logger } from "../logger/index.js";
 import { ReportService } from "../reports/index.js";
@@ -14,6 +15,7 @@ import { FilePipelineRunStore } from "./store.js";
 export function buildPipelineEngine(config: AppConfig, log: Logger = logger): PipelineEngine {
   const agents = buildAgentRegistry(config, log);
   const roles = buildRoleRegistry(config);
+  const chat = createDefaultChatFn(config.project.providers);
   const tasks = new TaskEngine({
     agents,
     roles,
@@ -29,7 +31,11 @@ export function buildPipelineEngine(config: AppConfig, log: Logger = logger): Pi
     roles,
     providers: config.project.providers,
     store: new FilePipelineRunStore(),
-    chat: createDefaultChatFn(config.project.providers),
+    chat,
+    ...(config.project.planner !== undefined
+      ? { planner: buildPlanner(config.project.planner, chat, log) }
+      : {}),
+    plans: new FilePlanStore(),
     reports: new ReportService(new FileReportStore(), log),
     log,
   });

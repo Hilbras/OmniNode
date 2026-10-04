@@ -18,7 +18,7 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v0.8.0 — Phase 7: Memory Integration** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
+**v0.9.0 — Phase 8: Planner System** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
 for the full plan and roadmap).
 
 What exists today:
@@ -84,6 +84,19 @@ What exists today:
     HTTP (base URL + `api_key_env_var`); strictly optional, like every
     Hilbras component
   - Memory failures are best-effort: logged, never fatal to a task
+- **Planner layer** (`src/planner/`):
+  - Typed plan schema (`Plan` with ordered steps, targets, acceptance
+    criteria, risks, and finding traceability via `sourceFindings`)
+  - Planner context builder: objective + role + combined findings with
+    sources + relevant memory + research context
+  - `ModelPlanner` — asks a chat model (`provider:model-id`) for JSON matching
+    the plan contract; unparseable output degrades gracefully to the heuristic
+    fallback
+  - `HeuristicPlanner` — deterministic, offline plan from recommendations and
+    significant findings (also the fallback)
+  - Plans persist to `.omninode/plans.json`; pipeline runs record `planId`
+  - Configure with `planner: { kind: model | heuristic, model, instruction }`
+    — never hardcoded to any provider
 - Typed error hierarchy (`src/errors/`)
 - Leveled logger with pluggable sink (`src/logger/`)
 - Configuration system: `omninode.yaml` with `${ENV_VAR}` expansion and strict
@@ -164,6 +177,17 @@ project:
 omninode pipeline run repo-audit "Audit the authentication module"
 omninode report combined          # the aggregated intelligence of that run
 omninode report show combined-xxx # grouped findings with per-source attribution
+omninode plan show plan-xxx       # the implementation plan the planner produced
+```
+
+The planner layer (§18) turns combined intelligence into an ordered,
+actionable implementation plan. Configure it once:
+
+```yaml
+project:
+  planner:
+    kind: model              # or heuristic for offline planning
+    model: my-gateway:chatgpt
 ```
 
 Persistent memory (§19–§20) — opt in with `memory: { provider: local }` or
@@ -210,8 +234,9 @@ Phases 0–11 are laid out in [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.m
 | v0.4.0 | Agent System |
 | v0.5.0 | Roles & Tasks |
 | v0.7.0 | Multi-AI Reports |
-| **v0.8.0** | **Remembera / Memory (current)** |
-| v0.9.0 | Planner |
+| v0.7.0 | Multi-AI Reports |
+| v0.8.0 | Remembera / Memory |
+| **v0.9.0** | **Planner (current)** |
 | v0.10.0 | End-to-End Runtime |
 | v1.0.0 | Production Release |
 

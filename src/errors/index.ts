@@ -16,6 +16,8 @@ export type OmniNodeErrorCode =
   | "PIPELINE_NOT_FOUND"
   | "PIPELINE_INVALID"
   | "PIPELINE_FAILED"
+  | "PLANNER_FAILED"
+  | "PLAN_INVALID"
   | "PROTOCOL_VIOLATION"
   | "MEMORY_UNAVAILABLE"
   | "REPORT_NOT_FOUND"
@@ -97,6 +99,16 @@ export class PipelineError extends OmniNodeError {
 export class ProtocolError extends OmniNodeError {
   constructor(message: string, options: OmniNodeErrorOptions = {}) {
     super("PROTOCOL_VIOLATION", message, options);
+  }
+}
+
+export class PlannerError extends OmniNodeError {
+  constructor(
+    code: "PLANNER_FAILED" | "PLAN_INVALID",
+    message: string,
+    options: OmniNodeErrorOptions = {},
+  ) {
+    super(code, message, options);
   }
 }
 

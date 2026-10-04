@@ -22,8 +22,13 @@ import type {
   PipelineStepRun,
 } from "../types/pipeline.js";
 import type { ChatMessage } from "../types/chat.js";
+import type { Plan } from "../types/plan.js";
 import type { Report } from "../types/report.js";
 import type { ReportService } from "../reports/index.js";
+import type { IPlanner } from "../planner/index.js";
+import type { PlanStore } from "../planner/store.js";
+import { HeuristicPlanner } from "../planner/heuristic.js";
+import { ModelPlanner } from "../planner/model.js";
 import type { TaskEngine } from "../tasks/index.js";
 import type { PipelineRunStore } from "./store.js";
 
@@ -36,6 +41,10 @@ export interface PipelineEngineOptions {
   providers: AppConfig["project"]["providers"];
   store: PipelineRunStore;
   chat?: ChatFn;
+  /** Default planner used by plan steps without their own model (§18). */
+  planner?: IPlanner;
+  /** When present, plans produced by plan steps are persisted. */
+  plans?: PlanStore;
   /** When present, finished runs have their reports collected, stored and combined (§16–§17). */
   reports?: ReportService;
   log?: Logger;
@@ -52,6 +61,7 @@ interface StepOutcome {
   /** What this step adds to the combined context (defaults to summary). */
   contextContribution?: string;
   taskIds: string[];
+  planId?: string;
   error?: string;
   reports: Report[];
 }
@@ -60,6 +70,8 @@ interface StepContext {
   objective: string;
   role?: RoleDefinition;
   combinedContext: string;
+  reports: Report[];
+  pipelineRunId?: string;
 }
 
 export class PipelineEngine {
@@ -214,6 +226,8 @@ export class PipelineEngine {
             objective,
             ...(role ? { role } : {}),
             combinedContext: contextParts.join("\n\n"),
+            reports: [...allReports],
+            pipelineRunId: run.id,
           };
           return this.executeStep(step, ctx);
         }),
@@ -233,6 +247,7 @@ export class PipelineEngine {
           status:
             outcome.status === "skipped" ? "cancelled" : outcome.status === "failed" ? "failed" : "completed",
           ...(outcome.taskIds.length > 0 ? { taskIds: outcome.taskIds } : {}),
+          ...(outcome.planId !== undefined ? { planId: outcome.planId } : {}),
           ...(outcome.error !== undefined ? { error: outcome.error } : {}),
         };
         run.stepRuns.push(stepRun);
@@ -244,6 +259,7 @@ export class PipelineEngine {
 
     const failed = [...outcomes.values()].some((o) => o.status === "failed");
     const finalStatus: PipelineRunStatus = failed ? "failed" : "completed";
+    const planId = [...outcomes.values()].find((o) => o.planId !== undefined)?.planId;
 
     // Report system (§16–§17): collect, store and combine reports from all tasks.
     let combinedReportId: string | undefined;
@@ -271,6 +287,7 @@ export class PipelineEngine {
       finishedAt: new Date().toISOString(),
       ...(run.reports !== undefined && run.reports.length > 0 ? { reports: run.reports } : {}),
       ...(combinedReportId !== undefined ? { combinedReportId } : {}),
+      ...(planId !== undefined ? { planId } : {}),
     };
     await this.options.store.save(finished);
     this.log.info(`Pipeline ${def.id} finished: ${finalStatus}.`);
@@ -400,31 +417,38 @@ export class PipelineEngine {
   }
 
   private async runPlan(step: PipelineStep, ctx: StepContext): Promise<StepOutcome> {
-    if (!step.model) {
-      // The full planner layer is Phase 8; a plan step without a model passes through.
-      return { status: "completed", summary: "(plan: no model configured — skipped)", taskIds: [], reports: [] };
-    }
-    const messages: ChatMessage[] = [
-      {
-        role: "system",
-        content:
-          "You are a planning assistant inside OmniNode. Given the objective and the combined " +
-          "research context, produce a prioritized, actionable plan.",
-      },
-      {
-        role: "user",
-        content: `# Objective\n${ctx.objective}\n\n${ctx.combinedContext}\n\nProduce the final plan.`,
-      },
-    ];
-    try {
-      const planText = await this.getChat()(step.model, messages);
+    const request = {
+      objective: ctx.objective,
+      reports: ctx.reports,
+      ...(ctx.combinedContext.length > 0 ? { context: ctx.combinedContext } : {}),
+      ...(ctx.role ? { role: ctx.role } : {}),
+      ...(ctx.pipelineRunId !== undefined ? { pipelineRunId: ctx.pipelineRunId } : {}),
+    };
+
+    // Selection order: an explicit step model wins, then the configured
+    // default planner, then a pass-through (nothing to plan with).
+    let planner: IPlanner;
+    if (step.model) {
+      planner = new ModelPlanner({
+        model: step.model,
+        chat: this.getChat(),
+        fallback: new HeuristicPlanner(),
+        log: this.log,
+      });
+    } else if (this.options.planner) {
+      planner = this.options.planner;
+    } else {
       return {
         status: "completed",
-        summary: planText.split("\n", 1)[0] ?? planText,
-        contextContribution: planText,
+        summary: "(plan: no model or planner configured — skipped)",
         taskIds: [],
         reports: [],
       };
+    }
+
+    let plan: Plan;
+    try {
+      plan = await planner.plan(request);
     } catch (error) {
       return {
         status: "failed",
@@ -434,6 +458,16 @@ export class PipelineEngine {
         reports: [],
       };
     }
+
+    await this.options.plans?.save(plan);
+    return {
+      status: "completed",
+      summary: plan.summary,
+      contextContribution: formatPlan(plan),
+      taskIds: [],
+      planId: plan.id,
+      reports: [],
+    };
   }
 
   private getChat(): ChatFn {
@@ -443,6 +477,22 @@ export class PipelineEngine {
       "No chat function available — configure a provider for plan steps.",
     );
   }
+}
+
+function formatPlan(plan: Plan): string {
+  const lines = [
+    `# Implementation Plan (by ${plan.generatedBy})`,
+    plan.summary,
+    "Steps:",
+    ...plan.steps.map((step) => {
+      const targets = step.targets && step.targets.length > 0 ? ` [targets: ${step.targets.join(", ")}]` : "";
+      return `${step.order}. ${step.title}${targets}`;
+    }),
+  ];
+  if (plan.risks && plan.risks.length > 0) {
+    lines.push("Risks:", ...plan.risks.map((risk) => `- ${risk}`));
+  }
+  return lines.join("\n");
 }
 
 /** Default chat function: resolves "provider:model" against the configured providers. */

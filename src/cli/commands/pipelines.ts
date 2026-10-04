@@ -50,6 +50,9 @@ export function registerPipelineCommands(program: Command): void {
       if (finished.combinedReportId) {
         console.log(`  combined report: ${finished.combinedReportId}`);
       }
+      if (finished.planId) {
+        console.log(`  plan: ${finished.planId}`);
+      }
       console.log(`Pipeline ${finished.status}. Run id: ${finished.id}`);
       if (finished.status !== "completed") process.exitCode = 1;
     });

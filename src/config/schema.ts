@@ -74,6 +74,14 @@ export const pipelineConfigSchema = z
   })
   .strict();
 
+export const plannerConfigSchema = z
+  .object({
+    kind: z.enum(["model", "heuristic"]).default("model"),
+    model: z.string().optional(),
+    instruction: z.string().optional(),
+  })
+  .strict();
+
 export const projectConfigSchema = z
   .object({
     name: z.string().min(1),
@@ -81,6 +89,7 @@ export const projectConfigSchema = z
     agents: z.array(agentConfigSchema).default([]),
     roles: z.array(roleConfigSchema).default([]),
     pipelines: z.array(pipelineConfigSchema).default([]),
+    planner: plannerConfigSchema.optional(),
     memory: z
       .object({
         provider: z.string().min(1).default("local"),
@@ -107,5 +116,6 @@ export type AgentConfigYaml = z.infer<typeof agentConfigSchema>;
 export type RoleConfigYaml = z.infer<typeof roleConfigSchema>;
 export type PipelineConfigYaml = z.infer<typeof pipelineConfigSchema>;
 export type PipelineStepConfigYaml = z.infer<typeof pipelineStepConfigSchema>;
+export type PlannerConfigYaml = z.infer<typeof plannerConfigSchema>;
 export type ProjectConfigYaml = z.infer<typeof projectConfigSchema>;
 export type AppConfigYaml = z.infer<typeof appConfigSchema>;

@@ -23,6 +23,11 @@ export interface AppConfig {
     agents: AgentConfig[];
     roles: RoleDefinition[];
     pipelines: PipelineDefinition[];
+    planner?: {
+      kind: "model" | "heuristic";
+      model?: string;
+      instruction?: string;
+    };
     memory?: {
       provider: string;
       baseUrl?: string;
@@ -117,6 +122,15 @@ function toAppConfig(yaml: ReturnType<typeof appConfigSchema.parse>): AppConfig 
       agents: yaml.project.agents.map(toAgentConfig),
       roles: yaml.project.roles.map(toRoleDefinition),
       pipelines: yaml.project.pipelines.map(toPipelineDefinition),
+      ...(yaml.project.planner !== undefined
+        ? {
+            planner: {
+              kind: yaml.project.planner.kind,
+              model: yaml.project.planner.model,
+              instruction: yaml.project.planner.instruction,
+            },
+          }
+        : {}),
       ...(yaml.project.memory !== undefined
         ? {
             memory: {

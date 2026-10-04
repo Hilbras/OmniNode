@@ -44,6 +44,8 @@ export interface PipelineStepRun {
   status: TaskStatus;
   /** Tasks created for this step (research fans out to several). */
   taskIds?: string[];
+  /** Set on plan steps that produced a stored plan (§18). */
+  planId?: string;
   error?: string;
 }
 
@@ -58,4 +60,6 @@ export interface PipelineRun {
   reports?: Report[];
   /** Set when the report system generated a combined report for this run. */
   combinedReportId?: string;
+  /** Set when a plan step produced an implementation plan (§18). */
+  planId?: string;
 }
