@@ -12,7 +12,6 @@ import type { Plan, PlanStep } from "../types/plan.js";
 import type { ChatMessage } from "../types/chat.js";
 import type { ChatFn } from "../pipelines/index.js";
 import { buildPlannerContext } from "./context.js";
-import { HeuristicPlanner } from "./heuristic.js";
 import type { IPlanner, PlanRequest } from "./types.js";
 
 export interface ModelPlannerOptions {
