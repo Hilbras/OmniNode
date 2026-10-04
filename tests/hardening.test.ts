@@ -119,6 +119,7 @@ describe("store reliability under concurrency", () => {
           id: `task-${i}`,
           objective: `objective ${i}`,
           status: "created",
+          attempt: 0,
           createdAt: now,
           updatedAt: now,
         }),

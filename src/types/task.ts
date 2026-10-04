@@ -1,6 +1,15 @@
 /** Task system: every operation becomes a Task (§13). */
 import type { Report } from "./report.js";
 
+/**
+ * Execution states (v2 Phase 2, roadmap §6.1).
+ *
+ * The crucial distinction: `unknown` means "we cannot prove the outcome" —
+ * e.g. a process timeout after the agent may already have performed side
+ * effects. It is deliberately NOT `failed`: retrying blindly could duplicate
+ * work, and reporting failure would be a lie. Resolve it explicitly with
+ * `task retry` (which starts a fresh execution) or by inspecting artifacts.
+ */
 export type TaskStatus =
   | "created"
   | "queued"
@@ -8,7 +17,29 @@ export type TaskStatus =
   | "waiting"
   | "completed"
   | "failed"
-  | "cancelled";
+  | "timed_out"
+  | "cancelled"
+  | "unknown"
+  | "partially_completed";
+
+/** States from which no further automatic transition happens. */
+export const TERMINAL_TASK_STATUSES: readonly TaskStatus[] = [
+  "completed",
+  "failed",
+  "timed_out",
+  "cancelled",
+  "partially_completed",
+];
+
+/** One execution attempt (roadmap §6.5 identity: task + attempt + execution id). */
+export interface ExecutionRecord {
+  executionId: string;
+  attempt: number;
+  startedAt: string;
+  finishedAt: string;
+  outcome: "completed" | "failed" | "timed_out" | "unknown" | "cancelled";
+  error?: string;
+}
 
 export interface TaskContext {
   project?: string;
@@ -44,5 +75,11 @@ export interface Task {
   status: TaskStatus;
   createdAt: string;
   updatedAt: string;
+  /** Number of engine.run attempts so far (0 = never executed). */
+  attempt: number;
+  /** Error from the most recent failed/unknown attempt. */
+  lastError?: string;
+  /** Recent execution attempts, newest last, bounded in length. */
+  executions?: ExecutionRecord[];
   result?: TaskResult;
 }

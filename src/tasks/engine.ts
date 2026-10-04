@@ -7,21 +7,50 @@ import { randomBytes } from "node:crypto";
 import type { AgentRegistry } from "../agents/index.js";
 import type { RoleRegistry } from "../roles/index.js";
 import { logger, type Logger } from "../logger/index.js";
-import { TaskError } from "../errors/index.js";
+import { AgentError, TaskError } from "../errors/index.js";
 import type { AuditAction, AuditSink } from "../audit/index.js";
 import type { MemoryService } from "../memory/index.js";
-import type { Task, TaskContext, TaskResult, TaskStatus } from "../types/task.js";
+import type {
+  ExecutionRecord,
+  Task,
+  TaskContext,
+  TaskResult,
+  TaskStatus,
+} from "../types/task.js";
 import type { TaskStore, TaskStoreFilter } from "./store.js";
 
+/**
+ * Strict state machine (roadmap §6.2). Invalid transitions are rejected —
+ * engines never mutate state directly.
+ *
+ *   created ──▶ queued ──▶ running ──┬─▶ completed
+ *      │           │         │        ├─▶ failed
+ *      │           │         │        ├─▶ timed_out   (no side effects possible)
+ *      └───────────┴─────────┴────────┼─▶ unknown      (outcome unprovable — e.g. killed after dispatch)
+ *                                       ├─▶ cancelled
+ *                                       └─▶ partially_completed (fan-out where some units succeeded)
+ */
 const ALLOWED_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
   created: ["queued", "running", "cancelled"],
   queued: ["running", "cancelled"],
-  running: ["completed", "failed", "cancelled"],
+  running: ["completed", "failed", "timed_out", "unknown", "cancelled", "partially_completed"],
   waiting: ["running", "cancelled"],
   completed: [],
-  failed: [],
+  // failed → running is the only re-entry: bounded automatic retry (§6.4).
+  failed: ["running"],
+  timed_out: [],
   cancelled: [],
+  unknown: [],
+  partially_completed: [],
 };
+
+/**
+ * Error codes safe to retry automatically: a transient agent crash before any
+ * report was produced. Timeouts/unknown outcomes are NEVER auto-retried
+ * because the agent may already have performed side effects (roadmap §6.4).
+ */
+const RETRYABLE_ERROR_CODES: readonly string[] = ["AGENT_FAILED"];
+const EXECUTION_HISTORY_LIMIT = 10;
 
 export interface CreateTaskInput {
   objective: string;
@@ -29,6 +58,13 @@ export interface CreateTaskInput {
   role?: string;
   agent?: string;
   context?: TaskContext;
+}
+
+export interface RunTaskOptions {
+  /** Total attempts (1 = no automatic retry). Retries apply to retryable errors only. */
+  maxAttempts?: number;
+  /** Linear backoff base in ms: waits backoffMs × attempt between attempts. */
+  retryBackoffMs?: number;
 }
 
 export interface TaskEngineOptions {
@@ -73,6 +109,7 @@ export class TaskEngine {
       id: generateTaskId(),
       objective: input.objective.trim(),
       status: "created",
+      attempt: 0,
       createdAt: now,
       updatedAt: now,
       ...(input.project !== undefined ? { project: input.project } : {}),
@@ -91,8 +128,10 @@ export class TaskEngine {
     return this.transition(task, "queued");
   }
 
-  /** Runs the task through its assigned agent and records the result. */
-  async run(id: string): Promise<Task> {
+  /** Runs the task through its assigned agent and records the result.
+   *  `maxAttempts` enables bounded automatic retries of *retryable* errors
+   *  with linear backoff; unknown/timed_out outcomes are never auto-retried. */
+  async run(id: string, options: RunTaskOptions = {}): Promise<Task> {
     const task = await this.mustGet(id);
     if (task.status !== "created" && task.status !== "queued") {
       throw new TaskError("TASK_INVALID", `Task ${id} is "${task.status}" and cannot be run.`);
@@ -106,56 +145,99 @@ export class TaskEngine {
     }
     const role = task.role ? this.options.roles.get(task.role) : undefined;
 
-    const running = await this.transition(task, "running");
     this.log.info(`Running task ${task.id} on agent "${task.agent}".`);
 
     // §20: relevant memory is gathered before the agent receives context.
-    let background = running.context?.background;
+    let background = task.context?.background;
     if (this.options.memory) {
       const memoryContext = await this.options.memory.gatherContext({
-        objective: running.objective,
-        ...(running.role ? { role: running.role } : {}),
-        ...(running.project ? { project: running.project } : {}),
+        objective: task.objective,
+        ...(task.role ? { role: task.role } : {}),
+        ...(task.project ? { project: task.project } : {}),
       });
       if (memoryContext.length > 0) {
         background = [memoryContext, background].filter((part) => part && part.length > 0).join("\n\n");
       }
     }
 
-    let output;
-    try {
-      output = await agent.run({
-        taskId: running.id,
-        objective: running.objective,
-        ...(role ? { role } : {}),
-        ...(background !== undefined ? { context: background } : {}),
+    const maxAttempts = Math.max(1, options.maxAttempts ?? 1);
+    const backoffMs = options.retryBackoffMs ?? 0;
+
+    let current = task;
+    for (let i = 0; i < maxAttempts; i += 1) {
+      // Attempt numbers are cumulative for the task (roadmap §6.5).
+      const attempt = current.attempt + 1;
+      const executionId = `exec-${Date.now().toString(36)}-${randomBytes(3).toString("hex")}`;
+      const startedAt = new Date().toISOString();
+      current = await this.transition(current, "running", { attempt });
+
+      let output;
+      let thrown: unknown;
+      try {
+        output = await agent.run({
+          taskId: current.id,
+          objective: current.objective,
+          ...(role ? { role } : {}),
+          ...(background !== undefined ? { context: background } : {}),
+        });
+      } catch (error) {
+        thrown = error;
+      }
+
+      const finishedAt = new Date().toISOString();
+      if (thrown !== undefined || output === undefined) {
+        const outcome = classifyThrown(thrown);
+        const message = thrown instanceof Error ? thrown.message : String(thrown);
+        const retryable =
+          outcome === "failed" &&
+          RETRYABLE_ERROR_CODES.includes(errorCode(thrown)) &&
+          i < maxAttempts - 1;
+        current = await this.transition(current, outcome, {
+          attempt,
+          lastError: message,
+          execution: {
+            executionId,
+            attempt,
+            startedAt,
+            finishedAt,
+            outcome,
+            error: message,
+          },
+        });
+        this.log.warn(`Task ${current.id} attempt ${attempt} → ${outcome}: ${message}`);
+        if (retryable) {
+          if (backoffMs > 0) await sleep(backoffMs * attempt);
+          continue;
+        }
+        if (this.options.memory) await this.options.memory.recordTaskOutcome(current);
+        return current;
+      }
+
+      const result: TaskResult = {
+        ...(output.summary !== undefined ? { summary: output.summary } : {}),
+        ...(output.reports !== undefined && output.reports.length > 0 ? { reports: output.reports } : {}),
+        // Keep the verbatim output (bounded) for report extraction and audit.
+        ...(output.rawOutput !== undefined && output.rawOutput.length > 0
+          ? { rawOutput: output.rawOutput.slice(0, 10_000) }
+          : {}),
+        ...(output.error !== undefined ? { error: output.error } : {}),
+        finishedAt,
+      };
+      const finalStatus: TaskStatus = output.status === "completed" ? "completed" : "failed";
+      current = await this.transition(current, finalStatus, {
+        attempt,
+        result,
+        execution: { executionId, attempt, startedAt, finishedAt, outcome: finalStatus },
       });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.log.error(`Task ${task.id} failed: ${message}`);
-      return this.transition(running, "failed", {
-        result: { error: message, finishedAt: new Date().toISOString() },
-      });
+      this.log.info(`Task ${current.id} finished: ${finalStatus}.`);
+      break;
     }
 
-    const result: TaskResult = {
-      ...(output.summary !== undefined ? { summary: output.summary } : {}),
-      ...(output.reports !== undefined && output.reports.length > 0 ? { reports: output.reports } : {}),
-      // Keep the verbatim output (bounded) for report extraction and audit.
-      ...(output.rawOutput !== undefined && output.rawOutput.length > 0
-        ? { rawOutput: output.rawOutput.slice(0, 10_000) }
-        : {}),
-      ...(output.error !== undefined ? { error: output.error } : {}),
-      finishedAt: new Date().toISOString(),
-    };
-    const finalStatus: TaskStatus = output.status === "completed" ? "completed" : "failed";
-    const finished = await this.transition(running, finalStatus, { result });
-    this.log.info(`Task ${task.id} finished: ${finalStatus}.`);
     // §20: the outcome is written back to memory — best-effort, never fatal.
     if (this.options.memory) {
-      await this.options.memory.recordTaskOutcome(finished);
+      await this.options.memory.recordTaskOutcome(current);
     }
-    return finished;
+    return current;
   }
 
   async cancel(id: string): Promise<Task> {
@@ -170,13 +252,14 @@ export class TaskEngine {
     return this.transition(task, "cancelled");
   }
 
-  /** Error recovery (§27 Phase 9): reset a failed/cancelled task so it can run again. */
+  /** Error recovery: reset a failed/cancelled/unknown/timed_out task so it can run again. */
   async retry(id: string): Promise<Task> {
     const task = await this.mustGet(id);
-    if (task.status !== "failed" && task.status !== "cancelled") {
+    const retryableStates: TaskStatus[] = ["failed", "cancelled", "unknown", "timed_out"];
+    if (!retryableStates.includes(task.status)) {
       throw new TaskError(
         "TASK_INVALID",
-        `Only failed or cancelled tasks can be retried — task ${id} is "${task.status}".`,
+        `Only failed, timed out, unknown or cancelled tasks can be retried — task ${id} is "${task.status}".`,
       );
     }
     const { result: _discarded, ...rest } = task;
@@ -210,16 +293,22 @@ export class TaskEngine {
   private async transition(
     task: Task,
     to: TaskStatus,
-    extra: { result?: TaskResult } = {},
+    extra: { result?: TaskResult; attempt?: number; lastError?: string; execution?: ExecutionRecord } = {},
   ): Promise<Task> {
     const allowed = ALLOWED_TRANSITIONS[task.status] ?? [];
     if (!allowed.includes(to)) {
       throw new TaskError("TASK_INVALID", `Task ${task.id} cannot move from "${task.status}" to "${to}".`);
     }
+    const executions = extra.execution
+      ? [...(task.executions ?? []), extra.execution].slice(-EXECUTION_HISTORY_LIMIT)
+      : task.executions;
     const updated: Task = {
       ...task,
       status: to,
       updatedAt: new Date().toISOString(),
+      ...(extra.attempt !== undefined ? { attempt: extra.attempt } : {}),
+      ...(extra.lastError !== undefined ? { lastError: extra.lastError } : {}),
+      ...(executions !== undefined ? { executions } : {}),
       ...(extra.result !== undefined
         ? { result: { ...task.result, ...extra.result } }
         : {}),
@@ -243,4 +332,28 @@ export class TaskEngine {
 
 function generateTaskId(): string {
   return `task-${Date.now().toString(36)}-${randomBytes(3).toString("hex")}`;
+}
+
+function errorCode(error: unknown): string {
+  return (error as { code?: string } | undefined)?.code ?? "";
+}
+
+/**
+ * Classifies a thrown adapter error into a terminal state.
+ *
+ * §6.3: a timeout is NOT assumed to be a failure. If the operation was
+ * dispatched, the remote side may have completed it, so the outcome is
+ * `unknown`. Only a timeout provably raised *before* dispatch becomes
+ * `timed_out`.
+ */
+function classifyThrown(error: unknown): "failed" | "timed_out" | "unknown" {
+  if (error instanceof AgentError && error.code === "AGENT_TIMEOUT") {
+    const dispatched = (error.details as { dispatched?: unknown } | undefined)?.dispatched;
+    return dispatched === false ? "timed_out" : "unknown";
+  }
+  return "failed";
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

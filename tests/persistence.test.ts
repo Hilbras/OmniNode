@@ -109,6 +109,7 @@ describe("JsonFileStore", () => {
       id: "t1",
       objective: "verify persistence",
       status: "created",
+      attempt: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

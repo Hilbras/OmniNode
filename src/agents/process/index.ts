@@ -185,7 +185,19 @@ export class ProcessAgent implements IAgent {
               new AgentError(
                 "AGENT_TIMEOUT",
                 `Agent "${this.config.name}" timed out after ${timeoutMs}ms and was killed.`,
-                { details: { taskId: input.taskId, stdout: stdout.slice(0, 4000), stderr: stderr.slice(0, 2000) } },
+                {
+                  details: {
+                    operation: "agent.run",
+                    agent: this.config.name,
+                    durationMs: timeoutMs,
+                    // The process was started and may have performed side
+                    // effects before being killed — the outcome is unknown,
+                    // not failed (roadmap §6.3).
+                    dispatched: true,
+                    stdout: stdout.slice(0, 4000),
+                    stderr: stderr.slice(0, 2000),
+                  },
+                },
               ),
             );
             return;

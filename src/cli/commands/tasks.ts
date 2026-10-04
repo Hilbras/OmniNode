@@ -96,7 +96,7 @@ export function registerTaskCommands(program: Command): void {
 
   task
     .command("retry <task-id>")
-    .description("Reset a failed/cancelled task to created; combine with --run to execute it again.")
+    .description("Reset a failed, timed out, unknown or cancelled task to created; combine with --run to execute it again.")
     .option("--run", "Run the task again immediately after resetting it.")
     .action(async (taskId: string, options: { run?: boolean }) => {
       const config = loadConfig();
@@ -121,6 +121,17 @@ function printOutcome(task: Task, options: { verbose?: boolean } = {}): void {
     if (task.agent) console.log(`  agent:   ${task.agent}`);
     if (task.context?.files) console.log(`  files:   ${task.context.files.join(", ")}`);
     console.log(`  objective: ${task.objective}`);
+  }
+  if (options.verbose && task.attempt > 0) {
+    console.log(`  attempt: ${task.attempt}`);
+  }
+  if (task.lastError) console.log(`  error:   ${task.lastError}`);
+  if (options.verbose && task.executions && task.executions.length > 0) {
+    console.log(
+      `  executions: ${task.executions
+        .map((e) => `#${e.attempt}:${e.outcome}`)
+        .join(", ")}`,
+    );
   }
   const result = task.result;
   if (!result) return;

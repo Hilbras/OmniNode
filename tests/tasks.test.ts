@@ -56,6 +56,7 @@ describe("FileTaskStore", () => {
       id: "task-1",
       objective: "first",
       status: "created",
+      attempt: 0,
       createdAt: now,
       updatedAt: now,
       project: "p",
@@ -64,6 +65,7 @@ describe("FileTaskStore", () => {
       id: "task-2",
       objective: "second",
       status: "queued",
+      attempt: 0,
       createdAt: now,
       updatedAt: now,
       project: "p",
@@ -140,7 +142,7 @@ describe("TaskEngine", () => {
     const created = await engine.create({ objective: "x", agent: "fake" });
     const finished = await engine.run(created.id);
     expect(finished.status).toBe("failed");
-    expect(finished.result?.error).toContain("timed out");
+    expect(finished.lastError).toContain("timed out");
   });
 
   it("enforces lifecycle transitions", async () => {

@@ -59,7 +59,7 @@ export interface RunPipelineOptions {
 }
 
 interface StepOutcome {
-  status: "completed" | "failed" | "skipped";
+  status: "completed" | "failed" | "partial" | "skipped";
   summary: string;
   /** What this step adds to the combined context (defaults to summary). */
   contextContribution?: string;
@@ -255,7 +255,13 @@ export class PipelineEngine {
         const stepRun: PipelineStepRun = {
           stepId: step.id,
           status:
-            outcome.status === "skipped" ? "cancelled" : outcome.status === "failed" ? "failed" : "completed",
+            outcome.status === "skipped"
+              ? "cancelled"
+              : outcome.status === "failed"
+                ? "failed"
+                : outcome.status === "partial"
+                  ? "partially_completed"
+                  : "completed",
           ...(outcome.taskIds.length > 0 ? { taskIds: outcome.taskIds } : {}),
           ...(outcome.planId !== undefined ? { planId: outcome.planId } : {}),
           ...(outcome.error !== undefined ? { error: outcome.error } : {}),
@@ -267,8 +273,10 @@ export class PipelineEngine {
       await this.options.store.save(run);
     }
 
-    const failed = [...outcomes.values()].some((o) => o.status === "failed");
-    const finalStatus: PipelineRunStatus = failed ? "failed" : "completed";
+    const allOutcomes = [...outcomes.values()];
+    const failed = allOutcomes.some((o) => o.status === "failed");
+    const partial = !failed && allOutcomes.some((o) => o.status === "partial");
+    const finalStatus: PipelineRunStatus = failed ? "failed" : partial ? "partial" : "completed";
     const planId = [...outcomes.values()].find((o) => o.planId !== undefined)?.planId;
 
     // §28 — Result: the outcome of the last completed step with tasks.
@@ -346,6 +354,7 @@ export class PipelineEngine {
     const condition = step.condition ?? "on-success";
     const depStatuses = deps.map((d) => outcomes.get(d)?.status);
     const anyFailed = depStatuses.includes("failed");
+    // A partial dependency carries real output, so it does not block.
     const anySkipped = depStatuses.includes("skipped");
     if (condition === "always") return true;
     if (condition === "on-failure") return anyFailed;
@@ -401,6 +410,7 @@ export class PipelineEngine {
     );
     const results = await Promise.all(created.map((task) => this.options.tasks.run(task.id)));
 
+    const completedTasks = results.filter((r) => r.status === "completed");
     const failedTasks = results.filter((r) => r.status !== "completed");
     const lines = results.map((result, index) => {
       const agentName = agentNames[index] ?? "unknown";
@@ -411,12 +421,15 @@ export class PipelineEngine {
     const summary = lines.join("\n");
 
     if (failedTasks.length > 0) {
-      const firstError = failedTasks[0]?.result?.error ?? "unknown error";
+      const firstError = failedTasks[0]?.result?.error ?? failedTasks[0]?.lastError ?? "unknown outcome";
+      const states = failedTasks.map((r) => r.status).join(", ");
       return {
-        status: "failed",
+        // Some agents succeeded → the step produced usable but incomplete
+        // intelligence: partial, not failed (roadmap §9.3).
+        status: completedTasks.length > 0 ? "partial" : "failed",
         summary,
         taskIds: created.map((t) => t.id),
-        error: `${failedTasks.length}/${results.length} task(s) failed — ${firstError}`,
+        error: `${failedTasks.length}/${results.length} task(s) incomplete (${states}) — ${firstError}`,
         reports,
       };
     }
@@ -437,7 +450,9 @@ export class PipelineEngine {
     const result = await this.options.tasks.run(task.id);
     if (result.status !== "completed") {
       return {
-        status: "failed",
+        // Unknown/timed_out outcomes are not failures — the work may have
+        // happened remotely; the step is incomplete, not broken.
+        status: result.status === "unknown" || result.status === "timed_out" ? "partial" : "failed",
         summary: result.result?.summary ?? "",
         taskIds: [task.id],
         error: result.result?.error ?? `task ${task.id} did not complete`,

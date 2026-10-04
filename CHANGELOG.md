@@ -4,6 +4,31 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.2] — v2 Phase 2 (Execution Reliability)
+
+### Added
+
+- Execution states `timed_out`, `unknown`, `partially_completed` on tasks and
+  `partial` on pipeline runs, with a documented strict state machine
+  (invalid transitions rejected).
+- **Timeout ≠ failure**: an adapter timeout after dispatch marks the task
+  `unknown` (the agent may already have performed side effects); only a
+  timeout provably raised before dispatch becomes `timed_out`.
+- Execution identity and history per task: `executionId` per attempt,
+  cumulative `attempt` counter, `lastError`, bounded execution records.
+- Retry safety: `run(id, { maxAttempts, retryBackoffMs })` with bounded
+  retries, linear backoff, and a retryable-error allow-list (agent crashes).
+  Unknown/timed-out outcomes are never auto-retried; `task retry` starts an
+  explicit fresh execution instead.
+- Pipeline failure propagation: partial fan-out yields a `partial` step and
+  `partial` run (downstream still runs), hard failures still fail the run and
+  skip on-success steps.
+- Process-adapter timeout errors now carry operation, duration and a
+  `dispatched` flag.
+- Tests: 251 (was 240) — the execution failure matrix: unknown vs timed_out,
+  retryable vs non-retryable, bounded history, strict transitions,
+  partial fan-out, hard-failure skip.
+
 ## [2.0.0-alpha.1] — v2 Phase 1 (Architecture & API Stabilization)
 
 ### Added

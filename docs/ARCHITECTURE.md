@@ -54,6 +54,28 @@ written back afterwards (findings of high/critical severity become project-level
 | `memory.json` | Local memory provider entries |
 | `audit.jsonl` | Append-only lifecycle events |
 
+## Execution states (v2 Phase 2)
+
+```
+created ──▶ queued ──▶ running ──┬─▶ completed
+   │           │         │        ├─▶ failed            (outcome known, work not done)
+   │           │         │        ├─▶ timed_out        (timeout provably before dispatch)
+   └───────────┴─────────┴────────┼─▶ unknown           (killed after dispatch — may have succeeded)
+                                  ├─▶ cancelled
+                                  └─▶ partially_completed (fan-out: some units succeeded)
+```
+
+- A timeout after dispatch is **not** a failure — the agent may have already
+  done the work remotely. Such tasks end `unknown` and are resolved by an
+  explicit `task retry` (a new execution) or by inspecting artifacts.
+- Automatic retries apply only to allow-listed transient errors
+  (`AGENT_FAILED`), with bounded attempts and linear backoff. Unknown
+  outcomes are never retried automatically, to avoid duplicating side effects.
+- Every attempt has an `executionId`, a cumulative `attempt` number and a
+  bounded execution history on the task.
+- Pipeline runs derive `failed` (any hard failure) > `partial` (any partial or
+  unprovable step) > `completed`.
+
 ## v2 additions (Phase 1)
 
 ```

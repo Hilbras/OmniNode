@@ -18,7 +18,7 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v2.0.0-alpha.1 — v2 Phase 1: Architecture & API Stabilization** (the v2
+**v2.0.0-alpha.2 — v2 Phase 2: Execution Reliability** (after Phase 1: architecture & API stabilization) (the v2
 roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the v1 plan is complete:
 the
 full loop from §28 runs in one command —

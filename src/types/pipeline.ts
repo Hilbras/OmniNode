@@ -37,7 +37,18 @@ export interface PipelineDefinition {
   steps: PipelineStep[];
 }
 
-export type PipelineRunStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+/**
+ * Run status. "partial" means the run finished but some step outcome was
+ * incomplete or unprovable (partial fan-out, unknown task state) — the
+ * authoritative detail always lives in `stepRuns`/`taskRuns`.
+ */
+export type PipelineRunStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "partial"
+  | "cancelled";
 
 export interface PipelineStepRun {
   stepId: string;

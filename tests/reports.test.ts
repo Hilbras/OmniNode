@@ -22,7 +22,7 @@ function report(partial: Partial<Report> & { id: string; agent: string }): Repor
 
 function task(id: string, agent: string, result: Task["result"]): Task {
   const now = new Date().toISOString();
-  return { id, objective: "obj", agent, status: "completed", createdAt: now, updatedAt: now, result };
+  return { id, objective: "obj", agent, status: "completed", attempt: 0, createdAt: now, updatedAt: now, result };
 }
 
 describe("extractReportFromText", () => {
