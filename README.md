@@ -18,8 +18,9 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v0.9.0 — Phase 8: Planner System** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
-for the full plan and roadmap).
+**v0.10.0 — Phase 9: End-to-End Workflow** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
+for the full plan and roadmap). The full loop from §28 works in one command:
+`User → project context → memory → research agents → reports → aggregation → planner → plan → execution → result`.
 
 What exists today:
 
@@ -97,6 +98,15 @@ What exists today:
   - Plans persist to `.omninode/plans.json`; pipeline runs record `planId`
   - Configure with `planner: { kind: model | heuristic, model, instruction }`
     — never hardcoded to any provider
+- **End-to-end workflow** (§28, §27 Phase 9):
+  - One-command execution via the top-level `run` alias (`omninode run <pipeline> "<objective>"`)
+  - `omninode status` — full project state overview: providers, agents,
+    roles, pipelines, task/run/report/plan counts, memory provider + entries
+  - Pipeline runs persist their objective and a final `resultSummary` (§28 "Result")
+  - Error recovery: `task retry [--run]` (reset a failed/cancelled task) and
+    `pipeline retry <run-id>` (re-run a recorded failed run as a new run)
+  - Full integration test (`tests/e2e.test.ts`) drives the entire §28 workflow
+    through the real CLI against a local gateway
 - Typed error hierarchy (`src/errors/`)
 - Leveled logger with pluggable sink (`src/logger/`)
 - Configuration system: `omninode.yaml` with `${ENV_VAR}` expansion and strict
@@ -190,6 +200,14 @@ project:
     model: my-gateway:chatgpt
 ```
 
+```bash
+omninode init
+omninode status
+omninode run repo-audit "Audit the authentication module"   # the whole workflow
+omninode pipeline retry run-xxxx                             # recover a failed run
+omninode task retry task-yyyy --run                          # recover a failed task
+```
+
 Persistent memory (§19–§20) — opt in with `memory: { provider: local }` or
 `provider: remembera` in `omninode.yaml`:
 
@@ -236,8 +254,9 @@ Phases 0–11 are laid out in [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.m
 | v0.7.0 | Multi-AI Reports |
 | v0.7.0 | Multi-AI Reports |
 | v0.8.0 | Remembera / Memory |
-| **v0.9.0** | **Planner (current)** |
-| v0.10.0 | End-to-End Runtime |
+| v0.8.0 | Remembera / Memory |
+| v0.9.0 | Planner |
+| **v0.10.0** | **End-to-End Workflow (current)** |
 | v1.0.0 | Production Release |
 
 Core architectural rule: OmniNode must run successfully with **zero Hilbras

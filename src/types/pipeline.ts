@@ -52,6 +52,8 @@ export interface PipelineStepRun {
 export interface PipelineRun {
   id: string;
   pipelineId: string;
+  /** The objective this run is executing (persisted for retries). */
+  objective?: string;
   status: PipelineRunStatus;
   startedAt?: string;
   finishedAt?: string;
@@ -62,4 +64,6 @@ export interface PipelineRun {
   combinedReportId?: string;
   /** Set when a plan step produced an implementation plan (§18). */
   planId?: string;
+  /** Outcome summary of the final executed step (§28 — Result). */
+  resultSummary?: string;
 }

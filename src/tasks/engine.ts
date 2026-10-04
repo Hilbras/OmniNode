@@ -166,6 +166,26 @@ export class TaskEngine {
     return this.transition(task, "cancelled");
   }
 
+  /** Error recovery (§27 Phase 9): reset a failed/cancelled task so it can run again. */
+  async retry(id: string): Promise<Task> {
+    const task = await this.mustGet(id);
+    if (task.status !== "failed" && task.status !== "cancelled") {
+      throw new TaskError(
+        "TASK_INVALID",
+        `Only failed or cancelled tasks can be retried — task ${id} is "${task.status}".`,
+      );
+    }
+    const { result: _discarded, ...rest } = task;
+    const reset: Task = {
+      ...rest,
+      status: "created",
+      updatedAt: new Date().toISOString(),
+    };
+    await this.options.store.save(reset);
+    this.log.info(`Task ${id} reset for retry.`);
+    return reset;
+  }
+
   async get(id: string): Promise<Task | undefined> {
     return this.options.store.get(id);
   }

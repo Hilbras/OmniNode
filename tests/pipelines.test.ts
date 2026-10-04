@@ -174,6 +174,12 @@ describe("PipelineEngine run", () => {
     // The executor received the plan through its context.
     expect(executor.received[0]?.context).toContain("# Implementation Plan");
     expect(executor.received[0]?.role).toMatchObject({ id: "planner" });
+    // §28 — the objective and the final result are persisted on the run.
+    expect(run.objective).toBe("audit everything");
+    expect(run.resultSummary).toContain("exec-summary");
+    const reread = await engine.get(run.id);
+    expect(reread?.objective).toBe("audit everything");
+    expect(reread?.resultSummary).toContain("exec-summary");
     // The produced plan was persisted and linked to the run.
     expect(run.planId).toBeDefined();
     const stored = await plans.get(run.planId!);

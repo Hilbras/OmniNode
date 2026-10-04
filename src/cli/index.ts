@@ -11,9 +11,10 @@ import { registerAgentCommands } from "./commands/agents.js";
 import { registerRoleCommands } from "./commands/roles.js";
 import { registerTaskCommands } from "./commands/tasks.js";
 import { registerReportCommands } from "./commands/reports.js";
-import { registerPipelineCommands } from "./commands/pipelines.js";
+import { registerPipelineCommands, registerRunAlias } from "./commands/pipelines.js";
 import { registerMemoryCommands } from "./commands/memory.js";
 import { registerPlanCommands } from "./commands/plan.js";
+import { registerStatusCommand } from "./commands/status.js";
 
 export function createProgram(): Command {
   const program = new Command();
@@ -37,6 +38,8 @@ export function createProgram(): Command {
   registerPipelineCommands(program);
   registerMemoryCommands(program);
   registerPlanCommands(program);
+  registerStatusCommand(program);
+  registerRunAlias(program);
 
   return program;
 }

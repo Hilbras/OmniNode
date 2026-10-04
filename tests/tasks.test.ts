@@ -182,3 +182,53 @@ describe("TaskEngine", () => {
     await expect(engine.run("task-nope")).rejects.toMatchObject({ code: "TASK_NOT_FOUND" });
   });
 });
+
+class FlakyTaskAgent implements IAgent {
+  info: AgentInfo = { name: "flaky", integration: "process", status: "ready" };
+  fail = true;
+
+  async run(input: AgentTaskInput): Promise<AgentTaskOutput> {
+    if (this.fail) {
+      return { taskId: input.taskId, status: "failed", error: "transient failure" };
+    }
+    return { taskId: input.taskId, status: "completed", summary: "recovered on retry" };
+  }
+
+  async cancel(): Promise<void> {}
+}
+
+describe("TaskEngine error recovery", () => {
+  it("retry resets a failed task to created and it can run again", async () => {
+    const store = new FileTaskStore("/tmp/omninode-retry-test-1");
+    const agent = new FlakyTaskAgent();
+    const engine = makeEngine(agent, store);
+
+    const created = await engine.create({ objective: "flaky objective", agent: "flaky" });
+    const failed = await engine.run(created.id);
+    expect(failed.status).toBe("failed");
+    expect(failed.result?.error).toContain("transient");
+
+    const reset = await engine.retry(created.id);
+    expect(reset.status).toBe("created");
+    expect(reset.result).toBeUndefined();
+    expect(reset.objective).toBe("flaky objective");
+    expect(reset.id).toBe(created.id);
+
+    agent.fail = false;
+    const finished = await engine.run(created.id);
+    expect(finished.status).toBe("completed");
+    expect(finished.result?.summary).toBe("recovered on retry");
+  });
+
+  it("retry also works for cancelled tasks, but not for completed ones", async () => {
+    const store = new FileTaskStore("/tmp/omninode-retry-test-2");
+    const engine = makeEngine(new FakeAgent(), store);
+    const created = await engine.create({ objective: "x", agent: "fake" });
+    await engine.cancel(created.id);
+    expect((await engine.retry(created.id)).status).toBe("created");
+
+    const second = await engine.create({ objective: "y", agent: "fake" });
+    await engine.run(second.id);
+    await expect(engine.retry(second.id)).rejects.toMatchObject({ code: "TASK_INVALID" });
+  });
+});

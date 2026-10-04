@@ -93,6 +93,22 @@ export function registerTaskCommands(program: Command): void {
       const cancelled = await engine.cancel(taskId);
       console.log(`Task ${cancelled.id} is now "${cancelled.status}".`);
     });
+
+  task
+    .command("retry <task-id>")
+    .description("Reset a failed/cancelled task to created; combine with --run to execute it again.")
+    .option("--run", "Run the task again immediately after resetting it.")
+    .action(async (taskId: string, options: { run?: boolean }) => {
+      const config = loadConfig();
+      const engine = createTaskEngine(config);
+      const reset = await engine.retry(taskId);
+      console.log(`Task ${reset.id} reset to "${reset.status}".`);
+      if (!options.run) return;
+      console.log(`Running task ${reset.id}...`);
+      const finished = await engine.run(reset.id);
+      printOutcome(finished);
+      if (finished.status !== "completed") process.exitCode = 1;
+    });
 }
 
 function printOutcome(task: Task, options: { verbose?: boolean } = {}): void {

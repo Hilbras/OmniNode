@@ -195,6 +195,7 @@ export class PipelineEngine {
     const run: PipelineRun = {
       id: `run-${Date.now().toString(36)}-${randomBytes(3).toString("hex")}`,
       pipelineId: def.id,
+      objective,
       status: "running",
       startedAt: now,
       stepRuns: [],
@@ -261,10 +262,29 @@ export class PipelineEngine {
     const finalStatus: PipelineRunStatus = failed ? "failed" : "completed";
     const planId = [...outcomes.values()].find((o) => o.planId !== undefined)?.planId;
 
-    // Report system (§16–§17): collect, store and combine reports from all tasks.
+    // §28 — Result: the outcome of the last completed step with tasks.
+    let resultSummary: string | undefined;
+    for (let i = def.steps.length - 1; i >= 0; i -= 1) {
+      const step = def.steps[i]!;
+      const outcome = outcomes.get(step.id);
+      if (outcome?.status !== "completed" || outcome.taskIds.length === 0) continue;
+      const stepTasks = (
+        await Promise.all(outcome.taskIds.map((id) => this.options.tasks.get(id)))
+      ).filter((task): task is NonNullable<typeof task> => task !== undefined);
+      const summaries = stepTasks
+        .map((task) => task.result?.summary)
+        .filter((summary): summary is string => summary !== undefined);
+      if (summaries.length > 0) resultSummary = summaries.join("\n");
+      break;
+    }
+
+    // Report system (§16–§17): collect, store and combine reports from the
+    // analysis tasks (research/analyze) — execution output is a result, not a report.
     let combinedReportId: string | undefined;
     if (this.options.reports) {
-      const taskIds = [...outcomes.values()].flatMap((o) => o.taskIds);
+      const taskIds = def.steps
+        .filter((step) => step.kind === "research" || step.kind === "analyze")
+        .flatMap((step) => outcomes.get(step.id)?.taskIds ?? []);
       const tasks = (
         await Promise.all(taskIds.map((id) => this.options.tasks.get(id)))
       ).filter((task): task is NonNullable<typeof task> => task !== undefined);
@@ -288,6 +308,7 @@ export class PipelineEngine {
       ...(run.reports !== undefined && run.reports.length > 0 ? { reports: run.reports } : {}),
       ...(combinedReportId !== undefined ? { combinedReportId } : {}),
       ...(planId !== undefined ? { planId } : {}),
+      ...(resultSummary !== undefined ? { resultSummary } : {}),
     };
     await this.options.store.save(finished);
     this.log.info(`Pipeline ${def.id} finished: ${finalStatus}.`);

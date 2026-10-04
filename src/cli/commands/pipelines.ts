@@ -30,31 +30,31 @@ export function registerPipelineCommands(program: Command): void {
     .description(
       "Run a pipeline. The objective argument overrides the definition's default objective.",
     )
-    .action(async (id: string, objective: string | undefined) => {
+    .action(async (id: string, objective: string | undefined) => runPipelineAction(id, objective));
+
+  pipeline
+    .command("retry <run-id> [objective]")
+    .description(
+      "Error recovery: re-run a recorded pipeline run as a new run, reusing its objective.",
+    )
+    .action(async (runId: string, objective: string | undefined) => {
       const config = loadConfig();
-      const def = findPipeline(config, id);
       const engine = buildPipelineEngine(config);
-      console.log(
-        `Running pipeline "${def.id}" (${def.steps.length} step(s))${objective ? ` — "${objective}"` : ""}...`,
-      );
-      const finished = await engine.run(def, {
-        ...(objective !== undefined ? { objective } : {}),
-        onStep: (stepRun) => {
-          const suffix = stepRun.error ? ` — ${stepRun.error}` : "";
-          console.log(`  [${stepRun.stepId}] ${stepRun.status}${suffix}`);
-        },
-      });
-      if (finished.reports && finished.reports.length > 0) {
-        console.log(`  reports: ${finished.reports.length} structured report(s)`);
+      const previous = await engine.get(runId);
+      if (!previous) {
+        throw new PipelineError(
+          "PIPELINE_NOT_FOUND",
+          `Pipeline run "${runId}" does not exist in this project's run store.`,
+        );
       }
-      if (finished.combinedReportId) {
-        console.log(`  combined report: ${finished.combinedReportId}`);
+      const def = config.project.pipelines.find((p) => p.id === previous.pipelineId);
+      if (!def) {
+        throw new PipelineError(
+          "PIPELINE_NOT_FOUND",
+          `Pipeline "${previous.pipelineId}" (run ${runId}) is no longer configured in omninode.yaml.`,
+        );
       }
-      if (finished.planId) {
-        console.log(`  plan: ${finished.planId}`);
-      }
-      console.log(`Pipeline ${finished.status}. Run id: ${finished.id}`);
-      if (finished.status !== "completed") process.exitCode = 1;
+      await runPipelineAction(def.id, objective ?? previous.objective);
     });
 
   pipeline
@@ -91,6 +91,7 @@ export function registerPipelineCommands(program: Command): void {
       console.log(`  status:     ${run.status}`);
       console.log(`  started:    ${run.startedAt ?? "?"}`);
       if (run.finishedAt) console.log(`  finished:   ${run.finishedAt}`);
+      if (run.resultSummary) console.log(`  result:     ${run.resultSummary}`);
       for (const stepRun of run.stepRuns) {
         console.log(`  [${stepRun.stepId}] ${stepRun.status}`);
       }
@@ -98,6 +99,44 @@ export function registerPipelineCommands(program: Command): void {
         console.log(`  reports:    ${run.reports.length}`);
       }
     });
+}
+
+async function runPipelineAction(id: string, objective: string | undefined): Promise<void> {
+  const config = loadConfig();
+  const def = findPipeline(config, id);
+  const engine = buildPipelineEngine(config);
+  console.log(
+    `Running pipeline "${def.id}" (${def.steps.length} step(s))${objective ? ` — "${objective}"` : ""}...`,
+  );
+  const finished = await engine.run(def, {
+    ...(objective !== undefined ? { objective } : {}),
+    onStep: (stepRun) => {
+      const suffix = stepRun.error ? ` — ${stepRun.error}` : "";
+      console.log(`  [${stepRun.stepId}] ${stepRun.status}${suffix}`);
+    },
+  });
+  if (finished.reports && finished.reports.length > 0) {
+    console.log(`  reports: ${finished.reports.length} structured report(s)`);
+  }
+  if (finished.combinedReportId) {
+    console.log(`  combined report: ${finished.combinedReportId}`);
+  }
+  if (finished.planId) {
+    console.log(`  plan: ${finished.planId}`);
+  }
+  if (finished.resultSummary) {
+    console.log(`  result: ${finished.resultSummary}`);
+  }
+  console.log(`Pipeline ${finished.status}. Run id: ${finished.id}`);
+  if (finished.status !== "completed") process.exitCode = 1;
+}
+
+/** Top-level `omninode run` — a workflow alias of `pipeline run` (§28). */
+export function registerRunAlias(program: Command): void {
+  program
+    .command("run <id> [objective]")
+    .description("Alias of `omninode pipeline run` — execute a configured pipeline end to end.")
+    .action(async (id: string, objective: string | undefined) => runPipelineAction(id, objective));
 }
 
 function findPipeline(config: ReturnType<typeof loadConfig>, id: string): PipelineDefinition {
