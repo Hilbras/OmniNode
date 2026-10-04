@@ -9,7 +9,7 @@
  *  - **Schema versioning**: documents carry `schemaVersion`; v1 documents are
  *    migrated on read, future versions are refused rather than misread.
  */
-import { open, mkdir, readFile, rename, stat } from "node:fs/promises";
+import { open, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { logger, type Logger } from "../logger/index.js";
 
@@ -34,34 +34,55 @@ export interface JsonFileStoreOptions {
   fileName: string;
   /** Schema version to write (defaults to the current version). */
   schemaVersion?: number;
+  /** Power-loss durability: "rename" (default) or "fsync" (slower). */
+  durability?: Durability;
   /** Called when a persisted file is corrupt (after quarantine). */
   onCorrupt?: (path: string, error: unknown) => void;
   /** Disable file moves (used by dry runs / tests that inspect in place). */
   quarantine?: boolean;
 }
 
-/** Durably writes a file: temp → fsync → rename → directory fsync. */
-export async function writeFileAtomic(target: string, contents: string): Promise<void> {
+export type Durability = "rename" | "fsync";
+
+/**
+ * Writes a file atomically: temp → rename. The rename guarantees readers
+ * never observe a torn file. With `durability: "fsync"` the data and the
+ * directory entry are also flushed, which additionally survives power loss —
+ * at a significant per-write cost, so it is opt-in.
+ */
+export async function writeFileAtomic(
+  target: string,
+  contents: string,
+  durability: Durability = "rename",
+): Promise<void> {
   const tmp = `${target}.tmp`;
   await mkdir(dirname(target), { recursive: true });
-  const handle = await open(tmp, "w");
-  try {
-    await handle.writeFile(contents, "utf8");
-    await handle.sync(); // flush data before the rename becomes visible
-  } finally {
-    await handle.close();
-  }
-  await rename(tmp, target);
-  // Sync the directory entry so the rename itself survives a crash.
-  try {
-    const dir = await open(dirname(target), "r");
+
+  if (durability === "fsync") {
+    const handle = await open(tmp, "w");
     try {
-      await dir.sync();
+      await handle.writeFile(contents, "utf8");
+      await handle.sync();
     } finally {
-      await dir.close();
+      await handle.close();
     }
-  } catch {
-    // Directory fsync is unsupported on some platforms — the rename is still atomic.
+  } else {
+    await writeFile(tmp, contents, "utf8");
+  }
+
+  await rename(tmp, target);
+
+  if (durability === "fsync") {
+    try {
+      const dir = await open(dirname(target), "r");
+      try {
+        await dir.sync();
+      } finally {
+        await dir.close();
+      }
+    } catch {
+      // Directory fsync is unsupported on some platforms — the rename is still atomic.
+    }
   }
 }
 
@@ -143,6 +164,7 @@ export async function readDocument<T>(
 export class JsonFileStore<T> {
   private readonly filePath: string;
   private readonly schemaVersion: number;
+  private readonly durability: Durability;
   private readonly onCorrupt?: (path: string, error: unknown) => void;
   private readonly quarantine: boolean;
   private readonly log: Logger;
@@ -151,6 +173,7 @@ export class JsonFileStore<T> {
   constructor(options: JsonFileStoreOptions) {
     this.filePath = `${options.directory ?? `${process.cwd()}/.omninode`}/${options.fileName}`;
     this.schemaVersion = options.schemaVersion ?? SCHEMA_VERSION;
+    this.durability = options.durability ?? "rename";
     this.onCorrupt = options.onCorrupt;
     this.quarantine = options.quarantine ?? true;
     this.log = logger.child({ component: "persistence", file: options.fileName });
@@ -167,7 +190,7 @@ export class JsonFileStore<T> {
 
   protected async writeAll(items: T[]): Promise<void> {
     const document: JsonDocument<T> = { schemaVersion: this.schemaVersion, items };
-    await writeFileAtomic(this.filePath, `${JSON.stringify(document, null, 2)}\n`);
+    await writeFileAtomic(this.filePath, `${JSON.stringify(document, null, 2)}\n`, this.durability);
   }
 
   /** Serializes an async operation against this file. */

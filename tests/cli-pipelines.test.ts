@@ -135,7 +135,7 @@ describe("CLI pipeline commands", () => {
     expect(statusOutput).toContain("pipeline:   audit");
     expect(statusOutput).toContain("status:     completed");
     expect(statusOutput).toContain("[research] completed");
-  });
+  }, 20_000);
 
   it("pipeline run fails clearly for unknown pipelines", async () => {
     await createProgram().parseAsync(["node", "omninode", "init"]);

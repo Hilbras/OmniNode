@@ -3,6 +3,7 @@ import { loadConfig } from "../../config/index.js";
 import { PipelineError } from "../../errors/index.js";
 import { buildPipelineEngine } from "../../pipelines/index.js";
 import type { PipelineDefinition } from "../../types/pipeline.js";
+import { registerPipelineInspect } from "./inspect.js";
 
 export function registerPipelineCommands(program: Command): void {
   const pipeline = program
@@ -133,6 +134,7 @@ export function registerPipelineCommands(program: Command): void {
         console.log(`  reports:    ${run.reports.length}`);
       }
     });
+  registerPipelineInspect(pipeline);
 }
 
 async function runPipelineAction(id: string, objective: string | undefined): Promise<void> {

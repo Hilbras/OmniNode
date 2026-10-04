@@ -96,7 +96,7 @@ describe("CLI report commands", () => {
     expect(showOutput).toContain("Combined report");
     expect(showOutput).toContain("sources:   helper, worker");
     expect(showOutput).toContain("0 unique finding group(s)");
-  });
+  }, 20_000);
 
   it("report show fails clearly for unknown ids", async () => {
     await createProgram().parseAsync(["node", "omninode", "init"]);

@@ -4,6 +4,37 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.14] — v2 Phase 14 (Audit & Observability)
+
+### Added
+
+- **Correlated audit events** (§18): every event carries `taskId`,
+  `pipelineId`, `executionId`, `agentId`, `providerId` alongside the subject
+  id, so a task → execution → pipeline run → agent → provider chain can be
+  reconstructed.
+- **New audit actions**: `agent.started`, `agent.completed`,
+  `provider.error` (with the normalized error kind), and distinct
+  `pipeline.run.failed` / `pipeline.run.cancelled`.
+- **Provider error auditing**: OpenAI-compatible adapters record
+  `provider.error` with the operation and normalized kind; the pipeline
+  engine passes its audit log to providers, so plan-step provider failures
+  land in the trail.
+- **Structured logs**: `logging.format: json` emits one JSON object per line
+  (level, message, timestamp, context) for log shipping.
+- **CLI diagnostics**: `omninode task inspect <id>` (executions, last error,
+  result, reports), `pipeline inspect <run-id>` (steps, task ids, plan/report
+  ids, result), `agent inspect <name>` (effective config, env policy, recent
+  tasks), `provider inspect <name>` (auth method, credential status) — all
+  with `--json`.
+- Tests: 401 (was 393) — correlation ids on lifecycle events, provider-error
+  auditing, JSON log format, and all four inspect commands.
+
+### Changed
+
+- Store writes default to atomic-rename durability; `fsync` (data + directory
+  flush) is now opt-in per store instead of always-on — same torn-read
+  protection, a fraction of the I/O cost.
+
 ## [2.0.0-alpha.13] — v2 Phase 13 (Security Hardening)
 
 ### Added

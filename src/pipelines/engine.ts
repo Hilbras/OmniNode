@@ -79,6 +79,9 @@ interface StepOutcome {
 interface StepContext {
   objective: string;
   runId?: string;
+  /** Definition id (correlates events with the pipeline, not just the run). */
+  pipelineDefId?: string;
+  taskId?: string;
   role?: RoleDefinition;
   combinedContext: string;
   reports: Report[];
@@ -264,6 +267,7 @@ export class PipelineEngine implements IPipelineExecutor {
       at: new Date().toISOString(),
       action: "pipeline.run.started",
       id: run.id,
+      pipelineId: def.id,
       detail: { pipeline: def.id, objective },
     });
 
@@ -311,6 +315,8 @@ export class PipelineEngine implements IPipelineExecutor {
             reports: [...allReports],
             pipelineRunId: run.id,
             runId: run.id,
+            pipelineDefId: def.id,
+            taskId: run.id,
           };
           return this.executeStep(step, ctx);
         }),
@@ -417,8 +423,9 @@ export class PipelineEngine implements IPipelineExecutor {
     this.log.info(`Pipeline ${def.id} finished: ${finalStatus}.`);
     await this.options.audit?.record({
       at: new Date().toISOString(),
-      action: "pipeline.run.finished",
+      action: cancelled ? "pipeline.run.cancelled" : finalStatus === "failed" ? "pipeline.run.failed" : "pipeline.run.finished",
       id: run.id,
+      pipelineId: def.id,
       detail: { pipeline: def.id, status: finalStatus },
     });
     return finished;
@@ -512,6 +519,7 @@ export class PipelineEngine implements IPipelineExecutor {
       agentNames.map((name) =>
         this.options.tasks.create({
           objective: ctx.objective,
+          ...(ctx.pipelineRunId !== undefined ? { pipelineId: ctx.pipelineRunId } : {}),
           agent: name,
           ...(ctx.role ? { role: ctx.role.id } : {}),
           ...(ctx.combinedContext.length > 0
@@ -563,6 +571,7 @@ export class PipelineEngine implements IPipelineExecutor {
   ): Promise<StepOutcome> {
     const task = await this.options.tasks.create({
       objective: ctx.objective,
+      ...(ctx.pipelineRunId !== undefined ? { pipelineId: ctx.pipelineRunId } : {}),
       agent: agentName,
       ...(ctx.role ? { role: ctx.role.id } : {}),
       ...(ctx.combinedContext.length > 0 ? { context: { background: ctx.combinedContext } } : {}),
@@ -643,7 +652,13 @@ export class PipelineEngine implements IPipelineExecutor {
       at: new Date().toISOString(),
       action: "plan.generated",
       id: plan.id,
-      detail: { generatedBy: plan.generatedBy, steps: plan.steps.length },
+      ...(ctx.pipelineDefId !== undefined ? { pipelineId: ctx.pipelineDefId } : {}),
+      detail: {
+        generatedBy: plan.generatedBy,
+        steps: plan.steps.length,
+        run: ctx.pipelineRunId,
+        taskId: ctx.taskId,
+      },
     });
     return {
       status: "completed",
@@ -681,8 +696,15 @@ function formatPlan(plan: Plan): string {
 }
 
 /** Default chat function: resolves "provider:model" against the configured providers. */
+export interface DefaultChatOptions {
+  /** Correlates provider errors in the audit log (§18). */
+  audit?: AuditSink;
+  env?: Record<string, string | undefined>;
+}
+
 export function createDefaultChatFn(
   providers: AppConfig["project"]["providers"],
+  options: DefaultChatOptions = {},
 ): ChatFn {
   return async (modelRef, messages) => {
     const separator = modelRef.indexOf(":");
@@ -701,7 +723,10 @@ export function createDefaultChatFn(
         `Provider "${providerName}" (model "${modelRef}") is not configured.`,
       );
     }
-    const provider = createProvider(providerConfig);
+    const provider = createProvider(providerConfig, {
+      ...(options.audit !== undefined ? { audit: options.audit } : {}),
+      ...(options.env !== undefined ? { env: options.env } : {}),
+    });
     const response = await provider.chat({ model: modelId, messages });
     return response.content;
   };

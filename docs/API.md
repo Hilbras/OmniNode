@@ -21,7 +21,8 @@ stability tier from [API_STABILITY.md](API_STABILITY.md).
 | `Project` | project entity | Stable |
 | `ChatMessage`, `ChatRequest`, `ChatResponse`, `ChatRole`, `ChatUsage`, `ChatFn`, `ChatStreamChunk` | chat contracts (incl. streaming chunks); `ChatFn` was re-exported from `pipelines` in v1 and remains so | Stable |
 | `MessageEnvelope`, `AgentToNodeMessage`, `NodeToAgentMessage` | JSON-lines agent protocol envelope | Experimental |
-| `AuditEvent`, `AuditAction`, `AuditSink`, `FileAuditLog` | append-only audit log | Experimental |
+| `AuditEvent`, `AuditAction`, `AuditSink`, `FileAuditLog` | append-only correlated audit log (§18) | Stable |
+| `Logger`, `ConsoleLogSink`, `LogSink`, `LogLevel`, `LogFormat`, `configureLogger` | logging (text or JSON lines) | Stable |
 
 ## Agent Protocol v2 (`src/agent-protocol`)
 

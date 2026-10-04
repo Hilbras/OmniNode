@@ -116,7 +116,10 @@ export const appConfigSchema = z
   .object({
     project: projectConfigSchema,
     logging: z
-      .object({ level: z.enum(["debug", "info", "warn", "error"]) })
+      .object({
+        level: z.enum(["debug", "info", "warn", "error"]),
+        format: z.enum(["text", "json"]).optional(),
+      })
       .strict()
       .optional(),
   })

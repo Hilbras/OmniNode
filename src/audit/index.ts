@@ -3,7 +3,7 @@
  * (task/pipeline transitions) in the project's .omninode directory. Useful
  * for compliance reviews and debugging multi-agent runs.
  */
-import { mkdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { logger, type Logger } from "../logger/index.js";
 
@@ -17,15 +17,30 @@ export type AuditAction =
   | "task.retry"
   | "pipeline.run.started"
   | "pipeline.run.finished"
+  | "pipeline.run.failed"
+  | "pipeline.run.cancelled"
   | "plan.generated"
+  | "agent.started"
+  | "agent.completed"
+  | "provider.error"
   | "memory.context.gathered"
   | "memory.outcome.recorded";
 
+/**
+ * Every event carries correlation ids so a failed execution can be traced
+ * across task → execution → pipeline run → agent → provider (roadmap §18).
+ */
 export interface AuditEvent {
   at: string;
   action: AuditAction;
   project?: string;
+  /** Primary subject: task id, pipeline run id, plan id… */
   id?: string;
+  taskId?: string;
+  pipelineId?: string;
+  executionId?: string;
+  agentId?: string;
+  providerId?: string;
   actor?: string;
   detail?: Record<string, unknown>;
 }
@@ -47,15 +62,9 @@ export class FileAuditLog implements AuditSink {
   async record(event: AuditEvent): Promise<void> {
     try {
       await mkdir(dirname(this.filePath), { recursive: true });
-      // fsync the append so audit entries survive a crash (roadmap §12 durability).
-      const { open } = await import("node:fs/promises");
-      const handle = await open(this.filePath, "a");
-      try {
-        await handle.appendFile(`${JSON.stringify(event)}\n`, "utf8");
-        await handle.sync();
-      } finally {
-        await handle.close();
-      }
+      // Append-only: a crash can tear the last line, which `recent()` skips.
+      // fsync-per-event would make every execution wait on the disk.
+      await appendFile(this.filePath, `${JSON.stringify(event)}\n`, "utf8");
     } catch (error) {
       this.log.warn(
         `Audit write failed: ${error instanceof Error ? error.message : String(error)}`,

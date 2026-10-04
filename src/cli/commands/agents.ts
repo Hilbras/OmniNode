@@ -3,6 +3,7 @@ import { agentConfigSchema, loadConfig } from "../../config/index.js";
 import { AgentError, OmniNodeError } from "../../errors/index.js";
 import { createAgent } from "../../agents/index.js";
 import { appendToConfigList } from "./shared.js";
+import { registerAgentInspect } from "./inspect.js";
 
 const collectArgs = (value: string, previous: string[]): string[] => [...previous, value];
 
@@ -72,6 +73,7 @@ export function registerAgentCommands(program: Command): void {
     .command("test <name>")
     .description("Verify the OmniNode ↔ agent connection by sending a trivial task.")
     .action(async (name: string) => testAgent(name));
+  registerAgentInspect(agent);
 }
 
 export async function addAgent(options: AddAgentOptions): Promise<void> {

@@ -1,4 +1,5 @@
 export { PipelineEngine, createDefaultChatFn } from "./engine.js";
+export type { DefaultChatOptions } from "./engine.js";
 export type { ChatFn, PipelineEngineOptions, RunPipelineOptions } from "./engine.js";
 export { FilePipelineRunStore } from "./store.js";
 export type { PipelineRunFilter, PipelineRunStore } from "./store.js";

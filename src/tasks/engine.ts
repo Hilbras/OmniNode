@@ -55,6 +55,7 @@ const EXECUTION_HISTORY_LIMIT = 10;
 export interface CreateTaskInput {
   objective: string;
   project?: string;
+  pipelineId?: string;
   role?: string;
   agent?: string;
   context?: TaskContext;
@@ -113,13 +114,14 @@ export class TaskEngine {
       createdAt: now,
       updatedAt: now,
       ...(input.project !== undefined ? { project: input.project } : {}),
+      ...(input.pipelineId !== undefined ? { pipelineId: input.pipelineId } : {}),
       ...(input.role !== undefined ? { role: input.role } : {}),
       ...(input.agent !== undefined ? { agent: input.agent } : {}),
       ...(input.context !== undefined ? { context: input.context } : {}),
     };
     await this.options.store.save(task);
     this.log.info(`Created task ${task.id}.`);
-    await this.audit("task.created", task.id, { objective: task.objective, project: task.project });
+    await this.audit("task.created", task, { objective: task.objective });
     return task;
   }
 
@@ -171,12 +173,25 @@ export class TaskEngine {
       const startedAt = new Date().toISOString();
       current = await this.transition(current, "running", { attempt });
 
+      await this.options.audit?.record({
+        at: startedAt,
+        action: "agent.started",
+        id: current.id,
+        taskId: current.id,
+        ...(current.pipelineId !== undefined ? { pipelineId: current.pipelineId } : {}),
+        agentId: task.agent,
+        executionId,
+        detail: { attempt },
+      });
+
       let output;
       let thrown: unknown;
       try {
         output = await agent.run({
           taskId: current.id,
           objective: current.objective,
+          executionId,
+          ...(current.pipelineId !== undefined ? { pipelineId: current.pipelineId } : {}),
           ...(role ? { role } : {}),
           ...(background !== undefined ? { context: background } : {}),
         });
@@ -185,6 +200,16 @@ export class TaskEngine {
       }
 
       const finishedAt = new Date().toISOString();
+      await this.options.audit?.record({
+        at: finishedAt,
+        action: "agent.completed",
+        id: current.id,
+        taskId: current.id,
+        ...(current.pipelineId !== undefined ? { pipelineId: current.pipelineId } : {}),
+        agentId: task.agent,
+        executionId,
+        detail: { attempt, outcome: thrown !== undefined || output === undefined ? "threw" : "returned" },
+      });
       if (thrown !== undefined || output === undefined) {
         const outcome = classifyThrown(thrown);
         const message = thrown instanceof Error ? thrown.message : String(thrown);
@@ -277,7 +302,7 @@ export class TaskEngine {
       updatedAt: new Date().toISOString(),
     };
     await this.options.store.save(reset);
-    await this.audit("task.retry", id, { from: task.status });
+    await this.audit("task.retry", reset, { from: task.status });
     this.log.info(`Task ${id} reset for retry.`);
     return reset;
   }
@@ -322,17 +347,28 @@ export class TaskEngine {
         : {}),
     };
     await this.options.store.save(updated);
-    await this.audit(`task.${to === "queued" ? "queued" : to}` as AuditAction, updated.id, {
+    await this.audit(`task.${to === "queued" ? "queued" : to}` as AuditAction, updated, {
       from: task.status,
     });
     return updated;
   }
 
-  private async audit(action: AuditAction, id: string, detail?: Record<string, unknown>): Promise<void> {
+  private async audit(
+    action: AuditAction,
+    task: Task,
+    detail?: Record<string, unknown>,
+    executionId?: string,
+  ): Promise<void> {
+    // Correlation (§18): every event carries task/pipeline/agent/execution ids.
     await this.options.audit?.record({
       at: new Date().toISOString(),
       action,
-      id,
+      id: task.id,
+      taskId: task.id,
+      ...(task.project !== undefined ? { project: task.project } : {}),
+      ...(task.pipelineId !== undefined ? { pipelineId: task.pipelineId } : {}),
+      ...(task.agent !== undefined ? { agentId: task.agent } : {}),
+      ...(executionId !== undefined ? { executionId } : {}),
       ...(detail !== undefined ? { detail } : {}),
     });
   }

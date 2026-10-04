@@ -18,7 +18,7 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v2.0.0-alpha.13 — v2 Phase 13: Security Hardening**
+**v2.0.0-alpha.14 — v2 Phase 14: Audit & Observability**
 (the reliability & interoperability line: architecture → execution →
 protocol → adapters → pipelines → providers → OmniHilbras → memory → reports) (the v2
 roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the v1 plan is complete:
@@ -31,6 +31,13 @@ for the plan and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design).
 
 ### What's new in v2 (so far)
 
+- **Phase 14 — Audit & Observability**: every audit event now carries
+  correlation ids (`taskId`, `pipelineId`, `executionId`, `agentId`,
+  `providerId`), new event types cover agent start/complete and provider
+  errors, logs can be emitted as machine-readable JSON
+  (`logging.format: json`), and `omninode task|pipeline|agent|provider
+  inspect <id>` answers "what happened?" after a failed run — with
+  `--json` for tooling.
 - **Phase 13 — Security Hardening**: configuration containing literal
   credentials is **rejected before parsing** (with a redacted, actionable
   error); reports over 256 KiB are rejected rather than persisted; static

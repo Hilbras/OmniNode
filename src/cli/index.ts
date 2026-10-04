@@ -3,6 +3,8 @@ import { realpathSync } from "node:fs";
 import { Command } from "commander";
 import { OMNINODE_VERSION } from "../version.js";
 import { isOmniNodeError } from "../errors/index.js";
+import { configureLogger } from "../logger/index.js";
+import { findConfigFile, loadConfig } from "../config/index.js";
 import { registerInitCommand } from "./commands/init.js";
 import { registerProjectCommands } from "./commands/project.js";
 import { registerProviderCommands } from "./commands/providers.js";
@@ -50,7 +52,20 @@ export function createProgram(): Command {
   return program;
 }
 
+function applyLoggingConfig(): void {
+  // Best effort: `init` and `--help` must work without a valid configuration.
+  try {
+    if (findConfigFile()) {
+      const logging = loadConfig().logging;
+      if (logging) configureLogger(logging);
+    }
+  } catch {
+    // Configuration problems surface when the command actually needs it.
+  }
+}
+
 export async function run(argv: string[]): Promise<void> {
+  applyLoggingConfig();
   const program = createProgram();
   try {
     await program.parseAsync(argv);

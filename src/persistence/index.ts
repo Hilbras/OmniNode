@@ -23,7 +23,7 @@ export {
   readDocument,
   writeFileAtomic,
 } from "./json-file-store.js";
-export type { JsonDocument, DocumentState, JsonFileStoreOptions } from "./json-file-store.js";
+export type { JsonDocument, DocumentState, JsonFileStoreOptions, Durability } from "./json-file-store.js";
 
 // Canonical storage interface names (roadmap §16). The v1 names above remain
 // the exported API; these aliases document the mapping.

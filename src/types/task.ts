@@ -66,6 +66,8 @@ export interface TaskResult {
 export interface Task {
   id: string;
   project?: string;
+  /** Pipeline run that owns this task, when created by a pipeline. */
+  pipelineId?: string;
   objective: string;
   /** Role id from the role system. */
   role?: string;

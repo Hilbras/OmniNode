@@ -14,9 +14,10 @@ import { PipelineEngine, createDefaultChatFn } from "./engine.js";
 import { FilePipelineRunStore } from "./store.js";
 
 export function buildPipelineEngine(config: AppConfig, log: Logger = logger): PipelineEngine {
+  const auditLog = new FileAuditLog();
   const agents = buildAgentRegistry(config, log);
   const roles = buildRoleRegistry(config);
-  const chat = createDefaultChatFn(config.project.providers);
+  const chat = createDefaultChatFn(config.project.providers, { audit: auditLog });
   const tasks = new TaskEngine({
     agents,
     roles,

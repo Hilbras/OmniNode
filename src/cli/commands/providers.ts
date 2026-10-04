@@ -5,6 +5,7 @@ import { createProvider, OmniHilbrasProvider } from "../../providers/index.js";
 import { ModelRegistry } from "../../registry/index.js";
 import type { ProviderStatus } from "../../types/provider.js";
 import { appendToConfigList, notImplemented } from "./shared.js";
+import { registerProviderInspect } from "./inspect.js";
 
 interface AddProviderOptions {
   name: string;
@@ -73,6 +74,7 @@ export function registerProviderCommands(program: Command): void {
     .action(() => {
       throw notImplemented("omninode provider remove", "a Phase 1 follow-up");
     });
+  registerProviderInspect(provider);
 }
 
 export async function addProvider(options: AddProviderOptions): Promise<void> {

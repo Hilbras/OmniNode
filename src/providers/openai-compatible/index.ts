@@ -9,6 +9,7 @@ import { logger, type Logger } from "../../logger/index.js";
 /** Default provider request timeout when the config does not set one. */
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 import type { ChatRequest, ChatResponse, ChatStreamChunk } from "../../types/chat.js";
+import type { AuditSink } from "../../audit/index.js";
 import type { Modality, ModelInfo } from "../../types/model.js";
 import type { IChatProvider, ProviderConfig, ProviderStatus } from "../../types/provider.js";
 import { authHeaders } from "../auth.js";
@@ -44,7 +45,15 @@ export class OpenAICompatibleProvider implements IChatProvider {
 
   private readonly env: Record<string, string | undefined>;
 
-  constructor(config: ProviderConfig, log: Logger = logger, env: Record<string, string | undefined> = process.env) {
+  private readonly audit?: AuditSink;
+
+  constructor(
+    config: ProviderConfig,
+    log: Logger = logger,
+    env: Record<string, string | undefined> = process.env,
+    audit?: AuditSink,
+  ) {
+    this.audit = audit;
     this.config = { ...config, baseUrl: normalizeBaseUrl(config.baseUrl) };
     this.env = env;
     this.providerId = config.providerId ?? config.name;
@@ -88,17 +97,28 @@ export class OpenAICompatibleProvider implements IChatProvider {
         timeoutMs: this.requestTimeoutMs,
       });
     } catch (error) {
-      if (error instanceof ProviderError) throw error; // auth problem — keep the precise error
-      throw providerTransportError({ provider: this.config.name, operation: "listModels", cause: error });
+      if (error instanceof ProviderError) {
+        await this.recordProviderError("listModels", error);
+        throw error; // auth problem — keep the precise error
+      }
+      const normalized = providerTransportError({
+        provider: this.config.name,
+        operation: "listModels",
+        cause: error,
+      });
+      await this.recordProviderError("listModels", normalized);
+      throw normalized;
     }
     const { status, body } = response;
     if (status !== 200) {
-      throw providerHttpError({
+      const httpError = providerHttpError({
         provider: this.config.name,
         operation: "listModels",
         status,
         body,
       });
+      await this.recordProviderError("listModels", httpError);
+      throw httpError;
     }
     return response;
   }
@@ -164,6 +184,22 @@ export class OpenAICompatibleProvider implements IChatProvider {
     return streamChatCompletion(this.config, request, onChunk, this.env);
   }
 
+  /** Provider errors are part of the audit trail (§14 correlation, §18 observability). */
+  private async recordProviderError(operation: string, error: ProviderError): Promise<void> {
+    await this.audit?.record({
+      at: new Date().toISOString(),
+      action: "provider.error",
+      id: this.providerId,
+      providerId: this.providerId,
+      detail: {
+        operation,
+        code: error.code,
+        kind: (error.details as { kind?: string } | undefined)?.kind,
+        message: error.message,
+      },
+    });
+  }
+
   async healthCheck(): Promise<ProviderStatus> {
     const lastCheckedAt = new Date().toISOString();
     try {
@@ -209,13 +245,18 @@ export class OpenAICompatibleProvider implements IChatProvider {
         },
       });
     } catch (error) {
-      if (error instanceof ProviderError) throw error;
-      throw providerTransportError({ provider: this.config.name, operation: "chat", cause: error });
+      if (error instanceof ProviderError) {
+        await this.recordProviderError("chat", error);
+        throw error;
+      }
+      const normalized = providerTransportError({ provider: this.config.name, operation: "chat", cause: error });
+      await this.recordProviderError("chat", normalized);
+      throw normalized;
     }
     const { status, body } = response;
 
     if (status !== 200) {
-      throw providerHttpError({
+      const httpError = providerHttpError({
         provider: this.config.name,
         operation: "chat",
         status,
@@ -226,6 +267,8 @@ export class OpenAICompatibleProvider implements IChatProvider {
             }
           : {}),
       });
+      await this.recordProviderError("chat", httpError);
+      throw httpError;
     }
 
     const payload = body as OpenAIChatResponse;

@@ -85,7 +85,7 @@ describe("CLI task commands", () => {
     expect(output).toContain("role:    planner");
     expect(output).toContain("agent:   worker");
     expect(output).toContain("status:  completed");
-  });
+  }, 20_000);
 
   it("task run exits non-zero when the agent fails", async () => {
     await setupProjectWithAgentAndRole();

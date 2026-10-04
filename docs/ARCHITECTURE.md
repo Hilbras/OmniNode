@@ -77,6 +77,24 @@ PipelineDefinition ──run()──▶ PipelineRun (attempt, cancellationReques
   reported as interrupted; `omninode pipeline retry <run-id>` re-runs it.
   This is state understanding, not replay.
 
+## Audit & observability (v2 Phase 14)
+
+Audit events are append-only JSONL in `.omninode/audit.jsonl`, each carrying
+correlation ids:
+
+```json
+{"at":"…","action":"agent.started","id":"task-1","taskId":"task-1",
+ "pipelineId":"run-42","agentId":"worker","executionId":"exec-a91-9f2c","detail":{"attempt":1}}
+```
+
+Events cover task lifecycle, agent start/complete, pipeline runs (with
+distinct failed/cancelled actions), plan generation and provider errors
+(with the normalized error kind).
+
+`omninode audit` tails the log; `omninode {task,pipeline,agent,provider}
+inspect <id>` renders the full post-mortem view of an execution (`--json` for
+tooling). Logs can be emitted as JSON lines via `logging.format: json`.
+
 ## Execution states (v2 Phase 2)
 
 ```

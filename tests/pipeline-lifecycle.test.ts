@@ -76,9 +76,15 @@ describe("pipeline cancellation (§9.2)", () => {
       { objective: "long job" },
     );
 
-    // Let the first step start, then cancel the run.
-    await new Promise((resolve) => setTimeout(resolve, 120));
-    await engine.cancel((await engine.listRuns({ pipelineId: "cancel-me" }))[0]!.id);
+    // Wait until the run is recorded (and the first step is under way), then cancel.
+    let runId: string | undefined;
+    for (let i = 0; i < 60 && runId === undefined; i += 1) {
+      runId = (await engine.listRuns({ pipelineId: "cancel-me" }))[0]?.id;
+      if (runId === undefined) await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    expect(runId).toBeDefined();
+    await new Promise((resolve) => setTimeout(resolve, 60)); // let the step start
+    await engine.cancel(runId!);
 
     const run = await running;
     expect(run.status).toBe("cancelled");

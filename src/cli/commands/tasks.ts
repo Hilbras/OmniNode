@@ -3,6 +3,7 @@ import { loadConfig } from "../../config/index.js";
 import { TaskError } from "../../errors/index.js";
 import { createTaskEngine } from "../../tasks/index.js";
 import type { Task } from "../../types/task.js";
+import { registerTaskInspect } from "./inspect.js";
 
 const collectFiles = (value: string, previous: string[]): string[] => [...previous, value];
 
@@ -109,6 +110,7 @@ export function registerTaskCommands(program: Command): void {
       printOutcome(finished);
       if (finished.status !== "completed") process.exitCode = 1;
     });
+  registerTaskInspect(task);
 }
 
 function printOutcome(task: Task, options: { verbose?: boolean } = {}): void {
