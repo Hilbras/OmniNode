@@ -3,10 +3,17 @@
  * referenced from configuration by variable name — never stored in files.
  */
 import { ProviderError } from "../errors/index.js";
-import type { ProviderConfig } from "../types/provider.js";
+// AuthRef is structurally satisfied by ProviderConfig.
+
+/** Minimal provider identity — any config object with a name and optional env var reference. */
+export interface AuthRef {
+  name: string;
+  apiKeyEnvVar?: string;
+  headers?: Record<string, string>;
+}
 
 export function resolveApiKey(
-  config: ProviderConfig,
+  config: AuthRef,
   env: Record<string, string | undefined> = process.env,
 ): string | undefined {
   if (!config.apiKeyEnvVar) return undefined;
@@ -21,7 +28,7 @@ export function resolveApiKey(
 }
 
 export function authHeaders(
-  config: ProviderConfig,
+  config: AuthRef,
   env: Record<string, string | undefined> = process.env,
 ): Record<string, string> {
   const key = resolveApiKey(config, env);

@@ -82,7 +82,11 @@ export const projectConfigSchema = z
     roles: z.array(roleConfigSchema).default([]),
     pipelines: z.array(pipelineConfigSchema).default([]),
     memory: z
-      .object({ provider: z.string().min(1) })
+      .object({
+        provider: z.string().min(1).default("local"),
+        base_url: z.string().url().optional(),
+        api_key_env_var: z.string().min(1).optional(),
+      })
       .strict()
       .optional(),
   })

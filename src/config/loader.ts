@@ -25,6 +25,8 @@ export interface AppConfig {
     pipelines: PipelineDefinition[];
     memory?: {
       provider: string;
+      baseUrl?: string;
+      apiKeyEnvVar?: string;
     };
   };
   logging?: {
@@ -115,7 +117,15 @@ function toAppConfig(yaml: ReturnType<typeof appConfigSchema.parse>): AppConfig 
       agents: yaml.project.agents.map(toAgentConfig),
       roles: yaml.project.roles.map(toRoleDefinition),
       pipelines: yaml.project.pipelines.map(toPipelineDefinition),
-      ...(yaml.project.memory !== undefined ? { memory: yaml.project.memory } : {}),
+      ...(yaml.project.memory !== undefined
+        ? {
+            memory: {
+              provider: yaml.project.memory.provider,
+              baseUrl: yaml.project.memory.base_url,
+              apiKeyEnvVar: yaml.project.memory.api_key_env_var,
+            },
+          }
+        : {}),
     },
     ...(yaml.logging !== undefined ? { logging: yaml.logging } : {}),
   };

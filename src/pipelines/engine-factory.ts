@@ -1,6 +1,7 @@
 /** Assembles a PipelineEngine from the project configuration (local-first defaults). */
 import type { AppConfig } from "../config/index.js";
 import { buildAgentRegistry } from "../agents/index.js";
+import { createMemoryProvider, MemoryService } from "../memory/index.js";
 import { buildRoleRegistry } from "../roles/index.js";
 import { logger, type Logger } from "../logger/index.js";
 import { ReportService } from "../reports/index.js";
@@ -17,6 +18,9 @@ export function buildPipelineEngine(config: AppConfig, log: Logger = logger): Pi
     agents,
     roles,
     store: new FileTaskStore(),
+    ...(config.project.memory !== undefined
+      ? { memory: new MemoryService(createMemoryProvider(config.project.memory), log) }
+      : {}),
     log,
   });
   return new PipelineEngine({

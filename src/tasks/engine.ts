@@ -8,6 +8,7 @@ import type { AgentRegistry } from "../agents/index.js";
 import type { RoleRegistry } from "../roles/index.js";
 import { logger, type Logger } from "../logger/index.js";
 import { TaskError } from "../errors/index.js";
+import type { MemoryService } from "../memory/index.js";
 import type { Task, TaskContext, TaskResult, TaskStatus } from "../types/task.js";
 import type { TaskStore, TaskStoreFilter } from "./store.js";
 
@@ -33,6 +34,8 @@ export interface TaskEngineOptions {
   agents: AgentRegistry;
   roles: RoleRegistry;
   store: TaskStore;
+  /** When present, tasks gather relevant memory before running and record outcomes after (§20). */
+  memory?: MemoryService;
   log?: Logger;
 }
 
@@ -102,13 +105,26 @@ export class TaskEngine {
     const running = await this.transition(task, "running");
     this.log.info(`Running task ${task.id} on agent "${task.agent}".`);
 
+    // §20: relevant memory is gathered before the agent receives context.
+    let background = running.context?.background;
+    if (this.options.memory) {
+      const memoryContext = await this.options.memory.gatherContext({
+        objective: running.objective,
+        ...(running.role ? { role: running.role } : {}),
+        ...(running.project ? { project: running.project } : {}),
+      });
+      if (memoryContext.length > 0) {
+        background = [memoryContext, background].filter((part) => part && part.length > 0).join("\n\n");
+      }
+    }
+
     let output;
     try {
       output = await agent.run({
         taskId: running.id,
         objective: running.objective,
         ...(role ? { role } : {}),
-        ...(running.context?.background ? { context: running.context.background } : {}),
+        ...(background !== undefined ? { context: background } : {}),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -129,8 +145,13 @@ export class TaskEngine {
       finishedAt: new Date().toISOString(),
     };
     const finalStatus: TaskStatus = output.status === "completed" ? "completed" : "failed";
+    const finished = await this.transition(running, finalStatus, { result });
     this.log.info(`Task ${task.id} finished: ${finalStatus}.`);
-    return this.transition(running, finalStatus, { result });
+    // §20: the outcome is written back to memory — best-effort, never fatal.
+    if (this.options.memory) {
+      await this.options.memory.recordTaskOutcome(finished);
+    }
+    return finished;
   }
 
   async cancel(id: string): Promise<Task> {

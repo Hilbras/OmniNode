@@ -18,7 +18,7 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v0.7.0 — Phase 6: Multi-AI Report System** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
+**v0.8.0 — Phase 7: Memory Integration** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
 for the full plan and roadmap).
 
 What exists today:
@@ -74,6 +74,16 @@ What exists today:
   - Aggregation (§17): duplicate/similar findings merged via deterministic
     token-set similarity, sources preserved, highest severity kept
   - Combined reports generated automatically at the end of every pipeline run
+- **Memory** (`src/memory/`): the §20 loop — before a task runs, relevant
+  memory is gathered and injected into the agent's context; after it finishes,
+  the outcome is recorded back. High/critical findings are promoted to
+  project-level "known problems". Opt in via a `memory:` config section:
+  - `provider: local` (default) — JSON file at `.omninode/memory.json` with
+    deterministic keyword/tag relevance scoring, zero dependencies
+  - `provider: remembera` — the preferred Hilbras memory integration over
+    HTTP (base URL + `api_key_env_var`); strictly optional, like every
+    Hilbras component
+  - Memory failures are best-effort: logged, never fatal to a task
 - Typed error hierarchy (`src/errors/`)
 - Leveled logger with pluggable sink (`src/logger/`)
 - Configuration system: `omninode.yaml` with `${ENV_VAR}` expansion and strict
@@ -156,6 +166,15 @@ omninode report combined          # the aggregated intelligence of that run
 omninode report show combined-xxx # grouped findings with per-source attribution
 ```
 
+Persistent memory (§19–§20) — opt in with `memory: { provider: local }` or
+`provider: remembera` in `omninode.yaml`:
+
+```bash
+omninode memory status                      # provider + entry counts
+omninode memory query "authentication jwt"  # what the agents will see
+omninode memory write "Decision: use rotating JWT secrets" --scope project --tags architecture
+```
+
 See [omninode.yaml.example](omninode.yaml.example) for a full configuration.
 
 ### Configuration
@@ -190,8 +209,8 @@ Phases 0–11 are laid out in [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.m
 | v0.3.0 | OmniHilbras Integration (optional, like every provider) |
 | v0.4.0 | Agent System |
 | v0.5.0 | Roles & Tasks |
-| **v0.7.0** | **Multi-AI Reports (current)** |
-| v0.8.0 | Remembera (optional memory integration) |
+| v0.7.0 | Multi-AI Reports |
+| **v0.8.0** | **Remembera / Memory (current)** |
 | v0.9.0 | Planner |
 | v0.10.0 | End-to-End Runtime |
 | v1.0.0 | Production Release |
