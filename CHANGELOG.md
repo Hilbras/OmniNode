@@ -4,6 +4,34 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.5] — v2 Phase 5 (Pipeline Lifecycle v2)
+
+### Added
+
+- **First-class pipeline cancellation** (§9.2): `engine.cancel(runId)` records
+  the request on the run and terminates tasks running in the same process;
+  the scheduler checks between waves, cancels pending steps, persists
+  `status: "cancelled"`. CLI: `omninode pipeline cancel <run-id>` (works for
+  runs executing in other processes at their next check point).
+- **Execution-model separation** (§9.1): runs carry `attempt` and an
+  `attempts` history; step runs carry `attempt` and `executionIds`, so
+  Pipeline / Run / Step / StepRun / Attempt are no longer conflated.
+- **`IPipelineExecutor`** interface (`validate` / `run` / `cancel` / `get` /
+  `listRuns`) — the contract orchestration code depends on.
+- **Hardened pre-run validation** (§9.5): plan-step model references are
+  validated (`provider:model-id` shape + provider configured), alongside the
+  existing dependency/cycle/agent checks. CLI: `omninode pipeline validate <id>`.
+- **Recovery awareness** (§9.6): `pipeline runs` and `pipeline status` flag
+  runs persisted as `running` without a `finishedAt` as interrupted, pointing
+  at `pipeline retry`.
+- Robustness fix: a task cancelled while its agent is finishing stays
+  `cancelled` instead of throwing on an invalid transition.
+- Concurrency fix: persisting a run no longer clobbers a cancellation
+  request set by another process.
+- Tests: 311 (was 297) — cancellation mid-run, external cancellation
+  request, attempt bookkeeping, the validation matrix, interrupted-run
+  awareness.
+
 ## [2.0.0-alpha.4] — v2 Phase 4 (Agent Adapter Hardening)
 
 ### Added

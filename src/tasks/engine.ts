@@ -213,6 +213,14 @@ export class TaskEngine {
         return current;
       }
 
+      // The task may have been cancelled while the agent was finishing —
+      // respect the terminal state instead of forcing a completed transition.
+      const currentState = await this.options.store.get(current.id);
+      if (currentState?.status === "cancelled") {
+        current = currentState;
+        break;
+      }
+
       const result: TaskResult = {
         ...(output.summary !== undefined ? { summary: output.summary } : {}),
         ...(output.reports !== undefined && output.reports.length > 0 ? { reports: output.reports } : {}),

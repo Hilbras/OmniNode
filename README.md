@@ -18,9 +18,9 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v2.0.0-alpha.4 — v2 Phase 4: Agent Adapter Hardening**
-(after Phase 1: architecture & API stabilization, Phase 2: execution reliability,
-Phase 3: agent protocol v2 — the reliability & interoperability line) (the v2
+**v2.0.0-alpha.5 — v2 Phase 5: Pipeline Lifecycle v2**
+(the reliability & interoperability line: architecture → execution →
+protocol → adapters → pipelines) (the v2
 roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the v1 plan is complete:
 the
 full loop from §28 runs in one command —
@@ -31,6 +31,13 @@ for the plan and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design).
 
 ### What's new in v2 (so far)
 
+- **Phase 5 — Pipeline Lifecycle**: first-class pipeline cancellation
+  (`omninode pipeline cancel <run-id>`: stop scheduling → cancel running
+  tasks → terminate agent processes → persist a `cancelled` run), `pipeline
+  validate` for pre-run checks (deps, cycles, agents, model references),
+  explicit run/step **attempts** in the run record, the
+  `IPipelineExecutor` contract, and recovery awareness — runs left `running`
+  without a `finishedAt` are flagged as interrupted in `pipeline runs`.
 - **Phase 4 — Agent Adapter Hardening**: process-tree cleanup (agents run in
   their own process group; timeout, cancel and Ctrl-C reap the whole tree, so
   no orphaned children), explicit environment policies

@@ -73,10 +73,10 @@ for `loadConfig`/`AppConfig`/schemas; helpers Experimental.
 
 ## Pipelines (`src/pipelines`)
 
-`PipelineEngine` (+ options, `RunPipelineOptions`), `buildPipelineEngine`,
+`PipelineEngine` (+ options, `PipelineRunOptions`), `buildPipelineEngine`,
 `createDefaultChatFn`, `ChatFn` (compat re-export), `FilePipelineRunStore`,
-`PipelineRunStore`, `PipelineRunFilter` — Stable; scheduling internals
-Experimental.
+`PipelineRunStore`, `PipelineRunFilter` — Stable; `IPipelineExecutor`,
+`PipelineRunAttempt` — Stable (v2); scheduling internals Experimental.
 
 ## Reports (`src/reports`)
 

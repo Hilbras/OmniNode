@@ -80,7 +80,7 @@ function makeEngine(
     tasks,
     agents: registry,
     roles,
-    providers: [],
+    providers: [{ name: "gw", type: "openai-compatible", baseUrl: "http://gw.test" }],
     store: stores.runs,
     plans: stores.plans,
     ...(chat ? { chat } : {}),

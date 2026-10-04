@@ -50,19 +50,39 @@ export type PipelineRunStatus =
   | "partial"
   | "cancelled";
 
+/**
+ * One step execution inside a run (§9.1 — Step Run is NOT the Step).
+ */
 export interface PipelineStepRun {
   stepId: string;
   status: TaskStatus;
   /** Tasks created for this step (research fans out to several). */
   taskIds?: string[];
+  /** Execution ids of the tasks this step created, for correlation (§6.5). */
+  executionIds?: string[];
+  /** Which attempt of this step produced this record (1 = first try). */
+  attempt?: number;
   /** Set on plan steps that produced a stored plan (§18). */
   planId?: string;
   error?: string;
 }
 
+/** One execution attempt of a run (§9.1 — Attempt is not the Run). */
+export interface PipelineRunAttempt {
+  attempt: number;
+  startedAt: string;
+  finishedAt?: string;
+  status: PipelineRunStatus;
+}
+
 export interface PipelineRun {
   id: string;
   pipelineId: string;
+  /** Execution attempt counter: retries of the same run increment it. */
+  attempt: number;
+  /** Set when cancellation was requested; the run stops at the next check point. */
+  cancellationRequested?: boolean;
+  cancellationRequestedAt?: string;
   /** The objective this run is executing (persisted for retries). */
   objective?: string;
   status: PipelineRunStatus;
@@ -77,4 +97,26 @@ export interface PipelineRun {
   planId?: string;
   /** Outcome summary of the final executed step (§28 — Result). */
   resultSummary?: string;
+  /** Per-attempt history (§9.1). */
+  attempts?: PipelineRunAttempt[];
+}
+
+/**
+ * Executor contract (roadmap §9.1 / §9.2): a Pipeline definition, a Run of
+ * it, Steps, Step Runs and Attempts are distinct concepts; this interface is
+ * what orchestration code depends on.
+ */
+export interface IPipelineExecutor {
+  validate(definition: PipelineDefinition): void;
+  run(definition: PipelineDefinition, options?: PipelineRunOptions): Promise<PipelineRun>;
+  cancel(runId: string): Promise<void>;
+  get(runId: string): Promise<PipelineRun | undefined>;
+  listRuns(filter?: { pipelineId?: string }): Promise<PipelineRun[]>;
+}
+
+export interface PipelineRunOptions {
+  objective?: string;
+  onStep?: (stepRun: PipelineStepRun) => void;
+  /** Total run attempts (1 = no automatic rerun of the whole run). */
+  maxAttempts?: number;
 }

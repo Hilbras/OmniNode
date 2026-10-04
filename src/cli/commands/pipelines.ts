@@ -58,6 +58,32 @@ export function registerPipelineCommands(program: Command): void {
     });
 
   pipeline
+    .command("cancel <run-id>")
+    .description("Request cancellation of a pipeline run (stops scheduling and cancels running tasks).")
+    .action(async (runId: string) => {
+      const config = loadConfig();
+      const engine = buildPipelineEngine(config);
+      await engine.cancel(runId);
+      console.log(`Cancellation requested for run ${runId}.`);
+      console.log("A run executing in another process stops at its next check point.");
+    });
+
+  pipeline
+    .command("validate <id>")
+    .description("Validate a pipeline definition before running it (§9.5).")
+    .action(async (id: string) => {
+      const config = loadConfig();
+      const def = findPipeline(config, id);
+      const engine = buildPipelineEngine(config);
+      engine.validate(def);
+      console.log(`Pipeline "${def.id}" is valid (${def.steps.length} step(s)).`);
+      for (const step of def.steps) {
+        const deps = step.dependsOn?.join(", ") ?? "(previous step)";
+        console.log(`  ${step.id}  kind=${step.kind}  depends_on=${deps}`);
+      }
+    });
+
+  pipeline
     .command("runs <id>")
     .description("List recorded runs of a pipeline.")
     .action(async (id: string) => {
@@ -69,7 +95,8 @@ export function registerPipelineCommands(program: Command): void {
         return;
       }
       for (const run of runs) {
-        console.log(`${run.id}  ${run.status.padEnd(10)} ${run.startedAt ?? "?"}`);
+        const note = isInterrupted(run) ? "  (interrupted — process gone before finish)" : "";
+        console.log(`${run.id}  ${run.status.padEnd(10)} ${run.startedAt ?? "?"}${note}`);
       }
     });
 
@@ -91,6 +118,13 @@ export function registerPipelineCommands(program: Command): void {
       console.log(`  status:     ${run.status}`);
       console.log(`  started:    ${run.startedAt ?? "?"}`);
       if (run.finishedAt) console.log(`  finished:   ${run.finishedAt}`);
+      console.log(`  attempt:   ${run.attempt}`);
+      if (run.cancellationRequested) {
+        console.log(`  cancellation requested at ${run.cancellationRequestedAt ?? "?"}`);
+      }
+      if (isInterrupted(run)) {
+        console.log("  note:       this run looks interrupted (no finishedAt) — retry with `pipeline retry`");
+      }
       if (run.resultSummary) console.log(`  result:     ${run.resultSummary}`);
       for (const stepRun of run.stepRuns) {
         console.log(`  [${stepRun.stepId}] ${stepRun.status}`);
@@ -137,6 +171,11 @@ export function registerRunAlias(program: Command): void {
     .command("run <id> [objective]")
     .description("Alias of `omninode pipeline run` — execute a configured pipeline end to end.")
     .action(async (id: string, objective: string | undefined) => runPipelineAction(id, objective));
+}
+
+/** A run left "running" with no finishedAt is assumed interrupted (§9.6). */
+function isInterrupted(run: { status: string; finishedAt?: string }): boolean {
+  return run.status === "running" && run.finishedAt === undefined;
 }
 
 function findPipeline(config: ReturnType<typeof loadConfig>, id: string): PipelineDefinition {

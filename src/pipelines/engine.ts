@@ -15,8 +15,10 @@ import type { RoleRegistry } from "../roles/index.js";
 import { createProvider } from "../providers/index.js";
 import type { RoleDefinition } from "../types/role.js";
 import type {
+  IPipelineExecutor,
   PipelineDefinition,
   PipelineRun,
+  PipelineRunOptions,
   PipelineRunStatus,
   PipelineStep,
   PipelineStepRun,
@@ -64,6 +66,10 @@ interface StepOutcome {
   /** What this step adds to the combined context (defaults to summary). */
   contextContribution?: string;
   taskIds: string[];
+  /** Execution ids of created tasks, for correlation (§6.5). */
+  executionIds?: string[];
+  /** Step attempt that produced this outcome (1 = first try). */
+  attempt?: number;
   planId?: string;
   error?: string;
   reports: Report[];
@@ -71,14 +77,20 @@ interface StepOutcome {
 
 interface StepContext {
   objective: string;
+  runId?: string;
   role?: RoleDefinition;
   combinedContext: string;
   reports: Report[];
   pipelineRunId?: string;
 }
 
-export class PipelineEngine {
+export class PipelineEngine implements IPipelineExecutor {
   private readonly log: Logger;
+  /** Runs executing in THIS process — cancellation can terminate them directly. */
+  private readonly activeRuns = new Map<
+    string,
+    { taskIds: Set<string>; cancelTasks: () => Promise<void> }
+  >();
 
   constructor(private readonly options: PipelineEngineOptions) {
     this.log = (options.log ?? logger).child({ component: "pipelines" });
@@ -86,6 +98,21 @@ export class PipelineEngine {
 
   get store(): PipelineRunStore {
     return this.options.store;
+  }
+
+  /**
+   * Saves the run while preserving fields that may be set by another process
+   * (e.g. a cancellation request) — an in-memory snapshot must never clobber
+   * externally requested cancellation (§9.2).
+   */
+  private async persist(run: PipelineRun): Promise<void> {
+    const current = await this.options.store.get(run.id);
+    await this.options.store.save({
+      ...run,
+      ...(current?.cancellationRequested === true
+        ? { cancellationRequested: true, cancellationRequestedAt: current.cancellationRequestedAt }
+        : {}),
+    });
   }
 
   /** Structural + semantic validation (§27 Phase 5 — pipeline parser). */
@@ -165,7 +192,7 @@ export class PipelineEngine {
     return deps;
   }
 
-  async run(def: PipelineDefinition, options: RunPipelineOptions = {}): Promise<PipelineRun> {
+  async run(def: PipelineDefinition, options: PipelineRunOptions = {}): Promise<PipelineRun> {
     this.validate(def);
 
     const objective = (options.objective ?? def.objective ?? "").trim();
@@ -182,7 +209,8 @@ export class PipelineEngine {
         `Role "${def.role}" (pipeline "${def.id}") is not defined in project.roles.`,
       );
     }
-    // Agents referenced by steps must be registered before anything runs.
+    // Agents referenced by steps must be registered, and plan-step models
+    // must resolve to a configured provider — both before anything runs (§9.5).
     for (const step of def.steps) {
       for (const name of [...(step.agents ?? []), ...(step.agent ? [step.agent] : [])]) {
         if (!this.options.agents.get(name)) {
@@ -192,19 +220,45 @@ export class PipelineEngine {
           );
         }
       }
+      if (step.model) {
+        const separator = step.model.indexOf(":");
+        if (separator <= 0 || separator === step.model.length - 1) {
+          throw new PipelineError(
+            "PIPELINE_INVALID",
+            `Step "${step.id}" has an invalid model reference "${step.model}" — use "provider:model-id".`,
+          );
+        }
+        const providerName = step.model.slice(0, separator);
+        if (!this.options.providers.some((p) => p.name === providerName)) {
+          throw new PipelineError(
+            "PIPELINE_INVALID",
+            `Step "${step.id}" uses model "${step.model}" but provider "${providerName}" is not configured.`,
+          );
+        }
+      }
     }
 
     const now = new Date().toISOString();
     const run: PipelineRun = {
       id: `run-${Date.now().toString(36)}-${randomBytes(3).toString("hex")}`,
       pipelineId: def.id,
+      attempt: 1,
       objective,
       status: "running",
       startedAt: now,
       stepRuns: [],
     };
     await this.options.store.save(run);
-    this.log.info(`Running pipeline ${def.id} as ${run.id}.`);
+    const liveTaskIds = new Set<string>();
+    this.activeRuns.set(run.id, {
+      taskIds: liveTaskIds,
+      cancelTasks: async () => {
+        for (const taskId of liveTaskIds) {
+          await this.options.tasks.cancel(taskId).catch(() => undefined);
+        }
+      },
+    });
+    this.log.info(`Running pipeline ${def.id} as ${run.id} (attempt ${run.attempt}).`);
     await this.options.audit?.record({
       at: new Date().toISOString(),
       action: "pipeline.run.started",
@@ -217,8 +271,25 @@ export class PipelineEngine {
     const pending = new Set(def.steps.map((s) => s.id));
     const contextParts: string[] = [];
     const allReports: Report[] = [];
+    let cancelled = false;
 
     while (pending.size > 0) {
+      // §9.2 cancellation check point: stop scheduling, terminate what runs.
+      const persisted = await this.options.store.get(run.id);
+      if (persisted?.cancellationRequested === true) {
+        cancelled = true;
+        run.cancellationRequested = true;
+        run.cancellationRequestedAt = persisted.cancellationRequestedAt;
+        await this.activeRuns.get(run.id)?.cancelTasks();
+        for (const step of def.steps.filter((s) => pending.has(s.id))) {
+          const stepRun: PipelineStepRun = { stepId: step.id, status: "cancelled" };
+          run.stepRuns.push(stepRun);
+          options.onStep?.(stepRun);
+        }
+        pending.clear();
+        break;
+      }
+
       const ready = def.steps.filter(
         (step) => pending.has(step.id) && (deps.get(step.id) ?? []).every((d) => outcomes.has(d)),
       );
@@ -238,6 +309,7 @@ export class PipelineEngine {
             combinedContext: contextParts.join("\n\n"),
             reports: [...allReports],
             pipelineRunId: run.id,
+            runId: run.id,
           };
           return this.executeStep(step, ctx);
         }),
@@ -254,6 +326,10 @@ export class PipelineEngine {
         }
         const stepRun: PipelineStepRun = {
           stepId: step.id,
+          attempt: outcome.attempt ?? 1,
+          ...(outcome.executionIds && outcome.executionIds.length > 0
+            ? { executionIds: outcome.executionIds }
+            : {}),
           status:
             outcome.status === "skipped"
               ? "cancelled"
@@ -270,13 +346,19 @@ export class PipelineEngine {
         options.onStep?.(stepRun);
       });
       run.reports = [...allReports];
-      await this.options.store.save(run);
+      await this.persist(run);
     }
 
     const allOutcomes = [...outcomes.values()];
-    const failed = allOutcomes.some((o) => o.status === "failed");
-    const partial = !failed && allOutcomes.some((o) => o.status === "partial");
-    const finalStatus: PipelineRunStatus = failed ? "failed" : partial ? "partial" : "completed";
+    const failed = !cancelled && allOutcomes.some((o) => o.status === "failed");
+    const partial = !cancelled && !failed && allOutcomes.some((o) => o.status === "partial");
+    const finalStatus: PipelineRunStatus = cancelled
+      ? "cancelled"
+      : failed
+        ? "failed"
+        : partial
+          ? "partial"
+          : "completed";
     const planId = [...outcomes.values()].find((o) => o.planId !== undefined)?.planId;
 
     // §28 — Result: the outcome of the last completed step with tasks.
@@ -318,16 +400,19 @@ export class PipelineEngine {
       }
     }
 
+    const finishedAt = new Date().toISOString();
+    this.activeRuns.delete(run.id);
     const finished: PipelineRun = {
       ...run,
       status: finalStatus,
-      finishedAt: new Date().toISOString(),
+      finishedAt,
+      attempts: [...(run.attempts ?? []), { attempt: run.attempt, startedAt: run.startedAt ?? finishedAt, finishedAt, status: finalStatus }],
       ...(run.reports !== undefined && run.reports.length > 0 ? { reports: run.reports } : {}),
       ...(combinedReportId !== undefined ? { combinedReportId } : {}),
       ...(planId !== undefined ? { planId } : {}),
       ...(resultSummary !== undefined ? { resultSummary } : {}),
     };
-    await this.options.store.save(finished);
+    await this.persist(finished);
     this.log.info(`Pipeline ${def.id} finished: ${finalStatus}.`);
     await this.options.audit?.record({
       at: new Date().toISOString(),
@@ -336,6 +421,24 @@ export class PipelineEngine {
       detail: { pipeline: def.id, status: finalStatus },
     });
     return finished;
+  }
+
+  /** First-class cancellation (§9.2): requests cancellation and terminates
+   *  tasks that are running in this process immediately. */
+  async cancel(runId: string): Promise<void> {
+    const run = await this.options.store.get(runId);
+    if (!run) {
+      throw new PipelineError("PIPELINE_NOT_FOUND", `Pipeline run "${runId}" does not exist.`);
+    }
+    await this.options.store.save({
+      ...run,
+      cancellationRequested: true,
+      cancellationRequestedAt: new Date().toISOString(),
+    });
+    const active = this.activeRuns.get(runId);
+    if (active) {
+      await active.cancelTasks();
+    }
   }
 
   async get(runId: string): Promise<PipelineRun | undefined> {
@@ -369,9 +472,17 @@ export class PipelineEngine {
         this.log.warn(`Step "${step.id}" failed — retry ${attempt}/${retries}.`);
       }
       last = await this.executeStepOnce(step, ctx);
-      if (last.status !== "failed") return last;
+      if (last.status !== "failed") return { ...last, attempt: attempt + 1 };
     }
-    return last!;
+    return { ...last!, attempt: retries + 1 };
+  }
+
+  /** Registers tasks created for a step as live, so cancellation can terminate them (§9.2). */
+  private trackLiveTasks(runId: string | undefined, taskIds: string[]): void {
+    if (!runId) return;
+    const active = this.activeRuns.get(runId);
+    if (!active) return;
+    for (const id of taskIds) active.taskIds.add(id);
   }
 
   private async executeStepOnce(step: PipelineStep, ctx: StepContext): Promise<StepOutcome> {
@@ -408,7 +519,9 @@ export class PipelineEngine {
         }),
       ),
     );
+    this.trackLiveTasks(ctx.runId, created.map((t) => t.id));
     const results = await Promise.all(created.map((task) => this.options.tasks.run(task.id)));
+    const executionIds = results.map((r) => r.executions?.at(-1)?.executionId).filter((id): id is string => id !== undefined);
 
     const completedTasks = results.filter((r) => r.status === "completed");
     const failedTasks = results.filter((r) => r.status !== "completed");
@@ -433,7 +546,13 @@ export class PipelineEngine {
         reports,
       };
     }
-    return { status: "completed", summary, taskIds: created.map((t) => t.id), reports };
+    return {
+      status: "completed",
+      summary,
+      taskIds: created.map((t) => t.id),
+      ...(executionIds.length > 0 ? { executionIds } : {}),
+      reports,
+    };
   }
 
   private async runSingle(
@@ -447,6 +566,7 @@ export class PipelineEngine {
       ...(ctx.role ? { role: ctx.role.id } : {}),
       ...(ctx.combinedContext.length > 0 ? { context: { background: ctx.combinedContext } } : {}),
     });
+    this.trackLiveTasks(ctx.runId, [task.id]);
     const result = await this.options.tasks.run(task.id);
     if (result.status !== "completed") {
       return {

@@ -54,6 +54,29 @@ written back afterwards (findings of high/critical severity become project-level
 | `memory.json` | Local memory provider entries |
 | `audit.jsonl` | Append-only lifecycle events |
 
+## Pipeline lifecycle (v2 Phase 5)
+
+```
+PipelineDefinition ──run()──▶ PipelineRun (attempt, cancellationRequested)
+                                 └── PipelineStepRun (attempt, taskIds, executionIds)
+                                       └── Task (attempt, executionId per attempt)
+```
+
+- **Cancellation** is first-class: `cancel(runId)` flags the run (visible to
+  other processes) and terminates in-process tasks — their agent processes
+  die with them (Phase 4 tree cleanup). At the next wave boundary the
+  scheduler stops dispatching, marks pending steps `cancelled`, and the run
+  persists as `cancelled`.
+- **Failure propagation**: a hard failure fails the run and skips
+  on-success downstream steps; a partial fan-out yields a `partial` run;
+  cancellation wins over both.
+- **Validation** happens before anything executes: duplicate ids, unknown or
+  cyclic dependencies, unregistered agents, and malformed/unconfigured plan
+  model references all fail fast (`omninode pipeline validate <id>`).
+- **Recovery**: a run persisted as `running` with no `finishedAt` is
+  reported as interrupted; `omninode pipeline retry <run-id>` re-runs it.
+  This is state understanding, not replay.
+
 ## Execution states (v2 Phase 2)
 
 ```
