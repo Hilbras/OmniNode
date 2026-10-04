@@ -1,10 +1,17 @@
 import type { Command } from "commander";
-import { findConfigFile, loadConfig, providerConfigSchema } from "../../config/index.js";
+import { readFileSync, writeFileSync } from "node:fs";
+import { parseDocument } from "yaml";
+import {
+  appConfigSchema,
+  findConfigFile,
+  loadConfig,
+  providerConfigSchema,
+} from "../../config/index.js";
 import { OmniNodeError, ProviderError } from "../../errors/index.js";
 import { createProvider, OmniHilbrasProvider } from "../../providers/index.js";
 import { ModelRegistry } from "../../registry/index.js";
 import type { ProviderStatus } from "../../types/provider.js";
-import { appendToConfigList, notImplemented } from "./shared.js";
+import { appendToConfigList } from "./shared.js";
 import { registerProviderInspect } from "./inspect.js";
 
 interface AddProviderOptions {
@@ -22,9 +29,14 @@ export function registerProviderCommands(program: Command): void {
   provider
     .command("list")
     .description("List configured providers.")
-    .action(async () => {
+    .option("--json", "Emit providers as JSON.")
+    .action(async (options: { json?: boolean }) => {
       const config = loadConfig();
       const providers = config.project.providers;
+      if (options.json) {
+        console.log(JSON.stringify(providers, null, 2));
+        return;
+      }
       if (providers.length === 0) {
         console.log(
           "No providers configured. Add one with `omninode provider add` or edit omninode.yaml.",
@@ -70,9 +82,9 @@ export function registerProviderCommands(program: Command): void {
 
   provider
     .command("remove <name>")
-    .description("Remove a provider (planned for Phase 1 follow-up).")
-    .action(() => {
-      throw notImplemented("omninode provider remove", "a Phase 1 follow-up");
+    .description("Remove a provider from omninode.yaml.")
+    .action((name: string) => {
+      removeProvider(name);
     });
   registerProviderInspect(provider);
 }
@@ -115,6 +127,30 @@ export async function addProvider(options: AddProviderOptions): Promise<void> {
   } else {
     console.log(`Run \`omninode provider test ${newProvider.name}\` to verify connectivity.`);
   }
+}
+
+function removeProvider(name: string): void {
+  const configPath = findConfigFile();
+  if (!configPath) {
+    throw new OmniNodeError("CONFIG_NOT_FOUND", "No omninode.yaml found.");
+  }
+  const config = loadConfig();
+  if (!config.project.providers.some((p) => p.name === name)) {
+    throw new ProviderError("PROVIDER_NOT_FOUND", `No provider "${name}" is configured.`);
+  }
+  const doc = parseDocument(readFileSync(configPath, "utf8"));
+  const current = doc.getIn(["project", "providers"]);
+  const remaining = (current === undefined || current === null
+    ? []
+    : (doc.get("project") as { providers?: unknown[] })?.providers ?? []
+  ).filter((entry) => (entry as { name?: string })?.name !== name);
+  doc.setIn(["project", "providers"], remaining);
+  const validated = appConfigSchema.safeParse(doc.toJS());
+  if (!validated.success) {
+    throw new OmniNodeError("CONFIG_INVALID", "Removing this provider would produce an invalid configuration.");
+  }
+  writeFileSync(configPath, doc.toString(), "utf8");
+  console.log(`Removed provider "${name}" from ${configPath}.`);
 }
 
 export async function testProvider(

@@ -14,12 +14,19 @@ const CAPABILITIES: readonly (keyof ModelCapabilities)[] = [
 ];
 
 export function registerModelsCommand(program: Command): void {
+  for (const name of ["models", "model"] as const) {
+    registerModelGroup(program, name);
+  }
+}
+
+function registerModelGroup(program: Command, name: "models" | "model"): void {
   program
-    .command("models")
+    .command(name)
     .description("Discover and list models from configured providers (model registry, §8).")
     .argument("[provider]", "Only discover from this provider.")
     .option("-c, --capability <capability>", `Filter by capability: ${CAPABILITIES.join(", ")}.`)
-    .action(async (providerName: string | undefined, options: { capability?: string }) => {
+    .option("--json", "Emit the discovered models as JSON.")
+    .action(async (providerName: string | undefined, options: { capability?: string; json?: boolean }) => {
       const capability = options.capability as keyof ModelCapabilities | undefined;
       if (capability !== undefined && !CAPABILITIES.includes(capability)) {
         throw new OmniNodeError(
@@ -33,6 +40,10 @@ export function registerModelsCommand(program: Command): void {
         providerName ? p.name === providerName : true,
       );
       if (selected.length === 0) {
+        if (options.json) {
+          console.log("[]");
+          return;
+        }
         throw new OmniNodeError(
           "PROVIDER_NOT_FOUND",
           providerName
@@ -57,6 +68,10 @@ export function registerModelsCommand(program: Command): void {
         ...(providerName !== undefined ? { provider: providerName } : {}),
         ...(capability !== undefined ? { capability } : {}),
       });
+      if (options.json) {
+        console.log(JSON.stringify(models, null, 2));
+        return;
+      }
       if (models.length === 0) {
         console.log("No models found.");
         return;

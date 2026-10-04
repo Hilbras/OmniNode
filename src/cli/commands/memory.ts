@@ -32,7 +32,8 @@ export function registerMemoryCommands(program: Command): void {
     .description("Search memory for entries relevant to the text.")
     .option("-s, --scope <scope>", "Restrict to a scope: project, task, role or knowledge.")
     .option("-n, --limit <count>", "Maximum entries to return.", (value: string) => Number(value), 10)
-    .action(async (text: string, options: { scope?: string; limit: number }) => {
+    .option("--json", "Emit entries as JSON.")
+    .action(async (text: string, options: { scope?: string; limit: number; json?: boolean }) => {
       const config = loadConfig();
       const svc = new MemoryService(createMemoryProvider(config.project.memory));
       const entries = await svc.providerRef.query({
@@ -40,6 +41,10 @@ export function registerMemoryCommands(program: Command): void {
         ...(options.scope !== undefined ? { scope: options.scope as "project" | "task" | "role" | "knowledge" } : {}),
         limit: options.limit,
       });
+      if (options.json) {
+        console.log(JSON.stringify(entries, null, 2));
+        return;
+      }
       if (entries.length === 0) {
         console.log("No relevant memory found.");
         return;

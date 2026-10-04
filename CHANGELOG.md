@@ -4,6 +4,31 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.15] — v2 Phase 15 (CLI v2)
+
+### Added
+
+- **Documented exit codes** (§19): `EXIT` map + `exitCodeFor()` /
+  `exitCodeForStatus()` — 0 success, 1 general, 2 invalid input, 3 config,
+  4 provider, 5 agent, 6 timeout, 7 cancelled, 8 not found, 9 not
+  implemented. Errors and failed tasks/pipelines now exit with the class
+  code instead of always 1.
+- **`config` command group**: `config show` (credential *references* only —
+  never values), `config path`, `config validate` (schema + inline-secret
+  scan).
+- **`pipeline create <id> --from <file>`**: builds a pipeline from a
+  YAML/JSON definition, validates it (deps, cycles, agents) and appends it to
+  `omninode.yaml` without ever writing an invalid config.
+- **`provider remove <name>`**: implemented for real (was a stub).
+- **`agent run <name> "<objective>"`**: run one task through an agent
+  immediately.
+- **`model` alias** for `models`, and **`--json`** output on the list/inspect
+  commands (task, pipeline, provider, agent, role, plan, report, model,
+  memory).
+- docs/CLI.md: command map, output modes, exit-code table, recipes, secrets
+  note.
+- Tests: 411 (was 401).
+
 ## [2.0.0-alpha.14] — v2 Phase 14 (Audit & Observability)
 
 ### Added

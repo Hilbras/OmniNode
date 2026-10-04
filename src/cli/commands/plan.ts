@@ -12,11 +12,16 @@ export function registerPlanCommands(program: Command): void {
     .command("list")
     .description("List stored plans.")
     .option("--run <pipelineRunId>", "Only plans for this pipeline run.")
-    .action(async (options: { run?: string }) => {
+    .option("--json", "Emit plans as JSON.")
+    .action(async (options: { run?: string; json?: boolean }) => {
       const store = new FilePlanStore();
       const plans = await store.list({
         ...(options.run !== undefined ? { pipelineRunId: options.run } : {}),
       });
+      if (options.json) {
+        console.log(JSON.stringify(plans, null, 2));
+        return;
+      }
       if (plans.length === 0) {
         console.log("No plans stored yet. Run a pipeline with a plan step to generate one.");
         return;

@@ -80,12 +80,10 @@ describe("CLI", () => {
     expect(output).not.toContain("sk-");
   });
 
-  it("phase-dependent commands explain when they will arrive", async () => {
+  it("provider remove reports unknown providers clearly", async () => {
     await createProgram().parseAsync(["node", "omninode", "init"]);
     await expect(
       createProgram().parseAsync(["node", "omninode", "provider", "remove", "ghost"]),
-    ).rejects.toMatchObject({
-      code: "NOT_IMPLEMENTED",
-    });
+    ).rejects.toMatchObject({ code: "PROVIDER_NOT_FOUND" });
   });
 });

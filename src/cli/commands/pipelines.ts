@@ -1,9 +1,13 @@
 import type { Command } from "commander";
-import { loadConfig } from "../../config/index.js";
+import { readFileSync, writeFileSync } from "node:fs";
+import { parseDocument } from "yaml";
+import { appConfigSchema, findConfigFile, loadConfig, pipelineConfigSchema } from "../../config/index.js";
+import { OmniNodeError } from "../../errors/index.js";
 import { PipelineError } from "../../errors/index.js";
 import { buildPipelineEngine } from "../../pipelines/index.js";
 import type { PipelineDefinition } from "../../types/pipeline.js";
 import { registerPipelineInspect } from "./inspect.js";
+import { exitCodeForStatus } from "../exit-codes.js";
 
 export function registerPipelineCommands(program: Command): void {
   const pipeline = program
@@ -13,9 +17,14 @@ export function registerPipelineCommands(program: Command): void {
   pipeline
     .command("list")
     .description("List configured pipelines.")
-    .action(async () => {
+    .option("--json", "Emit pipelines as JSON.")
+    .action(async (options: { json?: boolean }) => {
       const config = loadConfig();
       const pipelines = config.project.pipelines;
+      if (options.json) {
+        console.log(JSON.stringify(config.project.pipelines, null, 2));
+        return;
+      }
       if (pipelines.length === 0) {
         console.log("No pipelines configured. Add one under `project.pipelines` in omninode.yaml.");
         return;
@@ -67,6 +76,14 @@ export function registerPipelineCommands(program: Command): void {
       await engine.cancel(runId);
       console.log(`Cancellation requested for run ${runId}.`);
       console.log("A run executing in another process stops at its next check point.");
+    });
+
+  pipeline
+    .command("create <id>")
+    .description("Create a pipeline from a YAML/JSON file and append it to omninode.yaml.")
+    .requiredOption("--from <file>", "File containing { objective?, steps: [...] } (YAML or JSON).")
+    .action(async (id: string, options: { from: string }) => {
+      await createPipelineFromFile(id, options.from);
     });
 
   pipeline
@@ -164,7 +181,7 @@ async function runPipelineAction(id: string, objective: string | undefined): Pro
     console.log(`  result: ${finished.resultSummary}`);
   }
   console.log(`Pipeline ${finished.status}. Run id: ${finished.id}`);
-  if (finished.status !== "completed") process.exitCode = 1;
+  process.exitCode = exitCodeForStatus(finished.status);
 }
 
 /** Top-level `omninode run` — a workflow alias of `pipeline run` (§28). */
@@ -173,6 +190,43 @@ export function registerRunAlias(program: Command): void {
     .command("run <id> [objective]")
     .description("Alias of `omninode pipeline run` — execute a configured pipeline end to end.")
     .action(async (id: string, objective: string | undefined) => runPipelineAction(id, objective));
+}
+
+async function createPipelineFromFile(id: string, file: string): Promise<void> {
+  const configPath = findConfigFile();
+  if (!configPath) {
+    throw new OmniNodeError("CONFIG_NOT_FOUND", "No omninode.yaml found. Run `omninode init` first.");
+  }
+  let definition: unknown;
+  try {
+    definition = parseDocument(readFileSync(file, "utf8")).toJS();
+  } catch (error) {
+    throw new PipelineError("PIPELINE_INVALID", `Could not read pipeline definition from ${file}.`, {
+      cause: error,
+    });
+  }
+  const candidate = pipelineConfigSchema.safeParse({ id, ...(definition as object) });
+  if (!candidate.success) {
+    const issues = candidate.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ");
+    throw new PipelineError("PIPELINE_INVALID", `Invalid pipeline definition: ${issues}`);
+  }
+  // Reject duplicates and structural problems before touching the config.
+  const engine = buildPipelineEngine(loadConfig());
+  engine.validate({ id, ...(candidate.data as object) } as never);
+
+  const doc = parseDocument(readFileSync(configPath, "utf8"));
+  if (doc.getIn(["project", "pipelines"]) === undefined) {
+    doc.setIn(["project", "pipelines"], [candidate.data]);
+  } else {
+    doc.addIn(["project", "pipelines"], candidate.data);
+  }
+  const validated = appConfigSchema.safeParse(doc.toJS());
+  if (!validated.success) {
+    throw new PipelineError("PIPELINE_INVALID", "Adding this pipeline would produce an invalid configuration.");
+  }
+  writeFileSync(configPath, doc.toString(), "utf8");
+  console.log(`Created pipeline "${id}" (${candidate.data.steps.length} step(s)) in ${configPath}.`);
+  console.log(`Run it with: omninode pipeline run ${id} "<objective>"`);
 }
 
 /** A run left "running" with no finishedAt is assumed interrupted (§9.6). */

@@ -4,6 +4,7 @@ import { TaskError } from "../../errors/index.js";
 import { createTaskEngine } from "../../tasks/index.js";
 import type { Task } from "../../types/task.js";
 import { registerTaskInspect } from "./inspect.js";
+import { exitCodeForStatus } from "../exit-codes.js";
 
 const collectFiles = (value: string, previous: string[]): string[] => [...previous, value];
 
@@ -47,7 +48,7 @@ export function registerTaskCommands(program: Command): void {
       console.log(`Running task ${taskId}...`);
       const finished = await engine.run(taskId);
       printOutcome(finished);
-      if (finished.status !== "completed") process.exitCode = 1;
+      process.exitCode = exitCodeForStatus(finished.status);
     });
 
   task
@@ -70,12 +71,17 @@ export function registerTaskCommands(program: Command): void {
     .command("list")
     .description("List tasks in the project's task store.")
     .option("-s, --status <status>", "Filter by status (created, queued, running, completed, failed, cancelled).")
-    .action(async (options: { status?: string }) => {
+    .option("--json", "Emit tasks as JSON.")
+    .action(async (options: { status?: string; json?: boolean }) => {
       const config = loadConfig();
       const engine = createTaskEngine(config);
       const tasks = await engine.list(
         options.status !== undefined ? { status: options.status as Task["status"] } : {},
       );
+      if (options.json) {
+        console.log(JSON.stringify(tasks, null, 2));
+        return;
+      }
       if (tasks.length === 0) {
         console.log("No tasks found. Create one with `omninode task create`.");
         return;
@@ -108,7 +114,7 @@ export function registerTaskCommands(program: Command): void {
       console.log(`Running task ${reset.id}...`);
       const finished = await engine.run(reset.id);
       printOutcome(finished);
-      if (finished.status !== "completed") process.exitCode = 1;
+      process.exitCode = exitCodeForStatus(finished.status);
     });
   registerTaskInspect(task);
 }

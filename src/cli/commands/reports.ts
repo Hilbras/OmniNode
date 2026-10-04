@@ -18,12 +18,17 @@ export function registerReportCommands(program: Command): void {
     .description("List stored reports.")
     .option("--task <taskId>", "Only reports for this task.")
     .option("--agent <name>", "Only reports from this agent.")
-    .action(async (options: { task?: string; agent?: string }) => {
+    .option("--json", "Emit reports as JSON.")
+    .action(async (options: { task?: string; agent?: string; json?: boolean }) => {
       const svc = service();
       const reports = await svc.storeRef.listReports({
         ...(options.task !== undefined ? { taskId: options.task } : {}),
         ...(options.agent !== undefined ? { agent: options.agent } : {}),
       });
+      if (options.json) {
+        console.log(JSON.stringify(reports, null, 2));
+        return;
+      }
       if (reports.length === 0) {
         console.log("No reports stored yet. Run a pipeline to collect some.");
         return;
@@ -37,11 +42,16 @@ export function registerReportCommands(program: Command): void {
     .command("combined")
     .description("List combined reports (aggregated intelligence, §17).")
     .option("--run <pipelineRunId>", "Only combined reports for this pipeline run.")
-    .action(async (options: { run?: string }) => {
+    .option("--json", "Emit combined reports as JSON.")
+    .action(async (options: { run?: string; json?: boolean }) => {
       const svc = service();
       const combined = await svc.storeRef.listCombined({
         ...(options.run !== undefined ? { pipelineRunId: options.run } : {}),
       });
+      if (options.json) {
+        console.log(JSON.stringify(combined, null, 2));
+        return;
+      }
       if (combined.length === 0) {
         console.log("No combined reports stored yet. Run a pipeline to generate one.");
         return;

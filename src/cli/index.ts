@@ -4,11 +4,11 @@ import { Command } from "commander";
 import { OMNINODE_VERSION } from "../version.js";
 import { isOmniNodeError } from "../errors/index.js";
 import { configureLogger } from "../logger/index.js";
+import { exitCodeFor } from "./exit-codes.js";
 import { findConfigFile, loadConfig } from "../config/index.js";
 import { registerInitCommand } from "./commands/init.js";
 import { registerProjectCommands } from "./commands/project.js";
 import { registerProviderCommands } from "./commands/providers.js";
-import { registerModelsCommand } from "./commands/models.js";
 import { registerAgentCommands } from "./commands/agents.js";
 import { registerRoleCommands } from "./commands/roles.js";
 import { registerTaskCommands } from "./commands/tasks.js";
@@ -20,6 +20,8 @@ import { registerStatusCommand } from "./commands/status.js";
 import { registerAuditCommand } from "./commands/audit.js";
 import { registerMigrateCommand } from "./commands/migrate.js";
 import { registerSecurityCommand } from "./commands/security.js";
+import { registerConfigCommands } from "./commands/config.js";
+import { registerModelsCommand } from "./commands/models.js";
 
 export function createProgram(): Command {
   const program = new Command();
@@ -47,6 +49,7 @@ export function createProgram(): Command {
   registerAuditCommand(program);
   registerMigrateCommand(program);
   registerSecurityCommand(program);
+  registerConfigCommands(program);
   registerRunAlias(program);
 
   return program;
@@ -75,15 +78,16 @@ export async function run(argv: string[]): Promise<void> {
 }
 
 export function handleError(error: unknown): never {
+  const code = exitCodeFor(error);
   if (isOmniNodeError(error)) {
     console.error(`error: [${error.code}] ${error.message}`);
     if (error.details !== undefined) {
       console.error(JSON.stringify(error.details, null, 2));
     }
-    process.exit(1);
+    process.exit(code);
   }
   console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
+  process.exit(code);
 }
 
 const entry = process.argv[1]

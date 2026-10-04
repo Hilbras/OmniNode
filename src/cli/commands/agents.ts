@@ -2,6 +2,8 @@ import type { Command } from "commander";
 import { agentConfigSchema, loadConfig } from "../../config/index.js";
 import { AgentError, OmniNodeError } from "../../errors/index.js";
 import { createAgent } from "../../agents/index.js";
+import { createTaskEngine } from "../../tasks/index.js";
+import { exitCodeForStatus } from "../exit-codes.js";
 import { appendToConfigList } from "./shared.js";
 import { registerAgentInspect } from "./inspect.js";
 
@@ -29,9 +31,14 @@ export function registerAgentCommands(program: Command): void {
   agent
     .command("list")
     .description("List configured agents.")
-    .action(async () => {
+    .option("--json", "Emit agents as JSON.")
+    .action(async (options: { json?: boolean }) => {
       const config = loadConfig();
       const agents = config.project.agents;
+      if (options.json) {
+        console.log(JSON.stringify(config.project.agents, null, 2));
+        return;
+      }
       if (agents.length === 0) {
         console.log("No agents configured. Add one with `omninode agent add` or edit omninode.yaml.");
         return;
@@ -68,6 +75,25 @@ export function registerAgentCommands(program: Command): void {
       Number(value),
     )
     .action(async (options: AddAgentOptions) => addAgent(options));
+
+  agent
+    .command("run <name> <objective>")
+    .description("Run a single task through this agent immediately.")
+    .action(async (name: string, objective: string) => {
+      const config = loadConfig();
+      const agentConfig = config.project.agents.find((a) => a.name === name);
+      if (!agentConfig) {
+        throw new AgentError("AGENT_NOT_FOUND", `No agent "${name}" is configured.`);
+      }
+      const engine = createTaskEngine(config);
+      const task = await engine.create({ objective, agent: name, project: config.project.name });
+      const finished = await engine.run(task.id);
+      console.log(`  id:      ${finished.id}`);
+      console.log(`  status:  ${finished.status}`);
+      if (finished.result?.summary) console.log(`  summary: ${finished.result.summary}`);
+      if (finished.result?.error) console.log(`  error:   ${finished.result.error}`);
+      process.exitCode = exitCodeForStatus(finished.status);
+    });
 
   agent
     .command("test <name>")

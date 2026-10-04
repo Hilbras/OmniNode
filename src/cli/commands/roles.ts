@@ -9,9 +9,14 @@ export function registerRoleCommands(program: Command): void {
   role
     .command("list")
     .description("List configured roles.")
-    .action(async () => {
+    .option("--json", "Emit roles as JSON.")
+    .action(async (options: { json?: boolean }) => {
       const config = loadConfig();
       const roles = config.project.roles;
+      if (options.json) {
+        console.log(JSON.stringify(config.project.roles, null, 2));
+        return;
+      }
       if (roles.length === 0) {
         console.log("No roles configured. Add one under `project.roles` in omninode.yaml.");
         return;

@@ -107,6 +107,11 @@ Stable.
 `STORE_FILES`, `DocumentState` — Stable (v2). Canonical interface aliases
 (`PipelineStore`, `MemoryStore`, `AuditStore`) in `store-types.ts` — Stable.
 
+## CLI helpers (`src/cli`)
+
+`EXIT`, `ExitCode`, `exitCodeFor`, `exitCodeForStatus` — Stable. `configureLogger`
+— Stable.
+
 ## Logging (`src/logger`)
 
 `Logger`, `ConsoleLogSink`, `LogSink`, `LogLevel`, `logger` — Stable.
