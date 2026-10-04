@@ -5,9 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { LocalMemoryProvider } from "../src/memory/local.js";
 import { RememberaMemoryProvider } from "../src/memory/remembera.js";
 import { createMemoryProvider } from "../src/memory/factory.js";
-import { MemoryService } from "../src/memory/service.js";
 import { MemoryError } from "../src/errors/index.js";
-import type { Task } from "../src/types/task.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
