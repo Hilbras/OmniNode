@@ -28,6 +28,7 @@ export const agentConfigSchema = z
     env: z.record(z.string()).optional(),
     input_mode: z.enum(["stdin", "arg", "protocol"]).default("stdin"),
     timeout_ms: z.number().int().positive().optional(),
+    inherit_env: z.boolean().optional(),
     metadata: z.record(z.unknown()).optional(),
   })
   .strict();

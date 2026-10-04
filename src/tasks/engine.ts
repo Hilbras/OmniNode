@@ -8,6 +8,7 @@ import type { AgentRegistry } from "../agents/index.js";
 import type { RoleRegistry } from "../roles/index.js";
 import { logger, type Logger } from "../logger/index.js";
 import { TaskError } from "../errors/index.js";
+import type { AuditAction, AuditSink } from "../audit/index.js";
 import type { MemoryService } from "../memory/index.js";
 import type { Task, TaskContext, TaskResult, TaskStatus } from "../types/task.js";
 import type { TaskStore, TaskStoreFilter } from "./store.js";
@@ -36,6 +37,8 @@ export interface TaskEngineOptions {
   store: TaskStore;
   /** When present, tasks gather relevant memory before running and record outcomes after (§20). */
   memory?: MemoryService;
+  /** When present, task lifecycle transitions are appended to the audit log (§24). */
+  audit?: AuditSink;
   log?: Logger;
 }
 
@@ -79,6 +82,7 @@ export class TaskEngine {
     };
     await this.options.store.save(task);
     this.log.info(`Created task ${task.id}.`);
+    await this.audit("task.created", task.id, { objective: task.objective, project: task.project });
     return task;
   }
 
@@ -182,6 +186,7 @@ export class TaskEngine {
       updatedAt: new Date().toISOString(),
     };
     await this.options.store.save(reset);
+    await this.audit("task.retry", id, { from: task.status });
     this.log.info(`Task ${id} reset for retry.`);
     return reset;
   }
@@ -220,7 +225,19 @@ export class TaskEngine {
         : {}),
     };
     await this.options.store.save(updated);
+    await this.audit(`task.${to === "queued" ? "queued" : to}` as AuditAction, updated.id, {
+      from: task.status,
+    });
     return updated;
+  }
+
+  private async audit(action: AuditAction, id: string, detail?: Record<string, unknown>): Promise<void> {
+    await this.options.audit?.record({
+      at: new Date().toISOString(),
+      action,
+      id,
+      ...(detail !== undefined ? { detail } : {}),
+    });
   }
 }
 

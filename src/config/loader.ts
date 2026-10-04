@@ -188,6 +188,7 @@ function toAgentConfig(raw: AgentConfigYaml): AgentConfig {
     env: raw.env,
     inputMode: raw.input_mode,
     timeoutMs: raw.timeout_ms,
+    inheritEnv: raw.inherit_env,
     metadata: raw.metadata,
   };
 }

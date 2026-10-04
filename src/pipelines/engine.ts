@@ -25,6 +25,7 @@ import type { ChatMessage } from "../types/chat.js";
 import type { Plan } from "../types/plan.js";
 import type { Report } from "../types/report.js";
 import type { ReportService } from "../reports/index.js";
+import type { AuditSink } from "../audit/index.js";
 import type { IPlanner } from "../planner/index.js";
 import type { PlanStore } from "../planner/store.js";
 import { HeuristicPlanner } from "../planner/heuristic.js";
@@ -45,6 +46,8 @@ export interface PipelineEngineOptions {
   planner?: IPlanner;
   /** When present, plans produced by plan steps are persisted. */
   plans?: PlanStore;
+  /** When present, pipeline lifecycle events are appended to the audit log (§24). */
+  audit?: AuditSink;
   /** When present, finished runs have their reports collected, stored and combined (§16–§17). */
   reports?: ReportService;
   log?: Logger;
@@ -202,6 +205,12 @@ export class PipelineEngine {
     };
     await this.options.store.save(run);
     this.log.info(`Running pipeline ${def.id} as ${run.id}.`);
+    await this.options.audit?.record({
+      at: new Date().toISOString(),
+      action: "pipeline.run.started",
+      id: run.id,
+      detail: { pipeline: def.id, objective },
+    });
 
     const deps = this.effectiveDependencies(def);
     const outcomes = new Map<string, StepOutcome>();
@@ -312,6 +321,12 @@ export class PipelineEngine {
     };
     await this.options.store.save(finished);
     this.log.info(`Pipeline ${def.id} finished: ${finalStatus}.`);
+    await this.options.audit?.record({
+      at: new Date().toISOString(),
+      action: "pipeline.run.finished",
+      id: run.id,
+      detail: { pipeline: def.id, status: finalStatus },
+    });
     return finished;
   }
 
@@ -481,6 +496,12 @@ export class PipelineEngine {
     }
 
     await this.options.plans?.save(plan);
+    await this.options.audit?.record({
+      at: new Date().toISOString(),
+      action: "plan.generated",
+      id: plan.id,
+      detail: { generatedBy: plan.generatedBy, steps: plan.steps.length },
+    });
     return {
       status: "completed",
       summary: plan.summary,

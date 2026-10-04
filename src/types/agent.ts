@@ -27,6 +27,8 @@ export interface AgentConfig {
   inputMode?: AgentInputMode;
   /** Per-task timeout in milliseconds; the process is killed when exceeded. */
   timeoutMs?: number;
+  /** When false, the agent process starts with a minimal environment (PATH + env). */
+  inheritEnv?: boolean;
   /** Models (as "provider:model-id") this agent may use, if restricted. */
   allowedModels?: string[];
   metadata?: Record<string, unknown>;

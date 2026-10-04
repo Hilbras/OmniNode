@@ -1,5 +1,6 @@
 /** Assembles a TaskEngine from the project configuration (local-first defaults). */
 import type { AppConfig } from "../config/index.js";
+import { FileAuditLog } from "../audit/index.js";
 import { buildAgentRegistry } from "../agents/index.js";
 import { createMemoryProvider, MemoryService } from "../memory/index.js";
 import { buildRoleRegistry } from "../roles/index.js";
@@ -17,6 +18,7 @@ export function createTaskEngine(config: AppConfig, log: Logger = logger, direct
     ...(config.project.memory !== undefined
       ? { memory: new MemoryService(createMemoryProvider(config.project.memory), log) }
       : {}),
+    audit: new FileAuditLog(),
     log,
   });
 }

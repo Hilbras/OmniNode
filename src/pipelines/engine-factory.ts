@@ -1,4 +1,5 @@
 import type { AppConfig } from "../config/index.js";
+import { FileAuditLog } from "../audit/index.js";
 import { buildAgentRegistry } from "../agents/index.js";
 import { createMemoryProvider, MemoryService } from "../memory/index.js";
 import { buildPlanner } from "../planner/index.js";
@@ -23,6 +24,7 @@ export function buildPipelineEngine(config: AppConfig, log: Logger = logger): Pi
     ...(config.project.memory !== undefined
       ? { memory: new MemoryService(createMemoryProvider(config.project.memory), log) }
       : {}),
+    audit: new FileAuditLog(),
     log,
   });
   return new PipelineEngine({
@@ -37,6 +39,7 @@ export function buildPipelineEngine(config: AppConfig, log: Logger = logger): Pi
       : {}),
     plans: new FilePlanStore(),
     reports: new ReportService(new FileReportStore(), log),
+    audit: new FileAuditLog(),
     log,
   });
 }

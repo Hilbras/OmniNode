@@ -1,0 +1,65 @@
+# OmniNode Architecture
+
+OmniNode is a provider-agnostic orchestration layer. It never talks to a model
+directly — every AI system (provider API or CLI agent) plugs in through a
+replaceable interface, which is what keeps the core free of Hilbras
+dependencies and any other vendor.
+
+## Layers
+
+```
+CLI (src/cli)
+  └── config (src/config)          omninode.yaml → typed AppConfig (strict, env-expanded)
+        ├── providers (src/providers)   IProvider / IChatProvider — model discovery, chat
+        ├── agents (src/agents)         IAgent — process adapter over stdin/stdout (§21 protocol)
+        ├── roles (src/roles)           RoleRegistry — provider-independent roles
+        ├── tasks (src/tasks)           TaskEngine — lifecycle, retry, execution
+        ├── pipelines (src/pipelines)   PipelineEngine — DAG scheduling, steps, runs
+        ├── reports (src/reports)       normalization, aggregation, combined reports
+        ├── planner (src/planner)       IPlanner — ModelPlanner / HeuristicPlanner → Plan
+        ├── memory (src/memory)         IMemoryProvider — local JSON or Remembera
+        ├── registry (src/registry)     ModelRegistry (provider:model keys)
+        └── audit (src/audit)           append-only lifecycle log
+```
+
+Data flows through one direction only: config → engines → stores. Every store
+is an interface (`TaskStore`, `PipelineRunStore`, `ReportStore`, `PlanStore`,
+`AuditSink`, `IMemoryProvider`) with a local JSON default.
+
+## The workflow (§28)
+
+```
+User
+  ↓ omninode run <pipeline> "<objective>"
+PipelineEngine (validates the DAG, schedules steps)
+  ├── research step  → TaskEngine → ProcessAgent × N (parallel, independent)
+  │                     ↓ AgentTaskOutput
+  │                   ReportService (normalize, store, aggregate → CombinedReport)
+  ├── plan step      → IPlanner (ModelPlanner with heuristic fallback) → Plan
+  ├── execute step   → TaskEngine → ProcessAgent (receives the full plan)
+  └── final          → resultSummary on the run record
+MemoryService: relevant memory is injected before every task; outcomes are
+written back afterwards (findings of high/critical severity become project-level
+"known problems").
+```
+
+## Local state (`.omninode/`, gitignored)
+
+| File | Contents |
+| --- | --- |
+| `tasks.json` | Task records incl. status, results, truncated raw agent output |
+| `pipelines.json` | Pipeline runs: per-step status, task ids, plan/report ids |
+| `reports.json` | Raw reports and combined reports with source attribution |
+| `plans.json` | Implementation plans (steps, acceptance criteria, risks) |
+| `memory.json` | Local memory provider entries |
+| `audit.jsonl` | Append-only lifecycle events |
+
+## Design principles (from the plan)
+
+1. **Provider agnostic** — the core imports no vendor SDK.
+2. **Agent agnostic** — CLI agents integrate over stdin/stdout or the §21
+   protocol; no agent's internals are assumed.
+3. **Memory agnostic** — Remembera is one implementation of `IMemoryProvider`.
+4. **Modular** — every boundary (provider, agent, role, pipeline, transport,
+   storage, memory) is an interface with a local default.
+5. **Local first** — no cloud service is required for any core operation.

@@ -27,6 +27,24 @@ import type { Report } from "../../types/report.js";
 const DEFAULT_TIMEOUT_MS = 600_000;
 const KILL_GRACE_MS = 5_000;
 
+/**
+ * Builds the child environment. By default the agent inherits the full
+ * environment; with `inheritEnv: false` it receives only PATH plus the
+ * explicitly configured variables — useful to avoid leaking OmniNode's
+ * own secrets (e.g. provider API keys) into third-party agents.
+ */
+export function buildChildEnv(config: AgentConfig): NodeJS.ProcessEnv {
+  const configured = config.env ?? {};
+  if (config.inheritEnv !== false) {
+    return { ...process.env, ...configured };
+  }
+  return {
+    PATH: process.env.PATH ?? "",
+    HOME: process.env.HOME ?? "",
+    ...configured,
+  };
+}
+
 export function composeTaskText(input: AgentTaskInput): string {
   const sections: string[] = [`# Objective\n${input.objective}`];
   if (input.role) {
@@ -95,7 +113,7 @@ export class ProcessAgent implements IAgent {
         [...(this.config.args ?? []), ...(mode === "arg" ? [composeTaskText(input)] : [])],
         {
           cwd: this.config.cwd,
-          env: { ...process.env, ...this.config.env },
+          env: buildChildEnv(this.config),
           stdio: ["pipe", "pipe", "pipe"],
         },
       );

@@ -10,4 +10,5 @@ export * from "./tasks/index.js";
 export * from "./pipelines/index.js";
 export * from "./reports/index.js";
 export * from "./memory/index.js";
+export * from "./audit/index.js";
 export { OMNINODE_VERSION } from "./version.js";

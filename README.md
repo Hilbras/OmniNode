@@ -18,9 +18,26 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v0.10.0 — Phase 9: End-to-End Workflow** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
-for the full plan and roadmap). The full loop from §28 works in one command:
-`User → project context → memory → research agents → reports → aggregation → planner → plan → execution → result`.
+**v1.0.0 — Phases 10 + 11: Production Release.** The plan is complete: the
+full loop from §28 runs in one command —
+`User → project context → memory → research agents → reports → aggregation →
+planner → plan → execution → result` — with audit logging, error recovery and
+production hardening (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
+for the plan and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design).
+
+### What's in v1.0
+
+| Capability | Where |
+| --- | --- |
+| Provider abstraction, custom providers, model discovery | `src/providers/`, `src/registry/` |
+| OmniHilbras integration (optional) | `src/providers/omnihilbras/` |
+| CLI agents (stdin/arg/protocol), agent registry | `src/agents/` |
+| Roles, projects, tasks (lifecycle + retry) | `src/roles/`, `src/tasks/` |
+| Pipelines (DAG, parallel, retries, conditions) | `src/pipelines/` |
+| Multi-AI research + report aggregation | `src/reports/` |
+| Planner layer (model + heuristic) | `src/planner/` |
+| Remembera / local memory | `src/memory/` |
+| CLI, configuration, security foundations, docs | `src/cli/`, `src/config/`, `docs/` |
 
 What exists today:
 
@@ -251,17 +268,26 @@ Phases 0–11 are laid out in [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.m
 | v0.3.0 | OmniHilbras Integration (optional, like every provider) |
 | v0.4.0 | Agent System |
 | v0.5.0 | Roles & Tasks |
+| v0.6.0 | Pipeline Engine |
 | v0.7.0 | Multi-AI Reports |
-| v0.7.0 | Multi-AI Reports |
-| v0.8.0 | Remembera / Memory |
 | v0.8.0 | Remembera / Memory |
 | v0.9.0 | Planner |
-| **v0.10.0** | **End-to-End Workflow (current)** |
-| v1.0.0 | Production Release |
+| v0.10.0 | End-to-End Workflow (current) |
+| **v1.0.0** | **Production Release — Phases 10 + 11 (current, final)** |
 
 Core architectural rule: OmniNode must run successfully with **zero Hilbras
 dependencies**. OmniHilbras and Remembera make it more powerful, but neither is
 required for the core engine.
+
+## Documentation
+
+- [Development plan](docs/DEVELOPMENT_PLAN.md) — the full 12-phase roadmap
+- [Architecture](docs/ARCHITECTURE.md) — module map, workflow, local state
+- [Security model](docs/SECURITY.md) — secrets, process execution, env isolation, audit log
+- [Example project](examples/demo/) — a runnable end-to-end demo (`./demo.sh`)
+
+Prefer a container? `docker build -t omninode .` then
+`docker run --rm -v "$PWD:/work" -w /work omninode run my-pipeline "audit the repo"`.
 
 ## Install
 
