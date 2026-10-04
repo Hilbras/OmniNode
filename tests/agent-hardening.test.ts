@@ -106,11 +106,17 @@ describe("process-tree cleanup (§8)", () => {
   it("kills grandchildren when the agent is killed on timeout", async () => {
     const dir = tmp();
     const marker = path.join(dir, "grandchild.txt");
-    // Agent spawns a grandchild that would write a marker 3s later; the
-    // timeout kills the whole group, so the marker must never appear.
+    // The grandchild is a script FILE (not nested -e quoting, which is
+    // version-sensitive): it writes a marker 3s after spawn. The timeout
+    // kills the whole process group, so the marker must never appear.
+    const grandchildScript = path.join(dir, "grandchild.cjs");
+    writeFileSync(
+      grandchildScript,
+      `setTimeout(() => require("fs").writeFileSync(${JSON.stringify(marker)}, "orphan"), 3000);\n`,
+    );
     const script = `
       const { spawn } = require("child_process");
-      spawn(process.execPath, ["-e", "setTimeout(() => require('fs').writeFileSync(${JSON.stringify(marker)}, 'orphan'), 3000)"], { stdio: "ignore" });
+      spawn(process.execPath, [${JSON.stringify(grandchildScript)}], { stdio: "ignore" });
       setInterval(() => {}, 1000);
     `;
     const agent = new ProcessAgent(nodeAgent(script, { timeoutMs: 400 }));
