@@ -1,5 +1,12 @@
 # OmniNode
 
+[![CI](https://github.com/Hilbras/OmniNode/actions/workflows/ci.yml/badge.svg)](https://github.com/Hilbras/OmniNode/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/@hilbras/omninode)](https://www.npmjs.com/package/@hilbras/omninode)
+[![npm downloads](https://img.shields.io/npm/dm/@hilbras/omninode)](https://www.npmjs.com/package/@hilbras/omninode)
+[![Node.js support](https://img.shields.io/node/v/@hilbras/omninode)](https://www.npmjs.com/package/@hilbras/omninode)
+[![License: MIT](https://img.shields.io/github/license/Hilbras/OmniNode)](LICENSE)
+[![Roadmap phase](https://img.shields.io/badge/phase-0_%2F_11-Foundation-8A2BE2)](docs/DEVELOPMENT_PLAN.md)
+
 **OmniNode** is a provider-agnostic multi-AI orchestration platform. It coordinates
 CLI-based AI agents, AI providers, persistent memory, roles, reports and planning
 into a unified execution system — so multiple AI systems can collaborate on complex
