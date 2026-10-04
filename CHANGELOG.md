@@ -4,6 +4,36 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.3] — v2 Phase 3 (Agent Protocol v2)
+
+### Added
+
+- `src/agent-protocol/`: the OmniNode Agent Protocol v2 as a first-class,
+  dependency-free module — envelope, codec, handshake, session.
+- Explicit protocol versioning (`omninode-agent-protocol/2`); unversioned v1
+  messages still accepted; unsupported versions rejected, never misread.
+- Standardized envelope with full correlation (messageId, requestId, taskId,
+  agentId, pipelineId, executionId) and the complete message-type set
+  (TASK, CONTEXT, INSTRUCTION, RESPONSE, CANCEL, HELLO_ACK / HELLO,
+  TASK_ACCEPTED, TASK_STARTED, STATUS, QUESTION, REPORT, ARTIFACT, COMPLETION,
+  ERROR, CANCELLED).
+- HELLO/HELLO_ACK handshake with agent descriptors (name, version,
+  capabilities, supported message types).
+- Interactive QUESTION → RESPONSE round-trips driven by an optional responder.
+- Hardened decoding: total (never throws), 1 MiB message/line limits, and
+  typed violations (INVALID_JSON, NOT_AN_OBJECT, UNKNOWN_TYPE, MISSING_FIELD,
+  INVALID_PAYLOAD, UNSUPPORTED_VERSION, OVERSIZED) surfaced on the task.
+- docs/PROTOCOL.md: the specification external agents integrate against.
+- Tests: 270 (was 251) — versioning, the full malformed matrix, streaming
+  decoder, handshake, question round-trips, and real v2-speaking and
+  garbage-emitting agent processes.
+
+### Changed
+
+- Process adapter protocol mode now emits v2 envelopes (previously ad-hoc
+  `{meta, message}` objects) and returns protocol diagnostics (descriptor,
+  questions, violations) on the task result.
+
 ## [2.0.0-alpha.2] — v2 Phase 2 (Execution Reliability)
 
 ### Added

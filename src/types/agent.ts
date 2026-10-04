@@ -1,4 +1,6 @@
 /** Agent abstraction: CLI agents and custom agents plug in via adapters (§9–§10). */
+import type { AskedQuestion } from "../agent-protocol/types.js";
+import type { AgentDescriptor } from "../agent-protocol/handshake.js";
 import type { Report } from "./report.js";
 import type { RoleDefinition } from "./role.js";
 
@@ -48,6 +50,10 @@ export interface AgentInfo {
 export interface AgentTaskInput {
   taskId: string;
   objective: string;
+  /** Pipeline run that owns this task (protocol correlation, §7.4). */
+  pipelineId?: string;
+  /** Execution identity for this attempt (protocol correlation, §7.4). */
+  executionId?: string;
   role?: RoleDefinition;
   /** Assembled task context (project, memory, files) already selected for this agent. */
   context?: string;
@@ -64,6 +70,14 @@ export interface AgentTaskOutput {
   logs?: string[];
   /** Structured reports extracted from protocol-mode runs (§16, §21). */
   reports?: Report[];
+  /** Protocol diagnostics for protocol-mode runs (roadmap §7): questions asked, violations seen. */
+  protocol?: {
+    protocol: string;
+    legacy: boolean;
+    descriptor?: AgentDescriptor;
+    questions: AskedQuestion[];
+    violations: string[];
+  };
   error?: string;
 }
 

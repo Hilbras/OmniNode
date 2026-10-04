@@ -21,6 +21,16 @@ stability tier from [API_STABILITY.md](API_STABILITY.md).
 | `MessageEnvelope`, `AgentToNodeMessage`, `NodeToAgentMessage` | JSON-lines agent protocol envelope | Experimental |
 | `AuditEvent`, `AuditAction`, `AuditSink`, `FileAuditLog` | append-only audit log | Experimental |
 
+## Agent Protocol v2 (`src/agent-protocol`)
+
+`PROTOCOL_V2`, `SUPPORTED_PROTOCOL_VERSIONS`, `isSupportedProtocol`,
+`MAX_MESSAGE_BYTES`, `envelope`, `newMessageId`, `decodeMessage`,
+`encodeMessage`, `validateEnvelope`, `ProtocolDecoder`, `ProtocolSession`,
+`parseHello`, `buildHello`, `buildHelloAck`, `decodeStream`,
+`requireCompletion`, and types (`ProtocolEnvelope`, `AgentDescriptor`,
+`DecodeResult`, `ProtocolViolation`, `AskedQuestion`, `ArtifactPayload`, …) —
+Stable. Spec: docs/PROTOCOL.md.
+
 ## Errors (`src/errors`)
 
 `OmniNodeError` (stable, carries a stable `code` union), plus subclasses

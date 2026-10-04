@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { composeTaskText, ProcessAgent } from "../src/agents/process/index.js";
 import { createAgent } from "../src/agents/factory.js";
 import { AgentRegistry } from "../src/agents/registry.js";
-import { AgentError, ProtocolError } from "../src/errors/index.js";
+import { AgentError } from "../src/errors/index.js";
 import type { AgentConfig } from "../src/types/agent.js";
 import type { RoleDefinition } from "../src/types/role.js";
 
@@ -164,7 +164,7 @@ describe("ProcessAgent — protocol mode (§21)", () => {
     expect(result.error).toContain("cannot do that");
   });
 
-  it("throws ProtocolError when a healthy exit produced no protocol messages", async () => {
+  it("fails cleanly (never throws) when a healthy exit produced no protocol messages", async () => {
     const agent = new ProcessAgent({
       name: "chatter",
       integration: "process",
@@ -172,22 +172,27 @@ describe("ProcessAgent — protocol mode (§21)", () => {
       args: ["-e", "process.stdout.write('plain text chatter')"],
       inputMode: "protocol",
     });
-    await expect(agent.run({ taskId: "t", objective: "x" })).rejects.toBeInstanceOf(ProtocolError);
+    const result = await agent.run({ taskId: "t", objective: "x" });
+    // v2: agent misbehavior is data, not an exception (§7.5).
+    expect(result.status).toBe("failed");
+    expect(result.error).toContain("no valid protocol messages");
+    expect(result.protocol?.violations.length).toBeGreaterThan(0);
   });
 
-  it("delivers TASK and ROLE envelopes on stdin", async () => {
+  it("delivers protocol v2 envelopes (TASK + role CONTEXT) on stdin", async () => {
     const agent = new ProcessAgent({
       name: "echoer",
       integration: "process",
       command: "node",
       args: [
         "-e",
-        `let b='';process.stdin.on('data',d=>b+=d);process.stdin.on('end',()=>{const lines=b.trim().split('\\n').map(JSON.parse);process.stdout.write(JSON.stringify({type:'COMPLETION',payload:{summary:'types='+lines.map(l=>l.message.type).join(',')}}))})`,
+        `let b='';process.stdin.on('data',d=>b+=d);process.stdin.on('end',()=>{const lines=b.trim().split('\\n').map(JSON.parse);process.stdout.write(JSON.stringify({protocol:'omninode-agent-protocol/2',type:'COMPLETION',messageId:'m1',taskId:'t7',payload:{summary:'types='+lines.map(l=>l.type).join(',')}}))})`,
       ],
       inputMode: "protocol",
     });
     const result = await agent.run({ taskId: "t7", objective: "obj", role });
-    expect(result.summary).toBe("types=TASK,ROLE");
+    expect(result.summary).toBe("types=TASK,CONTEXT");
+    expect(result.protocol?.legacy).toBe(false);
   });
 });
 

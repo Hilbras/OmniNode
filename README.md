@@ -18,7 +18,7 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v2.0.0-alpha.2 — v2 Phase 2: Execution Reliability** (after Phase 1: architecture & API stabilization) (the v2
+**v2.0.0-alpha.3 — v2 Phase 3: Agent Protocol v2** (after Phase 1: architecture & API stabilization, Phase 2: execution reliability) (the v2
 roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the v1 plan is complete:
 the
 full loop from §28 runs in one command —
@@ -296,7 +296,7 @@ required for the core engine.
 - [Architecture](docs/ARCHITECTURE.md) — module map, workflow, local state
 - [Security model](docs/SECURITY.md) — secrets, process execution, env isolation, audit log
 - [API stability policy](docs/API_STABILITY.md) and [public API inventory](docs/API.md)
-- [Deprecations](docs/DEPRECATIONS.md) · [Changelog](CHANGELOG.md) · [v2 roadmap](docs/ROADMAP_V2.md)
+- [Agent Protocol v2 spec](docs/PROTOCOL.md) · [Deprecations](docs/DEPRECATIONS.md) · [Changelog](CHANGELOG.md) · [v2 roadmap](docs/ROADMAP_V2.md)
 - [Example project](examples/demo/) — a runnable end-to-end demo (`./demo.sh`)
 
 Prefer a container? `docker build -t omninode .` then

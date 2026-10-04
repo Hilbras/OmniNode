@@ -36,6 +36,10 @@ const STABLE_RUNTIME_EXPORTS = [
   "FileAuditLog", "Logger", "ConsoleLogSink", "logger",
   "OmniNodeError", "ConfigError", "ProviderError", "AgentError", "TaskError",
   "PipelineError", "PlannerError", "ProtocolError", "MemoryError", "isOmniNodeError",
+  // agent protocol v2
+  "PROTOCOL_V2", "ProtocolDecoder", "ProtocolSession", "decodeMessage", "encodeMessage",
+  "validateEnvelope", "envelope", "newMessageId", "isSupportedProtocol",
+  "parseHello", "buildHello", "buildHelloAck",
   // misc
   "OMNINODE_VERSION",
 ] as const;

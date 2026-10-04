@@ -5,6 +5,7 @@ export * from "./config/index.js";
 export * from "./providers/index.js";
 export * from "./registry/index.js";
 export * from "./agents/index.js";
+export * from "./agent-protocol/index.js";
 export * from "./roles/index.js";
 export * from "./tasks/index.js";
 export * from "./pipelines/index.js";

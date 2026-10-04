@@ -12,7 +12,8 @@
  *                into reports.
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { AgentError, ProtocolError } from "../../errors/index.js";
+import { AgentError } from "../../errors/index.js";
+import { PROTOCOL_V2, ProtocolSession, type QuestionResponder } from "../../agent-protocol/index.js";
 import { logger, type Logger } from "../../logger/index.js";
 import type {
   AgentConfig,
@@ -21,7 +22,6 @@ import type {
   AgentTaskOutput,
   IAgent,
 } from "../../types/agent.js";
-import type { EnvelopeMeta, NodeToAgentMessage } from "../../types/protocol.js";
 import type { Report } from "../../types/report.js";
 
 const DEFAULT_TIMEOUT_MS = 600_000;
@@ -63,18 +63,20 @@ export function composeTaskText(input: AgentTaskInput): string {
 }
 
 function buildProtocolMessages(input: AgentTaskInput, agentName: string): string[] {
-  const meta: EnvelopeMeta = {
+  // Protocol v2 envelopes with full correlation (roadmap §7.2, §7.4).
+  const session = new ProtocolSession({
+    requestId: `req-${input.taskId}`,
     taskId: input.taskId,
-    agent: agentName,
-    timestamp: new Date().toISOString(),
-  };
-  const messages: NodeToAgentMessage[] = [
-    { type: "TASK", payload: { taskId: input.taskId, objective: input.objective } },
-  ];
-  if (input.role) messages.push({ type: "ROLE", payload: input.role });
-  if (input.context) messages.push({ type: "CONTEXT", payload: { body: input.context } });
-  if (input.instruction) messages.push({ type: "INSTRUCTION", payload: { text: input.instruction } });
-  return messages.map((message) => JSON.stringify({ meta, message }));
+    agentId: agentName,
+    ...(input.pipelineId !== undefined ? { pipelineId: input.pipelineId } : {}),
+    ...(input.executionId !== undefined ? { executionId: input.executionId } : {}),
+  });
+  return session.taskMessages(
+    input.objective,
+    input.role,
+    input.context,
+    input.instruction,
+  );
 }
 
 export class ProcessAgent implements IAgent {
@@ -258,75 +260,92 @@ interface ProtocolRunInput {
   stdout: string;
   exitCode: number | null;
   logs?: string[];
+  responder?: QuestionResponder;
 }
 
-function interpretProtocolRun({ input, agentName, stdout, exitCode, logs }: ProtocolRunInput): AgentTaskOutput {
-  const reports: Report[] = [];
-  let summary: string | undefined;
-  let error: string | undefined;
-  let sawProtocolMessage = false;
+function interpretProtocolRun({
+  input,
+  agentName,
+  stdout,
+  exitCode,
+  logs,
+  responder,
+}: ProtocolRunInput): AgentTaskOutput {
+  const session = new ProtocolSession(
+    {
+      requestId: `req-${input.taskId}`,
+      taskId: input.taskId,
+      agentId: agentName,
+      ...(input.pipelineId !== undefined ? { pipelineId: input.pipelineId } : {}),
+      ...(input.executionId !== undefined ? { executionId: input.executionId } : {}),
+    },
+    { ...(responder !== undefined ? { responder } : {}) },
+  );
 
-  for (const line of stdout.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed.length === 0) continue;
-    const message = parseAgentMessage(trimmed);
-    if (!message) continue;
-    sawProtocolMessage = true;
-
-    if (message.type === "REPORT") {
-      const report = normalizeReport(message.payload, input.taskId, agentName, reports.length);
-      if (report) reports.push(report);
-    } else if (message.type === "COMPLETION") {
-      const payload = message.payload as { summary?: unknown } | undefined;
-      if (typeof payload?.summary === "string") summary = payload.summary;
-    } else if (message.type === "ERROR") {
-      const payload = message.payload as { code?: unknown; message?: unknown } | undefined;
-      const detail = typeof payload?.message === "string" ? payload.message : "unknown error";
-      const code = typeof payload?.code === "string" ? ` [${payload.code}]` : "";
-      error = `Agent error${code}: ${detail}`;
-    }
-    // STATUS / QUESTION / ARTIFACT are informational in v0.4 (§21 backlog).
+  // The stream was drained line-by-line already; re-decode deterministically.
+  for (const result of session.decoder.push(stdout)) {
+    // handled synchronously below via handle(); questions are resolved eagerly
+    session.handle(result);
+  }
+  for (const result of session.decoder.flush()) {
+    session.handle(result);
   }
 
-  if (!sawProtocolMessage && exitCode === 0) {
-    throw new ProtocolError(
-      `Agent "${agentName}" produced no protocol messages on stdout (input mode "protocol").`,
-      { details: { taskId: input.taskId, stdout: stdout.slice(0, 2000) } },
-    );
-  }
+  const reports = session.reports
+    .flatMap((payload) => (Array.isArray(payload) ? payload : [payload]))
+    .map((payload, index) => normalizeReport(payload, input.taskId, agentName, index))
+    .filter((report): report is NonNullable<typeof report> => report !== undefined);
 
   const trimmed = stdout.trim();
+  const protocolBlock = {
+    protocol: session.descriptor?.protocol ?? PROTOCOL_V2,
+    legacy: !session.sawV2 && session.descriptor === undefined,
+    ...(session.descriptor !== undefined ? { descriptor: session.descriptor } : {}),
+    questions: session.questions,
+    violations: session.violations.map((v) => `${v.code}: ${v.message}`),
+  };
+
+  if (session.errorMessage !== undefined) {
+    return {
+      taskId: input.taskId,
+      status: "failed",
+      error: session.errorMessage,
+      rawOutput: trimmed.length > 0 ? trimmed : undefined,
+      exitCode: exitCode ?? undefined,
+      logs,
+      protocol: protocolBlock,
+      ...(reports.length > 0 ? { reports } : {}),
+    };
+  }
+
+  if (session.descriptor === undefined && session.violations.length > 0 && session.reports.length === 0 && session.completionSummary === undefined) {
+    // Nothing usable parsed: protocol violation rather than silent success.
+    return {
+      taskId: input.taskId,
+      status: "failed",
+      error: `agent produced no valid protocol messages: ${protocolBlock.violations.join("; ")}`,
+      rawOutput: trimmed.length > 0 ? trimmed : undefined,
+      exitCode: exitCode ?? undefined,
+      logs,
+      protocol: protocolBlock,
+    };
+  }
+
+  const completed = exitCode === 0 && session.completionSummary !== undefined;
   return {
     taskId: input.taskId,
-    status: error !== undefined || exitCode !== 0 ? "failed" : "completed",
-    summary: summary ?? reports[0]?.summary,
+    status: completed || exitCode === 0 ? (completed ? "completed" : "completed") : "failed",
+    summary: session.completionSummary ?? reports[0]?.summary,
     rawOutput: trimmed.length > 0 ? trimmed : undefined,
     exitCode: exitCode ?? undefined,
     logs,
-    reports: reports.length > 0 ? reports : undefined,
-    error:
-      error ??
-      (exitCode !== 0 ? `Process exited with code ${exitCode ?? "unknown"}` : undefined),
+    protocol: protocolBlock,
+    ...(reports.length > 0 ? { reports } : {}),
+    ...(exitCode !== 0 ? { error: `Process exited with code ${exitCode ?? "unknown"}` } : {}),
   };
 }
 
-/** Accepts both bare `{ type, payload }` and enveloped `{ meta, message }` lines. */
-function parseAgentMessage(line: string): { type: string; payload: unknown } | undefined {
-  try {
-    const parsed = JSON.parse(line) as Record<string, unknown>;
-    if (typeof parsed.type === "string") {
-      return { type: parsed.type, payload: parsed.payload };
-    }
-    const inner = parsed.message as Record<string, unknown> | undefined;
-    if (inner && typeof inner.type === "string") {
-      return { type: inner.type, payload: inner.payload };
-    }
-  } catch {
-    // Non-JSON chatter is tolerated; protocol compliance is judged overall.
-  }
-  return undefined;
-}
-
+/** Normalizes a loose REPORT payload into a strict Report; drops malformed entries. */
 function normalizeReport(
   payload: unknown,
   taskId: string,
