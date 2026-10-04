@@ -5,7 +5,13 @@
  * dependency-free.
  */
 import { JsonFileStore } from "../persistence/json-file-store.js";
-import type { IMemoryProvider, MemoryEntry, MemoryQuery } from "../types/memory.js";
+import { defaultMetadata, defaultSearch } from "./base.js";
+import type {
+  IMemoryProvider,
+  MemoryEntry,
+  MemoryProviderMetadata,
+  MemoryQuery,
+} from "../types/memory.js";
 
 const STOPWORDS = new Set([
   "the", "and", "for", "with", "this", "that", "from", "into", "was", "were",
@@ -45,10 +51,33 @@ export class LocalMemoryProvider extends JsonFileStore<MemoryEntry> implements I
     super({ ...(directory !== undefined ? { directory } : {}), fileName: "memory.json" });
   }
 
-  async query(query: MemoryQuery): Promise<MemoryEntry[]> {
+  metadata(): MemoryProviderMetadata {
+    return defaultMetadata(this.name, {
+      capabilities: ["retrieve", "store", "search", "categories", "tags"],
+      relevanceRanking: true,
+      backend: { kind: "json-file", deterministicScoring: true },
+    });
+  }
+
+  search(text: string, options: { limit?: number; scope?: MemoryQuery["scope"] } = {}): Promise<MemoryEntry[]> {
+    return defaultSearch(this, text, options);
+  }
+
+  /** @deprecated v1 alias of {@link retrieve}. */
+  query(query: MemoryQuery): Promise<MemoryEntry[]> {
+    return this.retrieve(query);
+  }
+
+  /** @deprecated v1 alias of {@link store}. */
+  write(entry: MemoryEntry): Promise<void> {
+    return this.store(entry);
+  }
+
+  async retrieve(query: MemoryQuery): Promise<MemoryEntry[]> {
     const entries = await this.readAll();
     const filtered = entries
       .filter((entry) => (query.scope ? entry.scope === query.scope : true))
+      .filter((entry) => (query.category ? entry.category === query.category : true))
       .filter((entry) =>
         query.tags && query.tags.length > 0
           ? query.tags.every((tag) => (entry.tags ?? []).includes(tag))
@@ -70,7 +99,7 @@ export class LocalMemoryProvider extends JsonFileStore<MemoryEntry> implements I
       .map(({ entry }) => entry);
   }
 
-  write(entry: MemoryEntry): Promise<void> {
+  store(entry: MemoryEntry): Promise<void> {
     return this.mutate((entries) => {
       const index = entries.findIndex((e) => e.key === entry.key);
       const stamped: MemoryEntry = {

@@ -16,7 +16,11 @@ export function createTaskEngine(config: AppConfig, log: Logger = logger, direct
     roles,
     store: new FileTaskStore(directory),
     ...(config.project.memory !== undefined
-      ? { memory: new MemoryService(createMemoryProvider(config.project.memory), log) }
+      ? {
+          memory: new MemoryService(createMemoryProvider(config.project.memory), log, {
+            required: config.project.memory.required,
+          }),
+        }
       : {}),
     audit: new FileAuditLog(),
     log,

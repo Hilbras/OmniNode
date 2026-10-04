@@ -15,7 +15,8 @@ stability tier from [API_STABILITY.md](API_STABILITY.md).
 | `PipelineDefinition`, `PipelineStep`, `PipelineRun`, `PipelineStepRun` | pipeline definitions and run records | Stable |
 | `Plan`, `PlanStep` | planner output schema | Stable |
 | `Report`, `Finding`, `Confidence`, `CombinedReport`, `AggregatedFinding`, `FindingSource` | report model | Stable |
-| `MemoryEntry`, `MemoryQuery`, `MemoryScope`, `IMemoryProvider` | memory abstraction | Stable |
+| `MemoryEntry`, `MemoryQuery`, `MemoryScope`, `MemoryCategory`, `MemoryProviderMetadata`, `IMemoryProvider` | memory contract (v2) | Stable |
+| `MemoryTaskContext`, `MemoryServiceOptions`, `MAX_CONTEXT_CHARS`, `defaultSearch`, `defaultMetadata` | context manager + contract helpers | Stable |
 | `Project` | project entity | Stable |
 | `ChatMessage`, `ChatRequest`, `ChatResponse`, `ChatRole`, `ChatUsage`, `ChatFn`, `ChatStreamChunk` | chat contracts (incl. streaming chunks); `ChatFn` was re-exported from `pipelines` in v1 and remains so | Stable |
 | `MessageEnvelope`, `AgentToNodeMessage`, `NodeToAgentMessage` | JSON-lines agent protocol envelope | Experimental |

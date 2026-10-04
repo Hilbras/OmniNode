@@ -11,7 +11,13 @@ import { MemoryError } from "../errors/index.js";
 import { logger, type Logger } from "../logger/index.js";
 import { resolveApiKey } from "../providers/auth.js";
 import { requestJson } from "../providers/http.js";
-import type { IMemoryProvider, MemoryEntry, MemoryQuery } from "../types/memory.js";
+import type {
+  IMemoryProvider,
+  MemoryEntry,
+  MemoryProviderMetadata,
+  MemoryQuery,
+} from "../types/memory.js";
+import { defaultMetadata, defaultSearch } from "./base.js";
 
 export interface RememberaConfig {
   baseUrl: string;
@@ -33,6 +39,10 @@ export class RememberaMemoryProvider implements IMemoryProvider {
     this.log = log.child({ component: "remembera" });
   }
 
+  private get authenticationConfigured(): boolean {
+    return this.apiKeyEnvVar === undefined || Boolean(this.env[this.apiKeyEnvVar]);
+  }
+
   private headers(): Record<string, string> {
     const key = this.apiKeyEnvVar
       ? resolveApiKey({ name: "remembera", apiKeyEnvVar: this.apiKeyEnvVar }, this.env)
@@ -40,7 +50,37 @@ export class RememberaMemoryProvider implements IMemoryProvider {
     return key ? { authorization: `Bearer ${key}` } : {};
   }
 
-  async query(query: MemoryQuery): Promise<MemoryEntry[]> {
+  /** Search delegates to the gateway's relevance query. */
+  search(text: string, options: { limit?: number; scope?: MemoryQuery["scope"] } = {}): Promise<MemoryEntry[]> {
+    return defaultSearch(
+      this,
+      text,
+      {
+        ...(options.scope !== undefined ? { scope: options.scope } : {}),
+        ...(options.limit !== undefined ? { limit: options.limit } : {}),
+      },
+    );
+  }
+
+  metadata(): MemoryProviderMetadata {
+    return defaultMetadata(this.name, {
+      capabilities: ["retrieve", "store", "search", "categories", "tags"],
+      relevanceRanking: true,
+      backend: { kind: "http", baseUrl: this.baseUrl, authenticated: this.authenticationConfigured },
+    });
+  }
+
+  /** @deprecated v1 alias of {@link retrieve}. */
+  query(query: MemoryQuery): Promise<MemoryEntry[]> {
+    return this.retrieve(query);
+  }
+
+  /** @deprecated v1 alias of {@link store}. */
+  write(entry: MemoryEntry): Promise<void> {
+    return this.store(entry);
+  }
+
+  async retrieve(query: MemoryQuery): Promise<MemoryEntry[]> {
     const { status, body } = await this.request(`${this.baseUrl}/api/memory/query`, query);
     if (status !== 200) {
       throw new MemoryError(`Remembera query returned HTTP ${status}.`);
@@ -52,7 +92,7 @@ export class RememberaMemoryProvider implements IMemoryProvider {
     return entries.map((entry) => this.toEntry(entry)).filter((entry): entry is MemoryEntry => entry !== undefined);
   }
 
-  async write(entry: MemoryEntry): Promise<void> {
+  async store(entry: MemoryEntry): Promise<void> {
     const { status } = await this.request(`${this.baseUrl}/api/memory`, entry);
     if (status !== 200 && status !== 201) {
       throw new MemoryError(`Remembera write returned HTTP ${status}.`);
@@ -93,6 +133,9 @@ export class RememberaMemoryProvider implements IMemoryProvider {
           ? scope
           : "knowledge",
       ...(Array.isArray(entry.tags) ? { tags: entry.tags.filter((t): t is string => typeof t === "string") } : {}),
+      ...(typeof entry.category === "string"
+        ? { category: entry.category as MemoryEntry["category"] }
+        : {}),
       ...(typeof entry.createdAt === "string" ? { createdAt: entry.createdAt } : {}),
       ...(typeof entry.updatedAt === "string" ? { updatedAt: entry.updatedAt } : {}),
     };

@@ -102,7 +102,8 @@ export const projectConfigSchema = z
         provider: z.string().min(1).default("local"),
         base_url: z.string().url().optional(),
         api_key_env_var: z.string().min(1).optional(),
-    timeout_ms: z.number().int().positive().optional(),
+        /** When true, memory failures fail tasks instead of being tolerated (§12). */
+        required: z.boolean().optional(),
       })
       .strict()
       .optional(),

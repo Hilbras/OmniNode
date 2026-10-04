@@ -32,6 +32,7 @@ export interface AppConfig {
       provider: string;
       baseUrl?: string;
       apiKeyEnvVar?: string;
+      required?: boolean;
     };
   };
   logging?: {
@@ -137,6 +138,7 @@ function toAppConfig(yaml: ReturnType<typeof appConfigSchema.parse>): AppConfig 
               provider: yaml.project.memory.provider,
               baseUrl: yaml.project.memory.base_url,
               apiKeyEnvVar: yaml.project.memory.api_key_env_var,
+              required: yaml.project.memory.required,
             },
           }
         : {}),

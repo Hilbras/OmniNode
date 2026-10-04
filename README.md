@@ -18,9 +18,9 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v2.0.0-alpha.7 — v2 Phase 7: OmniHilbras Integration v2**
+**v2.0.0-alpha.8 — v2 Phase 8: Remembera Integration v2**
 (the reliability & interoperability line: architecture → execution →
-protocol → adapters → pipelines → providers → OmniHilbras) (the v2
+protocol → adapters → pipelines → providers → OmniHilbras → memory) (the v2
 roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the v1 plan is complete:
 the
 full loop from §28 runs in one command —
@@ -31,6 +31,12 @@ for the plan and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design).
 
 ### What's new in v2 (so far)
 
+- **Phase 8 — Remembera / Memory v2**: the memory contract is formalized
+  (`retrieve` / `store` / `search` / `metadata` with v1 `query` / `write`
+  aliases kept working), memory gains structured **categories** (decisions,
+  problems, conventions, tasks…), retrieval is **task-oriented and budgeted**
+  (never "load all memory"), and `memory.required: true` makes backend
+  failures fatal instead of tolerated. Details: [MEMORY.md](docs/MEMORY.md).
 - **Phase 7 — OmniHilbras Integration v2**: the dedicated adapter now
   captures gateway-level metadata (version, tier, region) and attaches it
   to discovered models, honors provider-level `timeout_ms`, and supports
@@ -333,7 +339,7 @@ required for the core engine.
 - [Architecture](docs/ARCHITECTURE.md) — module map, workflow, local state
 - [Security model](docs/SECURITY.md) — secrets, process execution, env isolation, audit log
 - [API stability policy](docs/API_STABILITY.md) and [public API inventory](docs/API.md)
-- [Agent Protocol v2 spec](docs/PROTOCOL.md) · [Providers](docs/PROVIDERS.md) · [Deprecations](docs/DEPRECATIONS.md) · [Changelog](CHANGELOG.md) · [v2 roadmap](docs/ROADMAP_V2.md)
+- [Agent Protocol v2 spec](docs/PROTOCOL.md) · [Providers](docs/PROVIDERS.md) · [Memory](docs/MEMORY.md) · [Deprecations](docs/DEPRECATIONS.md) · [Changelog](CHANGELOG.md) · [v2 roadmap](docs/ROADMAP_V2.md)
 - [Example project](examples/demo/) — a runnable end-to-end demo (`./demo.sh`)
 
 Prefer a container? `docker build -t omninode .` then

@@ -4,6 +4,35 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.8] — v2 Phase 8 (Remembera Integration v2)
+
+### Added
+
+- **Formalized memory contract** (§12): `retrieve` / `store` / `search` /
+  `metadata` on `IMemoryProvider`; the v1 `query` / `write` names remain as
+  aliases so existing integrations keep compiling. Shared helpers supply the
+  default search/metadata behavior.
+- **Structured memory categories** (§12): `project`, `architecture`,
+  `decisions`, `tasks`, `problems`, `solutions`, `conventions`,
+  `agent_reports` — with filtering on both adapters and category-aware task
+  outcomes (findings recorded as `problems`).
+- **Task-oriented, budgeted retrieval** (§12): `MemoryService.contextFor()`
+  returns the selected entries, prompt-ready text and a `truncated` flag —
+  OmniNode never loads all memory into a prompt.
+- **Failure policy** (§12): `memory.required: true` turns backend failures
+  into `MemoryError` (a task that needs context fails loudly); the default
+  remains warn-and-continue.
+- Contract parity suite: the same expectations run against the local and
+  Remembera adapters.
+- docs/MEMORY.md: contract, scopes/categories, the §20 loop, failure policy,
+  backends, extension guide.
+- Tests: 351 (was 339).
+
+### Fixed
+
+- Context truncation could exceed its character budget by one (the ellipsis
+  was appended after the slice).
+
 ## [2.0.0-alpha.7] — v2 Phase 7 (OmniHilbras Integration v2)
 
 ### Added
