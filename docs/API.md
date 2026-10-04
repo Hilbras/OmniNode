@@ -11,7 +11,7 @@ stability tier from [API_STABILITY.md](API_STABILITY.md).
 | `ModelInfo`, `ModelCapabilities` | normalized model registry entries | Stable |
 | `AgentConfig`, `AgentInfo`, `AgentTaskInput`, `AgentTaskOutput`, `IAgent`, `AgentInputMode` | CLI agent abstraction and process adapter contract | Stable |
 | `RoleDefinition` | provider-independent roles | Stable |
-| `Task`, `TaskStatus`, `TaskContext`, `TaskResult` | task model and lifecycle states | Stable |
+| `Task`, `TaskStatus`, `TaskContext`, `TaskResult`, `ExecutionRecord` | task model, lifecycle states and execution history | Stable |
 | `PipelineDefinition`, `PipelineStep`, `PipelineRun`, `PipelineStepRun` | pipeline definitions and run records | Stable |
 | `Plan`, `PlanStep` | planner output schema | Stable |
 | `Report`, `Finding`, `Confidence`, `Evidence`, `EvidenceKind`, `EvidenceInput`, `FindingOrigin`, `ReportArtifact`, `CombinedReport`, `AggregatedFinding`, `FindingSource`, `ReportConflict`, `ConflictPosition` | report model (v2) | Stable |

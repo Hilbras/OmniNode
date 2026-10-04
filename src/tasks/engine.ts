@@ -249,6 +249,7 @@ export class TaskEngine {
       const result: TaskResult = {
         ...(output.summary !== undefined ? { summary: output.summary } : {}),
         ...(output.reports !== undefined && output.reports.length > 0 ? { reports: output.reports } : {}),
+      ...(output.protocol !== undefined ? { protocol: output.protocol } : {}),
         // Keep the verbatim output (bounded) for report extraction and audit.
         ...(output.rawOutput !== undefined && output.rawOutput.length > 0
           ? { rawOutput: output.rawOutput.slice(0, 10_000) }

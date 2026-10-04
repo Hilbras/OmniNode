@@ -4,6 +4,25 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.17] — v2 Phase 17 (Testing Expansion)
+
+### Added
+
+- **Failure matrix suite** (`tests/failure-matrix.test.ts`, §21): explicit,
+  auditable coverage for provider rate limits, server errors, invalid keys,
+  missing key references, model unavailable, network loss, malformed gateway
+  responses, OmniHilbras unavailable, agent crash/timeout/missing executable,
+  malformed JSONL, huge stdout, duplicate execution, partial pipeline
+  failure, corrupted persistence, duplicate configuration names, Remembera
+  unavailable (tolerated and required), and malformed reports.
+- **Duplicate configuration names are rejected**: two providers/agents/roles/
+  pipelines with the same name used to silently shadow each other.
+- **Protocol diagnostics on task results**: `result.protocol` carries the
+  agent descriptor, questions and violations for `task inspect`.
+- docs/TESTING.md: the failure matrix table, regression-test list and how to
+  run the suite.
+- Tests: 446 (was 427).
+
 ## [2.0.0-alpha.16] — v2 Phase 16 (Configuration v2)
 
 ### Added

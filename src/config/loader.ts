@@ -166,6 +166,8 @@ export function loadConfigDetailed(options: LoadConfigOptions = {}): LoadConfigR
     );
   }
 
+  assertUniqueNames(parsed.data);
+
   return {
     config: toAppConfig(parsed.data),
     sources: {
@@ -176,6 +178,39 @@ export function loadConfigDetailed(options: LoadConfigOptions = {}): LoadConfigR
       defaults: withDefaults.applied,
     },
   };
+}
+
+/**
+ * Rejects duplicate identifiers. Without this, two providers/agents/roles
+ * with the same name silently shadow each other — the kind of failure that
+ * should be loud (roadmap §21, duplicate execution).
+ */
+function assertUniqueNames(data: {
+  project: {
+    providers: Array<{ name: string }>;
+    agents: Array<{ name: string }>;
+    roles: Array<{ id: string }>;
+    pipelines: Array<{ id: string }>;
+  };
+}): void {
+  const groups: Array<[string, string[]]> = [
+    ["provider", data.project.providers.map((p) => p.name)],
+    ["agent", data.project.agents.map((a) => a.name)],
+    ["role", data.project.roles.map((r) => r.id)],
+    ["pipeline", data.project.pipelines.map((p) => p.id)],
+  ];
+  for (const [kind, names] of groups) {
+    const seen = new Set<string>();
+    for (const name of names) {
+      if (seen.has(name)) {
+        throw new ConfigError(
+          "CONFIG_INVALID",
+          `Duplicate ${kind} name "${name}" — every ${kind} must have a unique name.`,
+        );
+      }
+      seen.add(name);
+    }
+  }
 }
 
 /** Reads, secret-scans and parses a configuration file. */

@@ -57,6 +57,14 @@ export interface TaskResult {
   reportId?: string;
   /** Structured reports produced by protocol-mode agents (Phase 6 builds on this). */
   reports?: Report[];
+  /** Protocol-mode diagnostics (descriptor, questions, violations) — see docs/PROTOCOL.md. */
+  protocol?: {
+    protocol: string;
+    legacy: boolean;
+    descriptor?: { protocol: string; name: string; version?: string; capabilities: string[]; supports: string[] };
+    questions: Array<{ questionId: string; question: string; answer?: string }>;
+    violations: string[];
+  };
   /** Truncated verbatim agent output, kept for report extraction and audit. */
   rawOutput?: string;
   error?: string;

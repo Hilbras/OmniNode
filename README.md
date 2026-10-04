@@ -18,7 +18,7 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v2.0.0-alpha.16 — v2 Phase 16: Configuration v2**
+**v2.0.0-alpha.17 — v2 Phase 17: Testing Expansion**
 (the reliability & interoperability line: architecture → execution →
 protocol → adapters → pipelines → providers → OmniHilbras → memory → reports) (the v2
 roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the v1 plan is complete:
@@ -31,6 +31,15 @@ for the plan and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design).
 
 ### What's new in v2 (so far)
 
+- **Phase 17 — Testing Expansion**: an explicit, auditable **failure
+  matrix** covering every scenario the roadmap lists — provider
+  429/500/401, model unavailable, network loss, malformed gateway
+  responses, agent crash/timeout/missing executable, malformed JSONL,
+  huge output, corrupted persistence, duplicate execution, partial
+  pipeline failure, Remembera/OmniHilbras unavailable — plus duplicate
+  configuration names now rejected instead of silently shadowing, and
+  protocol diagnostics surfaced on task results. Details:
+  [TESTING.md](docs/TESTING.md).
 - **Phase 16 — Configuration v2**: explicit precedence (CLI → env →
   project file → user file → profile overlay → defaults), named
   **profiles** (`development`/`production`/`testing`), `OMNINODE_*`
@@ -394,7 +403,7 @@ required for the core engine.
 - [Architecture](docs/ARCHITECTURE.md) — module map, workflow, local state
 - [Security model](docs/SECURITY.md) — secrets, process execution, env isolation, audit log
 - [API stability policy](docs/API_STABILITY.md) and [public API inventory](docs/API.md)
-- [Configuration](docs/CONFIGURATION.md) · [CLI guide](docs/CLI.md) · [Agent Protocol v2 spec](docs/PROTOCOL.md) · [Providers](docs/PROVIDERS.md) · [Memory](docs/MEMORY.md) · [Reports](docs/REPORTS.md) · [Persistence](docs/PERSISTENCE.md) · [Deprecations](docs/DEPRECATIONS.md) · [Changelog](CHANGELOG.md) · [v2 roadmap](docs/ROADMAP_V2.md)
+- [Configuration](docs/CONFIGURATION.md) · [Testing & failure matrix](docs/TESTING.md) · [CLI guide](docs/CLI.md) · [Agent Protocol v2 spec](docs/PROTOCOL.md) · [Providers](docs/PROVIDERS.md) · [Memory](docs/MEMORY.md) · [Reports](docs/REPORTS.md) · [Persistence](docs/PERSISTENCE.md) · [Deprecations](docs/DEPRECATIONS.md) · [Changelog](CHANGELOG.md) · [v2 roadmap](docs/ROADMAP_V2.md)
 - [Example project](examples/demo/) — a runnable end-to-end demo (`./demo.sh`)
 
 Prefer a container? `docker build -t omninode .` then
