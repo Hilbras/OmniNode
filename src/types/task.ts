@@ -1,4 +1,5 @@
 /** Task system: every operation becomes a Task (§13). */
+import type { Report } from "./report.js";
 
 export type TaskStatus =
   | "created"
@@ -23,6 +24,8 @@ export interface TaskResult {
   summary?: string;
   artifacts?: string[];
   reportId?: string;
+  /** Structured reports produced by protocol-mode agents (Phase 6 builds on this). */
+  reports?: Report[];
   error?: string;
   finishedAt?: string;
 }

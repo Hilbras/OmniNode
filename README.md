@@ -18,7 +18,7 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v0.4.0 — Phase 3: CLI Agent System** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
+**v0.5.0 — Phase 4: Roles & Tasks** (see [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)
 for the full plan and roadmap).
 
 What exists today:
@@ -44,6 +44,15 @@ What exists today:
     `TASK`/`ROLE`/`CONTEXT`/`INSTRUCTION` envelopes in, `REPORT`/`COMPLETION`/
     `ERROR` messages out, parsed into structured reports)
   - Agent factory and registry (`createAgent`, `AgentRegistry`)
+- **Roles & tasks** (`src/roles/`, `src/tasks/`):
+  - `RoleRegistry` with assignment validation — a task can only reference roles
+    and agents that actually exist
+  - Task lifecycle (created → queued → running → completed/failed/cancelled)
+    with transition enforcement
+  - `TaskEngine` runs tasks through their assigned agent, records structured
+    results (summary, reports, errors, timestamps)
+  - `TaskStore` interface with a local-first JSON implementation in
+    `.omninode/tasks.json` (atomic writes; swap in any backend)
 - Typed error hierarchy (`src/errors/`)
 - Leveled logger with pluggable sink (`src/logger/`)
 - Configuration system: `omninode.yaml` with `${ENV_VAR}` expansion and strict
@@ -93,6 +102,15 @@ omninode agent add --name opencode --command opencode --input-mode arg
 omninode agent test opencode     # sends a trivial task over the real adapter
 ```
 
+Create, run and track tasks (the `Project → Task → Role → Agent` chain):
+
+```bash
+omninode task create "audit the auth module" --role security-reviewer --agent opencode
+omninode task run task-xxxxxx
+omninode task status task-xxxxxx
+omninode task list
+```
+
 See [omninode.yaml.example](omninode.yaml.example) for a full configuration.
 
 ### Configuration
@@ -125,8 +143,8 @@ Phases 0–11 are laid out in [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.m
 | v0.1.0 | Foundation |
 | v0.2.0 | Provider System |
 | v0.3.0 | OmniHilbras Integration (optional, like every provider) |
-| **v0.4.0** | **CLI Agent System (current)** |
-| v0.5.0 | Roles & Tasks |
+| v0.4.0 | Agent System |
+| **v0.5.0** | **Roles & Tasks (current)** |
 | v0.6.0 | Pipeline Engine |
 | v0.7.0 | Multi-AI Reports |
 | v0.8.0 | Remembera (optional memory integration) |

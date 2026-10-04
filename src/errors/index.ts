@@ -11,6 +11,7 @@ export type OmniNodeErrorCode =
   | "AGENT_FAILED"
   | "AGENT_TIMEOUT"
   | "TASK_INVALID"
+  | "TASK_NOT_FOUND"
   | "TASK_FAILED"
   | "PIPELINE_INVALID"
   | "PIPELINE_FAILED"
@@ -73,7 +74,7 @@ export class AgentError extends OmniNodeError {
 
 export class TaskError extends OmniNodeError {
   constructor(
-    code: "TASK_INVALID" | "TASK_FAILED",
+    code: "TASK_INVALID" | "TASK_NOT_FOUND" | "TASK_FAILED",
     message: string,
     options: OmniNodeErrorOptions = {},
   ) {
