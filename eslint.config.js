@@ -6,6 +6,13 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    // Node CLI scripts: Node globals are available.
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      globals: { process: "readonly", console: "readonly", Buffer: "readonly" },
+    },
+  },
+  {
     rules: {
       "@typescript-eslint/no-unused-vars": [
         "error",

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 260" width="1000" height="260" role="img" aria-label="OmniNode — multi-AI orchestration layer">
+  <title>OmniNode</title>
+  <defs>
+    <linearGradient id="core" x1="172" y1="160" x2="339" y2="352" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#818CF8"/>
+      <stop offset="1" stop-color="#4F46E5"/>
+    </linearGradient>
+    <linearGradient id="spoke" x1="256" y1="256" x2="256" y2="66" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#818CF8"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+    <linearGradient id="spokeDown" x1="256" y1="256" x2="420" y2="351" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#A78BFA"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(20 4) scale(0.49)">
+    <circle cx="256" cy="256" r="190" fill="none" stroke="#6366F1" stroke-opacity="0.18" stroke-width="4" stroke-dasharray="10 14"/>
+    <g fill="none" stroke-width="14" stroke-linecap="round">
+      <path d="M256 256 V96" stroke="url(#spoke)"/>
+      <path d="M256 256 L104 344" stroke="url(#spokeDown)"/>
+      <path d="M256 256 L408 344" stroke="url(#spokeDown)"/>
+    </g>
+    <g stroke="#0B1020" stroke-width="10">
+      <circle cx="256" cy="80" r="38" fill="#22D3EE"/>
+      <circle cx="96" cy="352" r="38" fill="#A78BFA"/>
+      <circle cx="416" cy="352" r="38" fill="#A78BFA"/>
+    </g>
+    <path d="M256 160 L339.1 208 L339.1 304 L256 352 L172.9 304 L172.9 208 Z"
+          fill="url(#core)" stroke="#0B1020" stroke-width="10" stroke-linejoin="round"/>
+    <circle cx="256" cy="256" r="26" fill="#F8FAFC"/>
+  </g>
+
+  <text x="300" y="150" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+        font-size="92" font-weight="700" letter-spacing="-2" fill="#0F172A">Omni<tspan fill="#4F46E5">Node</tspan></text>
+  <text x="303" y="196" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+        font-size="27" font-weight="500" letter-spacing="0.5" fill="#475569">provider-agnostic multi-AI orchestration</text>
+</svg>

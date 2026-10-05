@@ -1,6 +1,6 @@
 {
   "name": "@hilbras/omninode",
-  "version": "2.0.0-alpha.21",
+  "version": "2.0.0-alpha.22",
   "description": "Provider-agnostic multi-AI orchestration platform: coordinates CLI agents, AI providers, memory, roles, reports and planning into one execution system.",
   "type": "module",
   "license": "MIT",
@@ -19,7 +19,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "assets/logo.svg",
+    "assets/favicon.svg"
   ],
   "prepublishOnly": "npm run build && npm test",
   "publishConfig": {
@@ -40,7 +42,10 @@
     "cli-agents",
     "llm",
     "pipeline",
-    "provider-agnostic"
+    "provider-agnostic",
+    "agent-protocol",
+    "multi-ai",
+    "reliability"
   ],
   "scripts": {
     "build": "tsup",
@@ -53,7 +58,11 @@
     "format": "prettier --write .",
     "verify": "npm run lint && npm run typecheck && npm test && npm run build",
     "cli": "tsx src/cli/index.ts",
-    "prepublishOnly": "npm run build && npm test"
+    "prepublishOnly": "npm run build && npm test",
+    "validate:package": "node scripts/release-gates.mjs package",
+    "scan:secrets": "node scripts/release-gates.mjs secrets",
+    "check:release": "node scripts/release-gates.mjs version",
+    "gates": "node scripts/release-gates.mjs"
   },
   "dependencies": {
     "commander": "^12.1.0",

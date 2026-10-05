@@ -1,3 +1,4 @@
+# Full gate for every push and pull request (roadmap §26).
 name: CI
 
 on:
@@ -9,15 +10,32 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        node: [20, 22]
+        node: [20, 22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
+      # `npm ci` fails if package.json and package-lock.json disagree (lockfile check).
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      # Dependency audit (security section of the roadmap).
+      - run: npm audit --audit-level=high
+      if: matrix.node == 24
+
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run build
+      # Version/changelog consistency, package contents, secret scan.
+      - run: npm run gates

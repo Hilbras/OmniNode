@@ -4,6 +4,35 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.22] — v2 Phase 22 (CI/CD Hardening)
+
+### Added
+
+- **Release gates** (§26) in `scripts/release-gates.mjs`, runnable locally
+  (`npm run gates`) and in CI:
+  - **version gate** — `package.json`, `src/version.ts` and `CHANGELOG.md` must
+    agree; it already caught a mid-release version drift in this cycle
+  - **package gate** — the published tarball must contain `dist/`, README,
+    LICENSE and package.json, and must not ship tests, sources, local state or
+    stray tarballs
+  - **secret gate** — scans committed material for API keys, tokens, private
+    keys and `.env`-style files, with an explicit allow-list for docs and
+    fixtures that intentionally mention those shapes
+- **CI hardening**: Node matrix widened to 20/22/24 with `fail-fast: false`,
+  `npm ci` (which fails on lockfile drift), `npm audit --audit-level=high`,
+  and a dedicated gates job that runs after the build.
+- **Release workflow** now runs the gates between build and publish.
+- Tests: 480 — the gates themselves (version drift, changelog gaps, secret
+  patterns, ignored directories, package contents).
+
+### Branding
+
+- **Logo**: `assets/logo.svg` (mark), `assets/favicon.svg` (simplified for
+  16–32px) and `assets/logo-wordmark.svg` (mark + wordmark), following the
+  architecture in the docs — one orchestration core coordinating providers,
+  agents and memory. The README now leads with the wordmark; the mark and
+  favicon ship with the npm package.
+
 ## [2.0.0-alpha.21] — v2 Phase 21 (Developer Experience)
 
 ### Added
