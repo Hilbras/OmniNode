@@ -30,7 +30,7 @@ import type { Plan } from "../types/plan.js";
 import type { Report } from "../types/report.js";
 import type { ReportService } from "../reports/index.js";
 import { aggregateReports, MAX_COMBINED_FINDINGS } from "../reports/aggregate.js";
-import type { AuditSink } from "../audit/index.js";
+import type { AuditEvent, AuditSink } from "../audit/index.js";
 import type { IPlanner } from "../planner/index.js";
 import type { PlanStore } from "../planner/store.js";
 import { HeuristicPlanner } from "../planner/heuristic.js";
@@ -101,14 +101,25 @@ export const DEFAULT_MAX_PARALLEL_STEPS = 8;
 /** Default combined-context budget for downstream steps (§24). */
 export const MAX_COMBINED_CONTEXT_CHARS = 20_000;
 
-/** Keeps the most recent context within budget, marking what was dropped. */
+/**
+ * Keeps the most recent context within budget, truncating at line boundaries
+ * where possible and marking the cut explicitly (§23 Fix 08).
+ */
 export function budgetContext(
   context: string,
   maxChars = MAX_COMBINED_CONTEXT_CHARS,
 ): string {
   if (context.length <= maxChars) return context;
-  const marker = "\n[earlier context trimmed]\n";
-  return marker + context.slice(context.length - (maxChars - marker.length));
+  const marker = "\n[CONTEXT TRUNCATED — earlier context trimmed]\n";
+  const budget = maxChars - marker.length;
+
+  // Prefer cutting at a line boundary at or before the budget.
+  const slice = context.slice(context.length - budget);
+  const firstLineBreak = slice.indexOf("\n");
+  const keep = firstLineBreak >= 0 ? slice.slice(firstLineBreak + 1) : slice;
+
+  const trimmed = `[earlier context trimmed]\n${keep}`;
+  return trimmed.length <= maxChars ? marker + keep : marker + keep.slice(0, Math.max(0, maxChars - marker.length));
 }
 
 export class PipelineEngine implements IPipelineExecutor {
@@ -286,7 +297,7 @@ export class PipelineEngine implements IPipelineExecutor {
       },
     });
     this.log.info(`Running pipeline ${def.id} as ${run.id} (attempt ${run.attempt}).`);
-    await this.options.audit?.record({
+    await this.auditSafely({
       at: new Date().toISOString(),
       action: "pipeline.run.started",
       id: run.id,
@@ -520,6 +531,15 @@ export class PipelineEngine implements IPipelineExecutor {
   }
 
   /** Registers tasks created for a step as live, so cancellation can terminate them (§9.2). */
+  /** Audit failures are observational — logged, never propagated (§23 Fix 06). */
+  private async auditSafely(event: AuditEvent): Promise<void> {
+    try {
+      await this.options.audit?.record(event);
+    } catch (error) {
+      this.log.warn(`Audit write failed (run unaffected): ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   private trackLiveTasks(runId: string | undefined, taskIds: string[]): void {
     if (!runId) return;
     const active = this.activeRuns.get(runId);
@@ -689,7 +709,7 @@ export class PipelineEngine implements IPipelineExecutor {
     }
 
     await this.options.plans?.save(plan);
-    await this.options.audit?.record({
+    await this.auditSafely({
       at: new Date().toISOString(),
       action: "plan.generated",
       id: plan.id,

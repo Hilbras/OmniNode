@@ -101,13 +101,34 @@ export function registerTaskCommands(program: Command): void {
     });
 
   task
+    .command("recover")
+    .description("Mark tasks stuck in `running` (e.g. after a crash) as unknown, per §23 Fix 02.")
+    .action(async () => {
+      const config = loadProjectConfig();
+      const engine = createTaskEngine(config);
+      const recovered = await engine.recoverStaleTasks();
+      if (recovered.length === 0) {
+        console.log("No stale running tasks.");
+        return;
+      }
+      for (const task of recovered) {
+        console.log(`${task.id}  running → unknown`);
+      }
+      console.log("Inspect each task and use `task retry <id> --run` to re-execute if safe.");
+    });
+
+  task
     .command("retry <task-id>")
     .description("Reset a failed, timed out, unknown or cancelled task to created; combine with --run to execute it again.")
     .option("--run", "Run the task again immediately after resetting it.")
     .action(async (taskId: string, options: { run?: boolean }) => {
       const config = loadProjectConfig();
       const engine = createTaskEngine(config);
+      const previous = await engine.get(taskId);
       const reset = await engine.retry(taskId);
+      if (previous?.status === "unknown") {
+        console.log("⚠ The previous execution ended in an unknown state. Retrying may duplicate side effects.");
+      }
       console.log(`Task ${reset.id} reset to "${reset.status}".`);
       if (!options.run) return;
       console.log(`Running task ${reset.id}...`);

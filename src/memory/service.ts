@@ -26,6 +26,9 @@ export interface MemoryTaskContext {
   entries: MemoryEntry[];
   /** True when the character budget cut the context short. */
   truncated: boolean;
+  /** Context size before and after truncation (§23 Fix 08 — no silent cuts). */
+  originalSize?: number;
+  finalSize?: number;
 }
 
 const DEFAULT_ENTRY_LIMIT = 8;

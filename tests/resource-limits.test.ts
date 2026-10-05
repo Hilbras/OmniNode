@@ -58,7 +58,7 @@ describe("bounded memory (§24)", () => {
     const long = "x".repeat(30_000);
     const budgeted = budgetContext(long, 1_000);
     expect(budgeted.length).toBeLessThanOrEqual(1_000);
-    expect(budgeted).toContain("[earlier context trimmed]");
+    expect(budgeted).toContain("earlier context trimmed"); // §23 Fix 08 marker
     expect(budgetContext("short", 1_000)).toBe("short");
   });
 });

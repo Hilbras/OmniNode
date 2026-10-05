@@ -13,10 +13,13 @@ export function defaultProjectConfigYaml(projectName = "My Project"): string {
   #    api_key_env_var: MY_API_KEY
 
   # CLI agents registered with OmniNode (Phase 3 wires them up).
+  # Security tip: prefer env_policy "explicit" or "allowlist" so agent
+  # processes never see OmniNode's own secrets (see docs/SECURITY.md).
   agents: []
   #  - name: opencode
   #    type: cli
   #    command: opencode
+  #    env_policy: explicit
 
   # Roles describe what an AI is supposed to do (Phase 4).
   roles: []

@@ -3,6 +3,7 @@
  * (task/pipeline transitions) in the project's .omninode directory. Useful
  * for compliance reviews and debugging multi-agent runs.
  */
+import { randomBytes } from "node:crypto";
 import { appendFile, mkdir, readFile, rename, stat } from "node:fs/promises";
 import { dirname } from "node:path";
 import { logger, type Logger } from "../logger/index.js";
@@ -31,6 +32,11 @@ export type AuditAction =
  * across task → execution → pipeline run → agent → provider (roadmap §18).
  */
 export interface AuditEvent {
+  /**
+   * Unique event id (§23 Fix 07) — audit logs describe history, they are not a
+   * replayable event stream. Assigned by the sink when omitted.
+   */
+  eventId?: string;
   at: string;
   action: AuditAction;
   project?: string;
@@ -82,11 +88,12 @@ export class FileAuditLog implements AuditSink {
 
   async record(event: AuditEvent): Promise<void> {
     try {
+      const stamped: AuditEvent = { ...event, eventId: `evt-${Date.now().toString(36)}-${randomBytes(3).toString("hex")}` };
       await mkdir(dirname(this.filePath), { recursive: true });
       await this.rotateIfNeeded();
       // Append-only: a crash can tear the last line, which `recent()` skips.
       // fsync-per-event would make every execution wait on the disk.
-      await appendFile(this.filePath, `${JSON.stringify(event)}\n`, "utf8");
+      await appendFile(this.filePath, `${JSON.stringify(stamped)}\n`, "utf8");
     } catch (error) {
       this.log.warn(
         `Audit write failed: ${error instanceof Error ? error.message : String(error)}`,

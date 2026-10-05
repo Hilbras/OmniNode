@@ -213,6 +213,12 @@ export class TaskEngine {
       if (thrown !== undefined || output === undefined) {
         const outcome = classifyThrown(thrown);
         const message = thrown instanceof Error ? thrown.message : String(thrown);
+        const unknownReason =
+          outcome === "unknown"
+            ? thrown instanceof AgentError && (thrown.details as { dispatched?: unknown } | undefined)?.dispatched === true
+              ? "dispatched then killed on timeout — completion unprovable"
+              : "execution dispatched but its outcome could not be proven"
+            : undefined;
         const retryable =
           outcome === "failed" &&
           RETRYABLE_ERROR_CODES.includes(errorCode(thrown)) &&
@@ -227,6 +233,7 @@ export class TaskEngine {
             finishedAt,
             outcome,
             error: message,
+            ...(unknownReason !== undefined ? { reason: unknownReason } : {}),
           },
         });
         this.log.warn(`Task ${current.id} attempt ${attempt} → ${outcome}: ${message}`);
@@ -261,7 +268,14 @@ export class TaskEngine {
       current = await this.transition(current, finalStatus, {
         attempt,
         result,
-        execution: { executionId, attempt, startedAt, finishedAt, outcome: finalStatus },
+        execution: {
+          executionId,
+          attempt,
+          startedAt,
+          finishedAt,
+          outcome: finalStatus,
+          result,
+        },
       });
       this.log.info(`Task ${current.id} finished: ${finalStatus}.`);
       break;
@@ -286,6 +300,25 @@ export class TaskEngine {
     return this.transition(task, "cancelled");
   }
 
+  /**
+   * Cross-process recovery (§23 Fix 02): after a crash, a task persisted as
+   * `running` has no live process and no provable outcome — it becomes
+   * `unknown`, never `completed`. Returns every task that changed.
+   */
+  async recoverStaleTasks(): Promise<Task[]> {
+    const recovered: Task[] = [];
+    for (const task of await this.options.store.list({ status: "running" })) {
+      const updated = await this.transition(task, "unknown", {
+        lastError: "OmniNode restarted while this task was running; the outcome could not be proven.",
+      });
+      recovered.push(updated);
+    }
+    if (recovered.length > 0) {
+      this.log.warn(`Recovered ${recovered.length} stale running task(s) as unknown.`);
+    }
+    return recovered;
+  }
+
   /** Error recovery: reset a failed/cancelled/unknown/timed_out task so it can run again. */
   async retry(id: string): Promise<Task> {
     const task = await this.mustGet(id);
@@ -296,10 +329,14 @@ export class TaskEngine {
         `Only failed, timed out, unknown or cancelled tasks can be retried — task ${id} is "${task.status}".`,
       );
     }
-    const { result: _discarded, ...rest } = task;
+    // Fix 01 (§23): a retry is a NEW execution attempt, not a rewrite of
+    // history. The previous result stays available as `lastResult`, and the
+    // full attempt history is preserved untouched.
     const reset: Task = {
-      ...rest,
+      ...task,
       status: "created",
+      lastResult: task.result,
+      result: undefined,
       updatedAt: new Date().toISOString(),
     };
     await this.options.store.save(reset);
@@ -361,6 +398,20 @@ export class TaskEngine {
     executionId?: string,
   ): Promise<void> {
     // Correlation (§18): every event carries task/pipeline/agent/execution ids.
+    try {
+      await this.auditOrThrow(action, task, detail, executionId);
+    } catch (error) {
+      // §23 Fix 06: audit state is observational — never corrupt execution.
+      this.log.warn(`Audit write failed (execution unaffected): ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async auditOrThrow(
+    action: AuditAction,
+    task: Task,
+    detail?: Record<string, unknown>,
+    executionId?: string,
+  ): Promise<void> {
     await this.options.audit?.record({
       at: new Date().toISOString(),
       action,

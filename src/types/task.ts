@@ -38,7 +38,11 @@ export interface ExecutionRecord {
   startedAt: string;
   finishedAt: string;
   outcome: "completed" | "failed" | "timed_out" | "unknown" | "cancelled";
+  /** The attempt's own result snapshot — preserved across retries (§23 Fix 01). */
+  result?: TaskResult;
   error?: string;
+  /** Why the outcome is unprovable, for `unknown` executions (§23 Fix 03). */
+  reason?: string;
 }
 
 export interface TaskContext {
@@ -89,6 +93,8 @@ export interface Task {
   attempt: number;
   /** Error from the most recent failed/unknown attempt. */
   lastError?: string;
+  /** Result of the previous attempt, preserved across retries (§23 Fix 01). */
+  lastResult?: TaskResult;
   /** Recent execution attempts, newest last, bounded in length. */
   executions?: ExecutionRecord[];
   result?: TaskResult;

@@ -17,6 +17,7 @@ project:
     #   api_key_env_var: OMNIHILBRAS_API_KEY
 
   agents:
+    # Security tip: prefer env_policy "explicit" or "allowlist" (see docs/SECURITY.md)
     - name: opencode
       type: cli
       command: opencode

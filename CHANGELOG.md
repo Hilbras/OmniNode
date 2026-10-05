@@ -4,6 +4,43 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.1] — hardening & fixes (per docs/ROADMAP_HARDENING.md)
+
+### Fixed
+
+- **Execution history preserved across retries** (Fix 01): a retry no longer
+  clears the previous result — it moves to `task.lastResult` and every attempt
+  keeps a full `ExecutionRecord` (id, attempt, timestamps, outcome, result
+  snapshot, error).
+- **Restart recovery** (Fix 02): `omninode task recover` marks tasks stuck in
+  `running` after a crash as `unknown` — never silently `completed`.
+- **Unknown-state detail** (Fix 03): unknown executions record *why* the
+  outcome is unprovable, and `task retry` on an unknown task warns that
+  retrying may duplicate side effects.
+- **Audit failure isolation** (Fix 06): audit write failures are logged and
+  never change execution semantics.
+- **Audit event ids** (Fix 07): every audit event carries `eventId`.
+- **Context truncation safety** (Fix 08): memory context truncates at line
+  boundaries with an explicit `[CONTEXT TRUNCATED]` marker, exposing
+  original/final sizes; pipeline context budget keeps the most recent lines
+  and marks the cut.
+
+### Added
+
+- `omninode task recover`.
+- `task.lastResult` and `ExecutionRecord.result`/`reason`.
+- docs/REMEMBERA_API.md — the formal Remembera API contract (`remembera-api/v1`).
+- Migration matrix, failure-matrix expansion, env-policy guidance in the
+  init template and example config, package/public-API validation tests.
+- Migration matrix suite (`tests/migration-matrix.test.ts`) — v1 data shapes,
+  idempotence, corrupt/future handling.
+- npm `verify` script and `gates` release checks.
+
+### Changed
+
+- npm audit: upgraded to vitest 5 / vite 7 — dev-only advisories resolved;
+  `npm audit --omit=dev` reports 0 vulnerabilities.
+
 ## [2.0.0] — the reliability & interoperability release
 
 The complete v2 roadmap (24 phases) shipped as tagged prereleases
