@@ -166,7 +166,7 @@ describe("CLI: omninode migrate", () => {
     await new FileTaskStore(path.join(workDir, ".omninode")).save(task("t1"));
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await createProgram().parseAsync(["node", "omninode", "migrate"]);
-    expect(log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n")).toContain("All stores are at schema");
+    expect(log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n")).toContain("current (no v1 patterns)");
     expect(existsSync(path.join(workDir, ".omninode/tasks.json"))).toBe(true);
   });
 });

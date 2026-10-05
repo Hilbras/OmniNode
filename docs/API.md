@@ -58,7 +58,7 @@ part of the contract.
 
 `loadConfig`, `loadConfigDetailed`, `LoadConfigResult`, `findConfigFile`,
 `expandEnvRefs`, `scanForInlineSecrets`, `describeSecretFindings`,
-`configDiagnostics`, `mergeConfig`, `resolveProfile`, `userConfigPath`,
+`configDiagnostics`, `findConfigV1Patterns`, `applyConfigMigration`, `mergeConfig`, `resolveProfile`, `userConfigPath`,
 `KNOWN_PROFILES`, `ConfigSources`, the zod schemas (`appConfigSchema`, `providerConfigSchema`,
 `agentConfigSchema`, `roleConfigSchema`, `pipelineConfigSchema`,
 `plannerConfigSchema`), `AppConfig`, and `defaultProjectConfigYaml` — Stable

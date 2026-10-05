@@ -14,18 +14,45 @@ changed, what is deprecated, and how to move a project forward.
 | `query` / `write` memory aliases | deprecated, still functional |
 | Human-facing CLI output | unchanged where it matters; `--json` added |
 
-## Storage migration
+## The migration tool
 
-v1 wrote bare JSON arrays; v2 writes `{ "schemaVersion": 2, "items": [...] }`.
+One command covers both categories, with a dry run first:
 
 ```bash
-omninode migrate --check   # report what would change
-omninode migrate           # rewrite in place (idempotent)
+omninode migrate --check   # report only — nothing is written
+omninode migrate           # apply
 ```
 
-Automatic in practice: a v1 file is read correctly and rewritten at the
-current schema on the next write. Files written by a **newer** OmniNode are
-refused rather than misread.
+Sample output:
+
+```
+storage:
+  tasks.json       v1-legacy  migrated 2 → 2 item(s)
+  pipelines.json   current    1 item(s)
+  reports.json     missing
+  plans.json       missing
+  memory.json      missing
+configuration:
+  omninode.yaml    implicit input_mode → input_mode: stdin (project.agents.0)
+  omninode.yaml    inherit_env: false → env_policy: explicit (project.agents.1)
+  omninode.yaml    implicit provider → provider: local (project.memory.provider)
+
+2 item(s) migrated to the v2 shape.
+```
+
+**Storage**: v1 bare-array documents are rewritten as schema-versioned
+envelopes in place; the command is idempotent; corrupt files are reported
+(never rewritten), and files from a newer OmniNode are refused.
+
+**Configuration**: v1 patterns are rewritten with comments and formatting
+preserved, and the result is schema-validated before the file is written:
+- `inherit_env: false` → `env_policy: explicit`
+- agents without `input_mode` → `input_mode: stdin`
+- a memory section without `provider` → `provider: local`
+
+A memory section is only touched if the user configured memory at all — a
+project that opted out stays opted out. `config validate` remains the tool
+for schema/secret checks.
 
 ## Configuration additions
 

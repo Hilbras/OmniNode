@@ -9,7 +9,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@hilbras/omninode)](https://www.npmjs.com/package/@hilbras/omninode)
 [![Node.js support](https://img.shields.io/node/v/@hilbras/omninode)](https://www.npmjs.com/package/@hilbras/omninode)
 [![License: MIT](https://img.shields.io/github/license/Hilbras/OmniNode)](LICENSE)
-[![v2 progress](https://img.shields.io/badge/v2-22%20%2F%2024%20phases-8A2BE2)](docs/ROADMAP_V2.md)
+[![v2 progress](https://img.shields.io/badge/v2-23%20%2F%2024%20phases-8A2BE2)](docs/ROADMAP_V2.md)
 
 **OmniNode** is a provider-agnostic multi-AI orchestration platform. It coordinates
 CLI-based AI agents, AI providers, persistent memory, roles, reports and planning
@@ -40,7 +40,7 @@ release — is in progress**, shipping as tagged prereleases (`v2.0.0-alpha.N`).
 | End-to-end workflow in one command | `omninode run <pipeline> "<objective>"` |
 | Audit log, security model, examples, Docker runtime | [`src/audit/`](src/audit), [docs/SECURITY.md](docs/SECURITY.md) |
 
-### v2.0.0 progress (22 of 24 phases)
+### v2.0.0 progress (23 of 24 phases)
 
 | # | Phase | Outcome |
 | --- | --- | --- |
@@ -66,7 +66,8 @@ release — is in progress**, shipping as tagged prereleases (`v2.0.0-alpha.N`).
 | 20 | Performance & resources | bounded reports/context/audit log, concurrency limits, released handles |
 | 21 | Developer experience | predictable scripts, local dev guide, verified extension guides |
 | 22 | CI/CD hardening | release gates (version/package/secrets), audit, Node 20/22/24 |
-| 23–24 | Migration tooling · final hardening | next: migration |
+| 23 | Migration tooling | `omninode migrate` covers storage + config v1 patterns |
+| 24 | Final hardening | next: full system audit |
 
 The roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the completed v1 plan is
 [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md).

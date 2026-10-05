@@ -4,6 +4,23 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.23] — v2 Phase 23 (Migration from v1 to v2)
+
+### Added
+
+- **Configuration migration** (§23): `findConfigV1Patterns()` /
+  `applyConfigMigration()` rewrite v1 patterns in omninode.yaml with comments
+  and formatting preserved, schema-validating the result before writing:
+  `inherit_env: false` → `env_policy: explicit`, explicit `input_mode: stdin`,
+  and `memory.provider: local` (only when a memory section exists — a project
+  that opted out stays opted out).
+- **`omninode migrate` extended** to cover both categories in one report:
+  storage files (schema migration) and configuration (v1 patterns), honoring
+  `--check` for a dry run.
+- MIGRATION.md documents the tool and every migration category (API, config,
+  storage, CLI, protocol, provider config, pipeline definitions).
+- Tests: 480 (was 466).
+
 ## [2.0.0-alpha.22] — v2 Phase 22 (CI/CD Hardening)
 
 ### Added

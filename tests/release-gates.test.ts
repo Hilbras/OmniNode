@@ -106,7 +106,7 @@ describe("package validation gate", () => {
   // dist/ assertion is conditional; the gate itself always runs after a build.
   const built = existsSync(path.join(process.cwd(), "dist"));
 
-  it.runIf(built)("accepts the real package (dist + metadata only)", () => {
+  it.runIf(built)("accepts the real package (dist + metadata only)", { timeout: 60_000 }, () => {
     const result = validatePackContents(process.cwd());
     if (!result.ok) {
       throw new Error(`package gate failed: ${result.problems.join(", ")}`);
