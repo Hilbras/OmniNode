@@ -7,15 +7,8 @@
 import { PROTOCOL_V2 } from "./version.js";
 import { envelope, type ProtocolEnvelope } from "./types.js";
 
-export interface AgentDescriptor {
-  /** Protocol the agent speaks. */
-  protocol: string;
-  name: string;
-  version?: string;
-  capabilities: string[];
-  /** Message types the agent can emit. */
-  supports: string[];
-}
+import type { AgentDescriptor } from "../types/agent-protocol.js";
+export type { AgentDescriptor };
 
 export type HelloResult =
   | { ok: true; descriptor: AgentDescriptor }

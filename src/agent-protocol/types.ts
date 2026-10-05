@@ -90,11 +90,8 @@ export interface ReportPayload {
 }
 
 /** A question an agent asked during a run, with the answer OmniNode gave (if any). */
-export interface AskedQuestion {
-  questionId: string;
-  question: string;
-  answer?: string;
-}
+import type { AskedQuestion } from "../types/agent-protocol.js";
+export type { AskedQuestion };
 
 export function newMessageId(prefix = "msg"): string {
   const random = Math.random().toString(36).slice(2, 10);

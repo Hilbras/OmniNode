@@ -1,6 +1,5 @@
 /** Agent abstraction: CLI agents and custom agents plug in via adapters (§9–§10). */
-import type { AskedQuestion } from "../agent-protocol/types.js";
-import type { AgentDescriptor } from "../agent-protocol/handshake.js";
+import type { AgentDescriptor, AskedQuestion } from "./agent-protocol.js";
 import type { Report } from "./report.js";
 import type { RoleDefinition } from "./role.js";
 

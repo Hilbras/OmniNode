@@ -4,6 +4,44 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0] — the reliability & interoperability release
+
+The complete v2 roadmap (24 phases) shipped as tagged prereleases
+(`2.0.0-alpha.1` → `2.0.0-alpha.23`) and is now stable. Highlights versus v1:
+
+### Reliability
+- Strict execution state machine: `unknown` (timeout ≠ failure),
+  `timed_out`, `partially_completed`; invalid transitions rejected
+- Bounded retries with backoff and a retryable-error allow-list
+- Execution identity: per-attempt `executionId`, cumulative attempt
+  counters, execution history
+- First-class pipeline cancellation; interrupted-run recovery awareness
+
+### Interoperability
+- **Agent Protocol v2** (`omninode-agent-protocol/2`): versioned, correlated
+  envelopes, complete message set, handshake, interactive questions,
+  malformed input that can never crash OmniNode, standardized artifacts
+- Native agent adapter registry; env policies (inherit/allowlist/denylist/
+  explicit); process-tree cleanup; output limits; cwd confinement
+
+### Infrastructure
+- Persistence v2: fsynced atomic writes, corruption quarantine, schema
+  versioning, `omninode migrate` (storage + config), canonical store
+  interfaces
+- Provider v2: model metadata, discovery, normalized error kinds
+- Report v2: schema validation, typed evidence, provenance, aggregation with
+  agreements/conflicts
+- Configuration v2: precedence, profiles, `OMNINODE_*` overrides, actionable
+  diagnostics
+- Audit v2: correlated events; JSON logs; `inspect` diagnostics; resource
+  limits everywhere; security hardening with honest trust-model docs;
+  documented CLI exit codes; failure-matrix test suite (480 tests)
+
+### Migration
+See [docs/MIGRATION.md](docs/MIGRATION.md). v1 configuration files, CLI
+commands and public APIs keep working; run `omninode migrate` to upgrade
+stored data.
+
 ## [2.0.0-alpha.23] — v2 Phase 23 (Migration from v1 to v2)
 
 ### Added
