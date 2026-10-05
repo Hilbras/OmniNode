@@ -154,7 +154,7 @@ describe("CLI: omninode security audit", () => {
     ]);
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await createProgram().parseAsync(["node", "omninode", "security", "audit"]);
-    const output = log.mock.calls.map((c) => c.join(" ")).join("\n");
+    const output = log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n");
     expect(output).toContain('agent "inherits"');
     expect(output).toContain("inherits the full environment");
     expect(output).toContain("Trust model");
@@ -165,6 +165,6 @@ describe("CLI: omninode security audit", () => {
     await createProgram().parseAsync(["node", "omninode", "init"]);
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await createProgram().parseAsync(["node", "omninode", "security", "audit"]);
-    expect(log.mock.calls.map((c) => c.join(" ")).join("\n")).toContain("no findings");
+    expect(log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n")).toContain("no findings");
   });
 });

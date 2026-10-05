@@ -31,7 +31,7 @@ function capture(): ReturnType<typeof vi.spyOn> {
 }
 
 function output(log: ReturnType<typeof vi.spyOn>): string {
-  return log.mock.calls.map((c) => c.join(" ")).join("\n");
+  return log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n");
 }
 
 describe("exit codes (§19)", () => {
@@ -64,19 +64,19 @@ describe("config group (§19)", () => {
     ]);
     delete process.env.TEST_GW_KEY;
 
-    let log = capture();
+    const log = capture();
     await createProgram().parseAsync(["node", "omninode", "config", "show"]);
     const text = output(log);
     expect(text).toContain("providers: gw (openai-compatible, key=$TEST_GW_KEY)");
     expect(text).not.toContain("super-secret-value");
 
-    log = capture();
+    log.mockClear();
     await createProgram().parseAsync(["node", "omninode", "config", "show", "--json"]);
     const json = JSON.parse(output(log));
     expect(json.providers[0].apiKeyEnvVar).toBe("TEST_GW_KEY");
     expect(output(log)).not.toContain("super-secret-value");
 
-    log = capture();
+    log.mockClear();
     await createProgram().parseAsync(["node", "omninode", "config", "validate"]);
     expect(output(log)).toContain("is valid");
   });
@@ -128,11 +128,11 @@ describe("provider remove (§19)", () => {
     await createProgram().parseAsync([
       "node", "omninode", "provider", "add", "--name", "gw", "--base-url", "https://gw.test/v1",
     ]);
-    const removed = capture();
-    await createProgram().parseAsync(["node", "omninode", "provider", "remove", "gw"]);
-    expect(output(removed)).toContain('Removed provider "gw"');
-
     const log = capture();
+    await createProgram().parseAsync(["node", "omninode", "provider", "remove", "gw"]);
+    expect(output(log)).toContain('Removed provider "gw"');
+
+    log.mockClear();
     await createProgram().parseAsync(["node", "omninode", "provider", "list", "--json"]);
     expect(JSON.parse(output(log))).toEqual([]);
   });

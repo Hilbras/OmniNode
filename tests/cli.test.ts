@@ -74,7 +74,7 @@ describe("CLI", () => {
 
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await createProgram().parseAsync(["node", "omninode", "provider", "list"]);
-    const output = log.mock.calls.map((call) => call.join(" ")).join("\n");
+    const output = log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n");
     expect(output).toContain("gw");
     expect(output).toContain("$SECRET_KEY");
     expect(output).not.toContain("sk-");

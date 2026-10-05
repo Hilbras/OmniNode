@@ -35,7 +35,7 @@ function capture(): ReturnType<typeof vi.spyOn> {
 }
 
 function outputOf(log: ReturnType<typeof capture>): string {
-  return log.mock.calls.map((call) => call.join(" ")).join("\n");
+  return log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n");
 }
 
 async function setupProjectWithAgentAndRole(): Promise<void> {
@@ -63,7 +63,7 @@ describe("CLI task commands", () => {
     await setupProjectWithAgentAndRole();
     expect(loadConfig().project.roles[0]?.id).toBe("planner");
 
-    let log = capture();
+    const log = capture();
     await createProgram().parseAsync([
       "node", "omninode", "task", "create", "audit the repository",
       "--role", "planner", "--agent", "worker",
@@ -73,13 +73,13 @@ describe("CLI task commands", () => {
     const taskId = /task-[a-z0-9-]+/.exec(output)?.[0];
     expect(taskId).toBeDefined();
 
-    log = capture();
+    log.mockClear();
     await createProgram().parseAsync(["node", "omninode", "task", "run", taskId!]);
     output = outputOf(log);
     expect(output).toContain("status:  completed");
     expect(output).toContain("summary: WORK DONE");
 
-    log = capture();
+    log.mockClear();
     await createProgram().parseAsync(["node", "omninode", "task", "status", taskId!]);
     output = outputOf(log);
     expect(output).toContain("role:    planner");

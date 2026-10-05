@@ -181,7 +181,7 @@ describe("CLI inspect diagnostics (§18)", () => {
     log.mockClear();
 
     await createProgram().parseAsync(["node", "omninode", "task", "inspect", taskId]);
-    const output = log.mock.calls.map((c) => c.join(" ")).join("\n");
+    const output = log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n");
     expect(output).toContain(`Task ${taskId}`);
     expect(output).toContain("agent:     worker");
     expect(output).toContain("executions:");
@@ -212,7 +212,7 @@ describe("CLI inspect diagnostics (§18)", () => {
     };
 
     await createProgram().parseAsync(["node", "omninode", "pipeline", "inspect", runs.items[0]!.id]);
-    const output = log.mock.calls.map((c) => c.join(" ")).join("\n");
+    const output = log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n");
     expect(output).toContain("steps:");
     expect(output).toContain("do");
     expect(output).toMatch(/do\s+completed/);
@@ -225,7 +225,7 @@ describe("CLI inspect diagnostics (§18)", () => {
     ]);
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await createProgram().parseAsync(["node", "omninode", "agent", "inspect", "isolated"]);
-    expect(log.mock.calls.map((c) => c.join(" ")).join("\n")).toContain("env policy:  explicit");
+    expect(log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n")).toContain("env policy:  explicit");
     log.mockClear();
 
     await createProgram().parseAsync([
@@ -233,7 +233,7 @@ describe("CLI inspect diagnostics (§18)", () => {
       "--base-url", "https://gw.test/v1", "--api-key-env-var", "GW_KEY",
     ]);
     await createProgram().parseAsync(["node", "omninode", "provider", "inspect", "gw"]);
-    const output = log.mock.calls.map((c) => c.join(" ")).join("\n");
+    const output = log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n");
     expect(output).toContain("auth:          bearer ($GW_KEY)");
     expect(output).toContain("credentials:");
   });

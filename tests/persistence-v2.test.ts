@@ -148,14 +148,14 @@ describe("CLI: omninode migrate", () => {
 
     const check = vi.spyOn(console, "log").mockImplementation(() => {});
     await createProgram().parseAsync(["node", "omninode", "migrate", "--check"]);
-    const checkOutput = check.mock.calls.map((c) => c.join(" ")).join("\n");
+    const checkOutput = check.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n");
     expect(checkOutput).toContain("tasks.json");
     expect(checkOutput).toContain("would migrate");
     expect(Array.isArray(JSON.parse(readFileSync(path.join(storeDir, "tasks.json"), "utf8")))).toBe(true);
 
     check.mockClear();
     await createProgram().parseAsync(["node", "omninode", "migrate"]);
-    const applyOutput = check.mock.calls.map((c) => c.join(" ")).join("\n");
+    const applyOutput = check.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n");
     expect(applyOutput).toContain("migrated");
     const doc = JSON.parse(readFileSync(path.join(storeDir, "tasks.json"), "utf8")) as { schemaVersion: number };
     expect(doc.schemaVersion).toBe(SCHEMA_VERSION);
@@ -166,7 +166,7 @@ describe("CLI: omninode migrate", () => {
     await new FileTaskStore(path.join(workDir, ".omninode")).save(task("t1"));
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await createProgram().parseAsync(["node", "omninode", "migrate"]);
-    expect(log.mock.calls.map((c) => c.join(" ")).join("\n")).toContain("All stores are at schema");
+    expect(log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n")).toContain("All stores are at schema");
     expect(existsSync(path.join(workDir, ".omninode/tasks.json"))).toBe(true);
   });
 });

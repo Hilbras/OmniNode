@@ -25,7 +25,7 @@ function capture(): ReturnType<typeof vi.spyOn> {
 }
 
 function outputOf(log: ReturnType<typeof capture>): string {
-  return log.mock.calls.map((call) => call.join(" ")).join("\n");
+  return log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n");
 }
 
 async function setupProjectWithPipeline(): Promise<void> {
@@ -68,13 +68,13 @@ describe("CLI report commands", () => {
   it("a pipeline run collects, stores and combines reports end to end", async () => {
     await setupProjectWithPipeline();
 
-    let log = capture();
+    const log = capture();
     await createProgram().parseAsync(["node", "omninode", "pipeline", "run", "audit", "audit the code"]);
     const runOutput = outputOf(log);
     expect(runOutput).toContain("Pipeline completed");
     expect(runOutput).toContain("combined report: combined-");
 
-    log = capture();
+    log.mockClear();
     await createProgram().parseAsync(["node", "omninode", "report", "list"]);
     const listOutput = outputOf(log);
     expect(listOutput).toContain("worker");
@@ -82,7 +82,7 @@ describe("CLI report commands", () => {
     expect(listOutput).toContain("WORKER-OK");
     expect(listOutput).toContain("HELPER-OK");
 
-    log = capture();
+    log.mockClear();
     await createProgram().parseAsync(["node", "omninode", "report", "combined"]);
     const combinedOutput = outputOf(log);
     expect(combinedOutput).toContain("combined-");
@@ -90,7 +90,7 @@ describe("CLI report commands", () => {
 
     const combinedId = /combined-[a-z0-9-]+/.exec(combinedOutput)?.[0];
     expect(combinedId).toBeDefined();
-    log = capture();
+    log.mockClear();
     await createProgram().parseAsync(["node", "omninode", "report", "show", combinedId!]);
     const showOutput = outputOf(log);
     expect(showOutput).toContain("Combined report");

@@ -25,7 +25,7 @@ function capture(): ReturnType<typeof vi.spyOn> {
 }
 
 function outputOf(log: ReturnType<typeof capture>): string {
-  return log.mock.calls.map((call) => call.join(" ")).join("\n");
+  return log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n");
 }
 
 describe("CLI agent commands", () => {

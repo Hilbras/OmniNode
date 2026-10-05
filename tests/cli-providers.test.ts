@@ -48,7 +48,7 @@ function silenceLog(): ReturnType<typeof vi.spyOn> {
 }
 
 function outputOf(log: ReturnType<typeof silenceLog>): string {
-  return log.mock.calls.map((call) => call.join(" ")).join("\n");
+  return log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n");
 }
 
 describe("CLI provider commands", () => {

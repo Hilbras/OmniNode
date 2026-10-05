@@ -214,7 +214,7 @@ describe("CLI: --config, --profile, config profiles/validate", () => {
     await createProgram().parseAsync([
       "node", "omninode", "--config", other, "config", "path",
     ]);
-    expect(log.mock.calls.map((c) => c.join(" ")).join("\n")).toContain("other.yaml");
+    expect(log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n")).toContain("other.yaml");
   });
 
   it("config profiles lists the active and defined profiles", async () => {
@@ -225,7 +225,7 @@ describe("CLI: --config, --profile, config profiles/validate", () => {
     );
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await createProgram().parseAsync(["node", "omninode", "config", "profiles"]);
-    const output = log.mock.calls.map((c) => c.join(" ")).join("\n");
+    const output = log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n");
     expect(output).toContain("active:  development");
     expect(output).toContain("defined: development, production");
   });
@@ -238,7 +238,7 @@ describe("CLI: --config, --profile, config profiles/validate", () => {
     );
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await createProgram().parseAsync(["node", "omninode", "config", "validate"]);
-    const output = log.mock.calls.map((c) => c.join(" ")).join("\n");
+    const output = log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n");
     expect(output).toContain("profile:  testing");
     expect(output).toContain('Provider "gw": API key reference is missing');
   });

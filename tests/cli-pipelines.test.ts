@@ -61,7 +61,7 @@ function capture(): ReturnType<typeof vi.spyOn> {
 }
 
 function outputOf(log: ReturnType<typeof capture>): string {
-  return log.mock.calls.map((call) => call.join(" ")).join("\n");
+  return log.mock.calls.map((call: unknown[]) => call.join(" ")).join("\n");
 }
 
 async function setupProject(): Promise<void> {
@@ -109,11 +109,11 @@ describe("CLI pipeline commands", () => {
   it("list, run and inspect a full pipeline against a local gateway", async () => {
     await setupProject();
 
-    let log = capture();
+    const log = capture();
     await createProgram().parseAsync(["node", "omninode", "pipeline", "list"]);
     expect(outputOf(log)).toContain("audit  Audit Pipeline  3 step(s)");
 
-    log = capture();
+    log.mockClear();
     await createProgram().parseAsync([
       "node", "omninode", "pipeline", "run", "audit", "audit the repository",
     ]);
@@ -125,11 +125,11 @@ describe("CLI pipeline commands", () => {
     const runId = /run-[a-z0-9-]+/.exec(runOutput)?.[0];
     expect(runId).toBeDefined();
 
-    log = capture();
+    log.mockClear();
     await createProgram().parseAsync(["node", "omninode", "pipeline", "runs", "audit"]);
     expect(outputOf(log)).toContain(runId!);
 
-    log = capture();
+    log.mockClear();
     await createProgram().parseAsync(["node", "omninode", "pipeline", "status", runId!]);
     const statusOutput = outputOf(log);
     expect(statusOutput).toContain("pipeline:   audit");
