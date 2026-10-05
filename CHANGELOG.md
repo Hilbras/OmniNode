@@ -4,6 +4,24 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.0-alpha.21] — v2 Phase 21 (Developer Experience)
+
+### Added
+
+- **Predictable script surface** (§25): `build`, `watch`, `clean`, `test`,
+  `test:watch`, `lint`, `typecheck`, `format`, `verify` (lint + typecheck +
+  test + build — the same gate CI runs), and `cli` to run the CLI from source.
+  `prepublishOnly` keeps the published artifact tested.
+- **docs/DEVELOPMENT.md** — local setup: Node/npm requirements, every script,
+  running the CLI from source, environment variables, test setup, a
+  keyless local provider (Ollama), and a stub agent for experimenting.
+- **docs/EXTENDING.md** — extension guides for creating a **Provider**,
+  **Agent adapter**, **Storage adapter**, **Memory adapter** and **Planner**,
+  each with rules that keep the core untouched. All six code samples are
+  compiled against the real public API as part of this phase (three errors
+  were found and fixed that way: a private `config` violating `IProvider`
+  and two undefined placeholder types).
+
 ## [2.0.0-alpha.20] — v2 Phase 20 (Performance & Resource Management)
 
 ### Added

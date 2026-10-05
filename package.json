@@ -1,6 +1,6 @@
 {
   "name": "@hilbras/omninode",
-  "version": "2.0.0-alpha.20",
+  "version": "2.0.0-alpha.21",
   "description": "Provider-agnostic multi-AI orchestration platform: coordinates CLI agents, AI providers, memory, roles, reports and planning into one execution system.",
   "type": "module",
   "license": "MIT",
@@ -45,12 +45,15 @@
   "scripts": {
     "build": "tsup",
     "watch": "tsup --watch",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
-    "cli": "tsx src/cli/index.ts"
+    "verify": "npm run lint && npm run typecheck && npm test && npm run build",
+    "cli": "tsx src/cli/index.ts",
+    "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {
     "commander": "^12.1.0",

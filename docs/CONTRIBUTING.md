@@ -29,12 +29,14 @@ releasable.
 ```bash
 git switch -c feat/my-change
 # … implement …
-npm test          # must pass; add tests for the failure modes you touch
-npm run lint      # eslint, zero warnings tolerated
-npm run typecheck # strict TypeScript, zero errors
+npm run verify     # lint + typecheck + test + build — the same gate CI runs
 git commit -m "…"
 git push -u origin feat/my-change
 ```
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for the full local setup and
+[EXTENDING.md](EXTENDING.md) for the extension guides (all samples there are
+compiled against the public API).
 
 ## What a good change looks like here
 
