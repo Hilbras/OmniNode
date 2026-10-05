@@ -24,9 +24,9 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      # Dependency audit (security section of the roadmap).
-      - run: npm audit --audit-level=high
-      if: matrix.node == 24
+      # Dependency audit (security section of the roadmap) — once, to avoid noise.
+      - if: matrix.node == 24
+        run: npm audit --audit-level=high
 
   gates:
     runs-on: ubuntu-latest
