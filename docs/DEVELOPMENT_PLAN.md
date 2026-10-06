@@ -1,5 +1,11 @@
 # OmniNode — Complete Development Plan
 
+> **Status: HISTORICAL / COMPLETED.** This is the v1 development plan; it
+> shipped as **v1.0.0**. The v2 architecture and all 24 roadmap phases shipped
+> as **v2.0.0** (see [ROADMAP_V2.md](ROADMAP_V2.md)), and the project is now on
+> the v2.0.x hardening line. Retained for reference only — it is no longer an
+> active target.
+
 ## 1. Product Overview
 
 **OmniNode** is a provider-agnostic multi-AI orchestration platform that connects CLI-based AI agents, AI providers, persistent memory, roles, reports, and planning into a unified execution system.

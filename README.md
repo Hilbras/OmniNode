@@ -9,7 +9,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@hilbras/omninode)](https://www.npmjs.com/package/@hilbras/omninode)
 [![Node.js support](https://img.shields.io/node/v/@hilbras/omninode)](https://www.npmjs.com/package/@hilbras/omninode)
 [![License: MIT](https://img.shields.io/github/license/Hilbras/OmniNode)](LICENSE)
-[![v2.0.0](https://img.shields.io/badge/v2.0.0-stable-4F46E5)](docs/ROADMAP_V2.md)
+[![v2.0.2](https://img.shields.io/badge/v2.0.2-stable-4F46E5)](docs/ROADMAP_V2.md)
 
 **OmniNode** is a provider-agnostic multi-AI orchestration platform. It coordinates
 CLI-based AI agents, AI providers, persistent memory, roles, reports and planning
@@ -22,8 +22,10 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v1.0.0 is feature complete. v2.0.0 — the reliability and interoperability
-release — is in progress**, shipping as tagged prereleases (`v2.0.0-alpha.N`).
+**v2.0.2 is the current stable release.** The v2.0.0 reliability and
+interoperability release shipped all 24 roadmap phases; v2.0.1 and v2.0.2
+were hardening and consistency releases on top of it. **v2.0.3 — the final
+hardening and release-polish pass — is in progress.**
 
 ### v1.0.0 delivered
 
@@ -98,19 +100,23 @@ The roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the completed v1 plan i
 ## Roadmap
 
 The v1 plan (phases 0–11) is complete and shipped as **v1.0.0** — see
-[docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md). The v2 roadmap
-(24 phases) is in progress — see [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md):
+[docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md) (historical). The v2
+roadmap (24 phases) is complete and shipped as **v2.0.0** — see
+[docs/ROADMAP_V2.md](docs/ROADMAP_V2.md). Subsequent v2.0.x releases
+(currently **v2.0.2**, with **v2.0.3** in progress) are hardening,
+consistency and release-quality passes over that completed architecture.
 
 | Version | Milestone |
 | --- | --- |
 | v0.1.0 – v0.10.0 | Foundation → end-to-end workflow |
 | **v1.0.0** | Production Release (v1 plan complete) |
 | **v2.0.0** | Reliability & interoperability release (all 24 phases complete) |
+| v2.0.1 – v2.0.2 | Hardening, fixes & documentation consistency |
 
-Install prereleases with:
+Install the stable release with:
 
 ```bash
-npm install -g @hilbras/omninode@next
+npm install -g @hilbras/omninode
 ```
 
 Core architectural rule: OmniNode must run successfully with **zero Hilbras
@@ -120,8 +126,8 @@ required for the core engine.
 ## Install
 
 ```bash
-npm install -g @hilbras/omninode          # stable (v2.0.0)
-npm install -g @hilbras/omninode@next     # v2 prereleases
+npm install -g @hilbras/omninode          # stable (v2.0.2)
+npm install -g @hilbras/omninode@next    # v2.0.3 prereleases
 ```
 
 Or as a library: `npm install @hilbras/omninode`. Node.js 20+.

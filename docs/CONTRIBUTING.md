@@ -22,8 +22,8 @@ processes.
 branch → implementation → tests → lint → typecheck → review → release
 ```
 
-Every phase of the v2 roadmap ships as its own tagged prerelease
-(`v2.0.0-alpha.N`), so keep changes small, coherent and independently
+Every v2.0.x hardening release ships as its own tagged prerelease
+(`v2.0.3-alpha.N`), so keep changes small, coherent and independently
 releasable.
 
 ```bash

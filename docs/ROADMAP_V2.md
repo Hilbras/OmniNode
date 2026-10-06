@@ -1,8 +1,13 @@
 # OmniNode v2.0.0 — Complete Development Roadmap
 
+> **Status: COMPLETED.** Every phase in this roadmap shipped as v2.0.0; the
+> v2.0.x line has since received hardening releases (v2.0.1, v2.0.2) and is
+> preparing v2.0.3. This document is retained as the historical plan for the
+> v2 architecture and is no longer an in-progress target.
+
 **Project:** Hilbras OmniNode  
-**Current Version:** v1.0.0  
-**Target Version:** v2.0.0  
+**Current Version:** v2.0.2 (v2.0.3 in progress)  
+**Completed Version:** v2.0.0 (all 24 phases shipped)  
 **Package:** `@hilbras/omninode`  
 **License:** MIT  
 **Runtime:** Node.js 20+  

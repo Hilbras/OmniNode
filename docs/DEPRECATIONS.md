@@ -13,10 +13,11 @@ until the next major release after it is listed here (see
 The re-export exists so v1 code keeps compiling; new code should treat
 `ChatFn` as a plain function type in the chat contracts.
 
-## Planned renames (v2 roadmap Phase 1 / Phase 23)
+## Planned renames (designed in v2 roadmap Phase 1 / Phase 23)
 
-These v1 names are kept stable for now; the roadmap's target names will be
-introduced as aliases first and only replace them in a major release:
+These v1 names are kept stable; the roadmap's target names will be
+introduced as aliases first and only replace them in a major release
+(the v2 phases shipped without breaking them):
 
 | v1 name | v2 target name |
 | --- | --- |
