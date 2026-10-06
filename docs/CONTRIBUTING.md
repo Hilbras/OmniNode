@@ -67,10 +67,37 @@ compiled against the public API).
 ## Releasing
 
 Releases are tag-driven: pushing `vX.Y.Z` runs [release.yml](.github/workflows/release.yml),
-which re-runs the full gate before publishing to npm and creating the GitHub
-release. To publish, add the repository secret `NPM_TOKEN` (an npm automation
-token with publish access for the `@hilbras` scope) under
-*Settings → Secrets and variables → Actions*.
+which re-runs the full gate (lint, typecheck, tests, build) before publishing
+to npm and creating the GitHub release. Prerelease tags (`vX.Y.Z-*`) publish
+to the `next` tag; plain tags publish to `latest`.
+
+**One-time setup — the `NPM_TOKEN` secret.** Publish requires an npm
+automation token with publish access for the `@hilbras` scope:
+
+1. Create an automation token in npm (*Access Tokens → Automation*, or an npm
+   user for the `@hilbras` org).
+2. Add it under *Settings → Secrets and variables → Actions* as `NPM_TOKEN`.
+
+Without that secret, the gate steps pass but the **Publish to npm** step fails
+with `ENEEDAUTH` and the release never publishes or creates a GitHub release.
+In that case the fallback is to publish from a machine already logged in as a
+publisher:
+
+```bash
+npm login
+npm publish --access public      # from a clean tree at the release version
+gh release create vX.Y.Z --title "..." --notes "..."
+```
+
+**Verify a release** from anywhere:
+
+```bash
+npm view @hilbras/omninode version dist-tags   # dist-tags.latest == vX.Y.Z
+gh release view vX.Y.Z
+```
+
+See [ROADMAP_V3.md](ROADMAP_V3.md) (quick win B) for the plan to keep release
+automation green end-to-end.
 
 ## Code of conduct
 

@@ -28,6 +28,29 @@ jobs:
       - if: matrix.node == 24
         run: npm audit --audit-level=high
 
+  # Windows lane (v3 roadmap, quick win A): the platform-specific process and
+  # CLI behavior documented in SECURITY.md / AGENTS.md is otherwise only
+  # exercised on ubuntu-latest. POSIX-only process-group tests graceful-skip
+  # via it.skipIf(win32); everything else must pass on Windows.
+  test-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      # The built binary must start on Windows too.
+      - run: npm run smoke:cli
+
   gates:
     runs-on: ubuntu-latest
     steps:

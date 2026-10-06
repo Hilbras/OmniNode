@@ -94,7 +94,7 @@ The roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the completed v1 plan i
 | [Contributing](docs/CONTRIBUTING.md) · [Development](docs/DEVELOPMENT.md) · [Extending](docs/EXTENDING.md) | setup, scripts, local workflow, extension guides |
 | [Architecture](docs/ARCHITECTURE.md) | module map, workflow, execution states, audit |
 | [API](docs/API.md) · [API stability](docs/API_STABILITY.md) · [Deprecations](docs/DEPRECATIONS.md) | the public surface and its guarantees |
-| [CHANGELOG](CHANGELOG.md) · [v1 plan](docs/DEVELOPMENT_PLAN.md) · [v2 roadmap](docs/ROADMAP_V2.md) | history and plans |
+| [CHANGELOG](CHANGELOG.md) · [v1 plan](docs/DEVELOPMENT_PLAN.md) · [v2 roadmap](docs/ROADMAP_V2.md) · [v3 roadmap](docs/ROADMAP_V3.md) | history, plans, and the forward-looking v3 direction |
 | [assets/](assets) | logo (`logo.svg`), favicon, wordmark |
 
 ## Roadmap
@@ -102,16 +102,19 @@ The roadmap is [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md); the completed v1 plan i
 The v1 plan (phases 0–11) is complete and shipped as **v1.0.0** — see
 [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md) (historical). The v2
 roadmap (24 phases) is complete and shipped as **v2.0.0** — see
-[docs/ROADMAP_V2.md](docs/ROADMAP_V2.md). Subsequent v2.0.x releases
-(currently **v2.0.2**, with **v2.0.3** in progress) are hardening,
-consistency and release-quality passes over that completed architecture.
+[docs/ROADMAP_V2.md](docs/ROADMAP_V2.md). Subsequent v2.0.x releases are
+hardening, consistency and release-quality passes over that completed
+architecture (the current release is **v2.0.3**). The forward-looking v3
+direction — advanced orchestration capabilities that build on the v2
+foundation — is in [docs/ROADMAP_V3.md](docs/ROADMAP_V3.md).
 
 | Version | Milestone |
 | --- | --- |
 | v0.1.0 – v0.10.0 | Foundation → end-to-end workflow |
 | **v1.0.0** | Production Release (v1 plan complete) |
 | **v2.0.0** | Reliability & interoperability release (all 24 phases complete) |
-| v2.0.1 – v2.0.2 | Hardening, fixes & documentation consistency |
+| v2.0.1 – v2.0.3 | Hardening, fixes, docs consistency & release polish |
+| **v3.0.0** | Advanced orchestration (roadmap in progress — see v3 roadmap) |
 
 Install the stable release with:
 
