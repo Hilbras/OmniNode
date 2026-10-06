@@ -62,5 +62,8 @@ jobs:
       - run: npm run build
       # CLI smoke test: the built binary must start outside the source tree.
       - run: npm run smoke:cli
+      # Coverage gate (v3 quick win C): run the suite with the v8 coverage
+      # provider and enforce the do-not-decrease thresholds from vitest.config.ts.
+      - run: npm run test:coverage
       # Version/changelog consistency, package contents, secret scan.
       - run: npm run gates
