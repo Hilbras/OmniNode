@@ -21,6 +21,8 @@ export interface HttpRequestOptions {
 export interface HttpResponse {
   status: number;
   body: unknown;
+  /** Wall-clock duration of the request (§23 Fix 04 — timeout detail model). */
+  durationMs: number;
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -28,8 +30,9 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 export async function requestJson(
   url: string,
   options: HttpRequestOptions = {},
-): Promise<HttpResponse> {
+): Promise<HttpResponse & { durationMs: number }> {
   const { method = "GET", headers = {}, body, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
+  const startedAt = Date.now();
 
   // Transport failures propagate raw: adapters normalize them into provider
   // error kinds (roadmap §10).
@@ -51,5 +54,5 @@ export async function requestJson(
     throw new HttpResponseError(`Response from ${url} was not valid JSON.`, response.status, error);
   }
 
-  return { status: response.status, body: parsed };
+  return { status: response.status, body: parsed, durationMs: Date.now() - startedAt };
 }

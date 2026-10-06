@@ -46,7 +46,10 @@ The composed text always contains `# Objective`, and when applicable `# Role`,
 ## Process handling
 
 - Runs in its own process group on POSIX — timeout, `task cancel` and OmniNode's
-  own SIGINT/SIGTERM reap the whole tree.
+  own SIGINT/SIGTERM reap the whole tree. On Windows, only the direct child is
+  terminated (`child.kill`); grandchildren may survive.
+- stdin/stdout/stderr are destroyed when the run settles, so long-lived agent
+  processes do not accumulate pipes.
 - Output is capped per stream (`max_output_bytes`); a flooding agent is killed
   rather than exhausting memory.
 - Working directories are validated and confined to the project root unless

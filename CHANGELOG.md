@@ -4,6 +4,25 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.2] — hardening & fixes (per docs/ROADMAP_HARDENING.md)
+
+### Fixed
+
+- **Timeout detail normalization** (Fix 04): provider transport and HTTP
+  errors now carry `durationMs`, `dispatched` and the normalized kind
+  consistently — a request that was dispatched but never answered is
+  `TIMEOUT` with `dispatched: true`, so the outcome is honestly unprovable.
+- **Side-effect safety tests** (Fix 13): retrying an unknown task is explicit
+  and preserves the failure; unknown tasks are never auto-retried even with
+  \`maxAttempts > 1\`.
+
+### Added
+
+- **Failure-matrix expansion** (Fix 12): HTTP 502/503, hanging provider
+  requests (real hanging server), memory matrix entries.
+- **Platform documentation** (Fix 14): Windows process-termination
+  differences documented in AGENTS.md and SECURITY.md.
+
 ## [2.0.1] — hardening & fixes (per docs/ROADMAP_HARDENING.md)
 
 ### Fixed

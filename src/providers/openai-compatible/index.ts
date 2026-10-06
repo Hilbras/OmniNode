@@ -90,7 +90,7 @@ export class OpenAICompatibleProvider implements IChatProvider {
   }
 
   private async modelsRequest(): Promise<{ status: number; body: unknown }> {
-    let response: { status: number; body: unknown };
+    let response: { status: number; body: unknown; durationMs: number };
     try {
       response = await requestJson(`${this.config.baseUrl}/models`, {
         headers: authHeaders(this.config, this.env),
@@ -116,6 +116,8 @@ export class OpenAICompatibleProvider implements IChatProvider {
         operation: "listModels",
         status,
         body,
+        durationMs: response.durationMs,
+        dispatched: true,
       });
       await this.recordProviderError("listModels", httpError);
       throw httpError;
@@ -230,7 +232,7 @@ export class OpenAICompatibleProvider implements IChatProvider {
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
-    let response: { status: number; body: unknown };
+    let response: { status: number; body: unknown; durationMs: number };
     try {
       response = await requestJson(`${this.config.baseUrl}/chat/completions`, {
         method: "POST",

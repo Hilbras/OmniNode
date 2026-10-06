@@ -21,12 +21,14 @@ import { AgentRegistry } from "../src/agents/index.js";
 import { ProcessAgent } from "../src/agents/process/index.js";
 import { RoleRegistry } from "../src/roles/index.js";
 import { OpenAICompatibleProvider } from "../src/providers/openai-compatible/index.js";
+import { kindFromStatus } from "../src/providers/errors.js";
 import { OmniHilbrasProvider } from "../src/providers/omnihilbras/index.js";
 import { MemoryService } from "../src/memory/service.js";
 import { FileTaskStore as Store } from "../src/tasks/store.js";
 import { loadConfigDetailed } from "../src/config/index.js";
 import { ReportService } from "../src/reports/service.js";
 import { FileReportStore } from "../src/reports/store.js";
+import { AgentError } from "../src/errors/index.js";
 import type { AgentInfo, AgentTaskInput, AgentTaskOutput, IAgent } from "../src/types/agent.js";
 import type { Report } from "../src/types/report.js";
 import type { MemoryEntry, IMemoryProvider } from "../src/types/memory.js";
@@ -381,5 +383,87 @@ describe("failure matrix: execution & persistence", () => {
     ]);
     expect(collected.map((r) => r.id)).toEqual(["ok"]);
     expect(service.lastDiagnostics.rejected).toHaveLength(1);
+  });
+});
+
+// --- Phase 23 Fix 12/13: expanded failure matrix + side-effect safety -----
+
+describe("failure matrix: provider status expansion (§23 Fix 12)", () => {
+  const matrix: Array<[number, string]> = [
+    [502, "SERVER_ERROR"],
+    [503, "SERVER_ERROR"],
+  ];
+  it.each(matrix)("maps HTTP %s to %s", (status, kind) => {
+    expect(kindFromStatus(status)).toBe(kind);
+  });
+
+  it("a hanging provider request is classified as TIMEOUT with dispatched: true", async () => {
+    // A server that accepts the connection but never responds — the request
+    // WAS dispatched, so a timeout here leaves the outcome unprovable.
+    const hanging = createServer(() => {});
+    await new Promise<void>((resolve) => hanging.listen(0, "127.0.0.1", resolve));
+    const hangPort = (hanging.address() as AddressInfo).port;
+    const provider = new OpenAICompatibleProvider(
+      { name: "gw", type: "openai-compatible", baseUrl: `http://127.0.0.1:${hangPort}/v1`, timeoutMs: 200 },
+    );
+    await expect(provider.listModels()).rejects.toMatchObject({
+      details: { kind: "TIMEOUT", dispatched: true, retryable: false },
+    });
+    await new Promise<void>((resolve) => hanging.close(() => resolve()));
+  }, 15_000);
+});
+
+class ScriptAgent implements IAgent {
+  info: AgentInfo = { name: "scripted", integration: "process", status: "ready" };
+  runs = 0;
+
+  constructor(
+    name: string,
+    private readonly script: () => Promise<AgentTaskOutput>,
+  ) {
+    this.info = { name, integration: "process", status: "ready" };
+  }
+
+  async run(): Promise<AgentTaskOutput> {
+    this.runs += 1;
+    return this.script();
+  }
+
+  async cancel(): Promise<void> {}
+}
+
+describe("side-effect safety (§23 Fix 13)", () => {
+  it("retrying an unknown task is explicit and preserves the failure", async () => {
+    const dir = tmp();
+    const agent = new ScriptAgent("worker", () => {
+      throw new AgentError("AGENT_TIMEOUT", "killed after dispatch", { details: { dispatched: true } });
+    });
+    const engine = engineWith([agent], dir);
+    const task = await engine.create({ objective: "side-effecting work", agent: "worker" });
+    const first = await engine.run(task.id);
+    expect(first.status).toBe("unknown");
+    expect(first.executions?.[0]?.reason).toBeDefined();
+
+    const reset = await engine.retry(task.id);
+    expect(reset.status).toBe("created");
+    expect(reset.lastError).toContain("killed after dispatch");
+  });
+
+  it("an unknown task is never retried automatically, even with maxAttempts > 1", async () => {
+    const dir = tmp();
+    let runs = 0;
+    const agent: IAgent = {
+      info: { name: "timeout-agent", integration: "process", status: "ready" },
+      run: async (): Promise<AgentTaskOutput> => {
+        runs += 1;
+        throw new AgentError("AGENT_TIMEOUT", "killed after dispatch", { details: { dispatched: true } });
+      },
+      cancel: async () => {},
+    };
+    const engine = engineWith([agent], dir);
+    const task = await engine.create({ objective: "x", agent: "timeout-agent" });
+    const result = await engine.run(task.id, { maxAttempts: 5 });
+    expect(result.status).toBe("unknown");
+    expect(runs).toBe(1);
   });
 });

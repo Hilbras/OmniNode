@@ -23,6 +23,9 @@ export interface ProviderErrorContext {
   status?: number;
   body?: unknown;
   retryAfterMs?: number;
+  /** Whether the request was dispatched before the failure (§23 Fix 04). */
+  dispatched?: boolean;
+  durationMs?: number;
   cause?: unknown;
   /** Maps the normalized kind onto the legacy stable error code. */
   code?:
@@ -130,6 +133,8 @@ export function providerHttpError(context: ProviderErrorContext): ProviderError 
         operation: context.operation,
         status,
         retryable: isRetryable(kind),
+        ...(context.durationMs !== undefined ? { durationMs: context.durationMs } : {}),
+        ...(context.dispatched !== undefined ? { dispatched: context.dispatched } : {}),
         ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
         ...(detail ? { providerMessage: detail } : {}),
       },
@@ -152,7 +157,11 @@ export function providerTransportError(context: Omit<ProviderErrorContext, "stat
       kind,
       provider: context.provider,
       operation: context.operation,
-      retryable: isRetryable(kind),
+      retryable: kind === "NETWORK_ERROR",
+      // A timeout may have hit after dispatch — mark it so callers know the
+      // outcome is unprovable (§23 Fix 04).
+      ...(kind === "TIMEOUT" ? { dispatched: true } : {}),
+      ...(context.durationMs !== undefined ? { durationMs: context.durationMs } : {}),
     },
   });
 }

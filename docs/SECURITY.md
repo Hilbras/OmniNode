@@ -66,9 +66,12 @@ project:
 
 ## Process containment
 
-- Agents run in their own process group on POSIX; timeout, cancellation and
-  OmniNode's own SIGINT/SIGTERM terminate the whole group, so agents cannot
-  leave orphaned children behind.
+- Agents run in their own process group on POSIX (Linux/macOS); timeout,
+  cancellation and OmniNode's own SIGINT/SIGTERM terminate the whole group, so
+  agents cannot leave orphaned children behind.
+- **Windows**: process groups are not used — only the direct child is
+  terminated (\`child.kill\`). Grandchildren may survive on Windows; run agents
+  inside a Job object container if that matters for your deployment.
 - Working directories are validated (existence, access, normalization) and
   confined to the project root unless `allow_external_cwd: true`.
 - Runaway output is capped (5 MiB per stream by default) and the agent is
