@@ -5,7 +5,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { appendFile, mkdir, readFile, rename, stat } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { logger, type Logger } from "../logger/index.js";
 
 export type AuditAction =
@@ -70,7 +70,7 @@ export class FileAuditLog implements AuditSink {
     log: Logger = logger,
     maxBytes: number = DEFAULT_AUDIT_MAX_BYTES,
   ) {
-    this.filePath = `${directory}/audit.jsonl`;
+    this.filePath = join(directory, "audit.jsonl");
     this.maxBytes = maxBytes;
     this.log = log.child({ component: "audit" });
   }

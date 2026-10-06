@@ -3,6 +3,7 @@
  * the canonical storage interface names, and the migration path that upgrades
  * v1 data in place.
  */
+import { join } from "node:path";
 import { FileAuditLog } from "../audit/index.js";
 import { LocalMemoryProvider } from "../memory/local.js";
 import { FilePipelineRunStore } from "../pipelines/store.js";
@@ -78,7 +79,7 @@ export async function migrateProjectStores(
 ): Promise<MigrationReport[]> {
   const reports: MigrationReport[] = [];
   for (const file of STORE_FILES) {
-    const path = `${directory}/${file}`;
+    const path = join(directory, file);
     const state = await inspectDocument(path);
     if (state.status === "missing") {
       reports.push({ file, state: state.status, migrated: false });

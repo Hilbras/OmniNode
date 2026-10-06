@@ -10,7 +10,7 @@
  *    migrated on read, future versions are refused rather than misread.
  */
 import { open, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { logger, type Logger } from "../logger/index.js";
 
 /** Current on-disk schema version. */
@@ -171,7 +171,8 @@ export class JsonFileStore<T> {
   private queue: Promise<unknown> = Promise.resolve();
 
   constructor(options: JsonFileStoreOptions) {
-    this.filePath = `${options.directory ?? `${process.cwd()}/.omninode`}/${options.fileName}`;
+    const directory = options.directory ?? `${process.cwd()}/.omninode`;
+    this.filePath = join(directory, options.fileName);
     this.schemaVersion = options.schemaVersion ?? SCHEMA_VERSION;
     this.durability = options.durability ?? "rename";
     this.onCorrupt = options.onCorrupt;

@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Release gates (roadmap §26, Release Validation).
  *
@@ -7,6 +6,11 @@
  *
  * Exits non-zero on failure so CI and the release workflow stop before a
  * version is published.
+ *
+ * No shebang on purpose: this file is imported as a module by
+ * tests/release-gates.test.ts (a leading `#!` is only valid in an entry
+ * point, not an imported .mjs, which breaks the import on some platforms).
+ * It is always run explicitly as `node scripts/release-gates.mjs`.
  */
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";

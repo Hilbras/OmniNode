@@ -4,6 +4,7 @@
  * and maps it onto the core TypeScript contracts.
  */
 import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { ConfigError } from "../errors/index.js";
 import { describeSecretFindings, scanForInlineSecrets } from "./secrets.js";
@@ -62,7 +63,7 @@ export interface LoadConfigOptions {
 
 export function findConfigFile(directory = process.cwd()): string | undefined {
   for (const filename of CONFIG_FILENAMES) {
-    const candidate = `${directory}/${filename}`;
+    const candidate = join(directory, filename);
     if (existsSync(candidate)) return candidate;
   }
   return undefined;
