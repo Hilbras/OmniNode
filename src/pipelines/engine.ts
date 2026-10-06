@@ -466,7 +466,7 @@ export class PipelineEngine implements IPipelineExecutor {
     };
     await this.persist(finished);
     this.log.info(`Pipeline ${def.id} finished: ${finalStatus}.`);
-    await this.options.audit?.record({
+    await this.auditSafely({
       at: new Date().toISOString(),
       action: cancelled ? "pipeline.run.cancelled" : finalStatus === "failed" ? "pipeline.run.failed" : "pipeline.run.finished",
       id: run.id,

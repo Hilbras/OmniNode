@@ -173,16 +173,9 @@ export class TaskEngine {
       const startedAt = new Date().toISOString();
       current = await this.transition(current, "running", { attempt });
 
-      await this.options.audit?.record({
-        at: startedAt,
-        action: "agent.started",
-        id: current.id,
-        taskId: current.id,
-        ...(current.pipelineId !== undefined ? { pipelineId: current.pipelineId } : {}),
-        agentId: task.agent,
-        executionId,
-        detail: { attempt },
-      });
+      // v2.0.3 Fix 02: every audit write goes through the safe wrapper — a
+      // broken audit sink must never alter execution state.
+      await this.audit("agent.started", current, { attempt }, executionId);
 
       let output;
       let thrown: unknown;
@@ -200,16 +193,12 @@ export class TaskEngine {
       }
 
       const finishedAt = new Date().toISOString();
-      await this.options.audit?.record({
-        at: finishedAt,
-        action: "agent.completed",
-        id: current.id,
-        taskId: current.id,
-        ...(current.pipelineId !== undefined ? { pipelineId: current.pipelineId } : {}),
-        agentId: task.agent,
+      await this.audit(
+        "agent.completed",
+        current,
+        { attempt, outcome: thrown !== undefined || output === undefined ? "threw" : "returned" },
         executionId,
-        detail: { attempt, outcome: thrown !== undefined || output === undefined ? "threw" : "returned" },
-      });
+      );
       if (thrown !== undefined || output === undefined) {
         const outcome = classifyThrown(thrown);
         const message = thrown instanceof Error ? thrown.message : String(thrown);

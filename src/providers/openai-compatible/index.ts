@@ -186,20 +186,31 @@ export class OpenAICompatibleProvider implements IChatProvider {
     return streamChatCompletion(this.config, request, onChunk, this.env);
   }
 
-  /** Provider errors are part of the audit trail (§14 correlation, §18 observability). */
+  /** Provider errors are part of the audit trail (§14 correlation, §18 observability).
+   *  v2.0.3 Fix 02: audit is observational — a broken sink never replaces the
+   *  real provider error or alters execution. */
   private async recordProviderError(operation: string, error: ProviderError): Promise<void> {
-    await this.audit?.record({
-      at: new Date().toISOString(),
-      action: "provider.error",
-      id: this.providerId,
-      providerId: this.providerId,
-      detail: {
-        operation,
-        code: error.code,
-        kind: (error.details as { kind?: string } | undefined)?.kind,
-        message: error.message,
-      },
-    });
+    if (!this.audit) return;
+    try {
+      await this.audit.record({
+        at: new Date().toISOString(),
+        action: "provider.error",
+        id: this.providerId,
+        providerId: this.providerId,
+        detail: {
+          operation,
+          code: error.code,
+          kind: (error.details as { kind?: string } | undefined)?.kind,
+          message: error.message,
+        },
+      });
+    } catch (auditError) {
+      this.log.warn(
+        `Audit write failed for provider error (execution unaffected): ${
+          auditError instanceof Error ? auditError.message : String(auditError)
+        }`,
+      );
+    }
   }
 
   async healthCheck(): Promise<ProviderStatus> {
