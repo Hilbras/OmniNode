@@ -135,6 +135,73 @@ created ──▶ queued ──▶ running ──┬─▶ completed
 - Pipeline runs derive `failed` (any hard failure) > `partial` (any partial or
   unprovable step) > `completed`.
 
+## Recovery, cancellation, interruption, retry and replay
+
+These five terms describe different mechanisms and must not be conflated:
+
+**Interruption** — the process running OmniNode disappears unexpectedly
+(crash, kill, power loss). Nothing runs to handle it; it is simply detected
+the next time OmniNode starts.
+
+**Recovery** — after an interruption, recovery reconciles persisted state
+with reality. A task persisted as `running` has no live process and no
+provable outcome, so recovery marks it `unknown` (never `completed`,
+never `failed`):
+
+```text
+running
+   ↓ process crash
+running (persisted)
+   ↓ recovery (omninode task recover)
+unknown
+```
+
+**Cancellation** — an explicit request to stop the currently running
+execution (`task cancel`, `pipeline cancel`). It terminates live agent
+processes where possible and prevents new work from being scheduled; the run
+persists as `cancelled`.
+
+**Retry** — starting a *new execution attempt* of a previously finished or
+interrupted task (`task retry`, `pipeline retry`). History is preserved: each
+attempt keeps its own `executionId`, and the previous result stays available
+as `lastResult`.
+
+```text
+attempt #1
+    ↓
+unknown
+    ↓
+attempt #2
+```
+
+**Replay** — reconstructing or re-executing a previous execution from its
+historical events. OmniNode does **not** provide replayable execution: the
+audit log and execution history are records for observability, not an event
+stream that can be re-driven. Normal retry is a new execution, not a replay.
+
+### Cross-process cancellation
+
+A cancellation request is persisted in the pipeline store, so it survives
+process boundaries and is honored by whichever OmniNode process owns the run.
+Live process handles, however, are process-local:
+
+```text
+Process A                      Process B
+  └── running agent              └── cancellation request (persisted)
+```
+
+Process B cannot directly terminate Process A's live child processes. What
+cross-process cancellation guarantees instead:
+
+1. The cancellation request is persisted (`cancellationRequested`).
+2. The owning process stops scheduling new work at the next wave boundary.
+3. In-process running tasks are terminated through their agent registry.
+4. The final state is reconciled safely — the run ends `cancelled`, and a run
+   left `running` by an interruption is reported as interrupted rather than
+   silently adopted.
+
+A remote process is never reported as killed unless it actually was.
+
 ## v2 additions (Phase 1)
 
 ```

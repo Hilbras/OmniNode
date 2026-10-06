@@ -70,6 +70,18 @@ omninode pipeline cancel run-…
 | `failed` | a hard failure; on-success downstream steps were skipped |
 | `cancelled` | cancellation was requested: pending steps cancelled, running tasks terminated |
 
+### Cancellation across processes
+
+`pipeline cancel` persists the cancellation request in the run store, so it
+survives process boundaries: the OmniNode process that owns the run honors it
+at the next wave boundary, stops scheduling, terminates its in-process tasks
+and reconciles the run as `cancelled`. Live process handles are
+process-local, though — a *different* process cannot directly kill another
+process's running agents; it can only record the request. A run left in
+`running` by an interruption is reported as interrupted, never silently
+adopted. See [ARCHITECTURE.md](ARCHITECTURE.md) for the full
+recovery/cancellation/retry/replay semantics.
+
 Reports from research/analyze steps are collected, validated, stored and
 aggregated into a **combined report** ([REPORTS.md](REPORTS.md)); the plan
 steps produce an implementation plan ([…](../docs/API.md)) handed to the
