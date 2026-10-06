@@ -122,4 +122,32 @@ describe("migration matrix (§23 Fix 11)", () => {
     expect(readFileSync(path.join(dir, "tasks.json"), "utf8")).toBe(afterFirst);
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it("partial migration: mixed v1/v2/corrupt stores migrate per file, and a re-run completes safely", async () => {
+    const dir = storageWith({
+      // v1 bare array — needs migration
+      "tasks.json": JSON.stringify([{ id: "t1", objective: "x", status: "created", createdAt: "", updatedAt: "" }]),
+      // already current — untouched
+      "plans.json": CURRENT([{ id: "p1" }]),
+      // corrupt — reported, never rewritten
+      "memory.json": "{ broken json",
+    });
+    const first = await migrateProjectStores(dir);
+    expect(first.find((r) => r.file === "tasks.json")).toMatchObject({ migrated: true });
+    expect(first.find((r) => r.file === "plans.json")).toMatchObject({ state: "current", migrated: false });
+    expect(first.find((r) => r.file === "memory.json")).toMatchObject({ state: "corrupt", migrated: false });
+
+    // The v1 file is now current; the corrupt file is untouched.
+    const tasksDoc = JSON.parse(readFileSync(path.join(dir, "tasks.json"), "utf8")) as { schemaVersion: number };
+    expect(tasksDoc.schemaVersion).toBe(2);
+    expect(readFileSync(path.join(dir, "memory.json"), "utf8")).toBe("{ broken json");
+    const tasksAfterFirst = readFileSync(path.join(dir, "tasks.json"), "utf8");
+
+    // A second run (e.g. after an interrupted earlier attempt) is safe and
+    // changes nothing.
+    const second = await migrateProjectStores(dir);
+    expect(second.find((r) => r.file === "tasks.json")).toMatchObject({ state: "current", migrated: false });
+    expect(readFileSync(path.join(dir, "tasks.json"), "utf8")).toBe(tasksAfterFirst);
+    rmSync(dir, { recursive: true, force: true });
+  });
 });
