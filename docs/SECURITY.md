@@ -70,7 +70,7 @@ project:
   cancellation and OmniNode's own SIGINT/SIGTERM terminate the whole group, so
   agents cannot leave orphaned children behind.
 - **Windows**: process groups are not used — only the direct child is
-  terminated (\`child.kill\`). Grandchildren may survive on Windows; run agents
+  terminated (`child.kill`). Grandchildren may survive on Windows; run agents
   inside a Job object container if that matters for your deployment.
 - Working directories are validated (existence, access, normalization) and
   confined to the project root unless `allow_external_cwd: true`.
@@ -124,14 +124,22 @@ Reports (advisory, changes nothing): agents inheriting the full environment,
 agents allowed outside the project root, explicit per-agent env injection,
 providers/memory without credential references — plus the trust model above.
 
-## Known limitations (v1.0)
+## Known limitations (v2.0.2)
 
 - Task/agent execution inherits OmniNode's OS permissions — OmniNode does not
   sandbox agent file access.
 - Reports and memory entries are stored as plain JSON/JSONL on disk; protect
   `.omninode/` with filesystem permissions if it contains sensitive material.
-- The Remembera adapter's API convention is assumed, not verified against a
-  published spec — see `src/memory/remembera.ts`.
+- The Remembera adapter implements the published contract
+  [`remembera-api/v1`](REMEMBERA_API.md) over HTTPS + JSON with bearer-token
+  authentication; secrets are referenced by environment-variable name and
+  never written to disk or logs by the adapter.
+- **Cross-platform cancellation**: on POSIX, timeout/cancellation terminates
+  the whole process group, so grandchildren die with their agent. On Windows
+  only the direct child is terminated — grandchildren may survive. A
+  cancellation *request* that crosses a process boundary (persisted in the
+  pipeline store) is honored by the OmniNode process that owns the run; a
+  different process cannot directly kill another process's live children.
 
 ## Reporting vulnerabilities
 
