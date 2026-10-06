@@ -127,6 +127,37 @@ describe("process-tree cleanup (§8)", () => {
     expect(() => readFileSync(marker)).toThrow(); // grandchild was reaped with the group
     rmSync(dir, { recursive: true, force: true });
   }, 20_000);
+
+  it("kills grandchildren when a running agent is cancelled", async () => {
+    const dir = tmp();
+    const marker = path.join(dir, "grandchild-cancel.txt");
+    const grandchildScript = path.join(dir, "grandchild-cancel.cjs");
+    writeFileSync(
+      grandchildScript,
+      `setTimeout(() => require("fs").writeFileSync(${JSON.stringify(marker)}, "orphan"), 3000);\n`,
+    );
+    const script = `
+      const { spawn } = require("child_process");
+      spawn(process.execPath, [${JSON.stringify(grandchildScript)}], { stdio: "ignore" });
+      setInterval(() => {}, 1000);
+    `;
+    const agent = new ProcessAgent(nodeAgent(script, { timeoutMs: 10_000 }));
+    const settled = await new Promise<{ kind: string }>((resolve) => {
+      agent
+        .run({ taskId: "tree-cancel", objective: "spawn" })
+        .then(
+          () => resolve({ kind: "resolved" }),
+          () => resolve({ kind: "rejected" }),
+        );
+      // Cancel once the agent and its grandchild are up.
+      setTimeout(() => void agent.cancel("tree-cancel"), 400);
+    });
+    // The run settles instead of hanging when the tree is killed.
+    expect(["resolved", "rejected"]).toContain(settled.kind);
+    await new Promise((resolve) => setTimeout(resolve, 3500));
+    expect(() => readFileSync(marker)).toThrow(); // grandchild was reaped with the group
+    rmSync(dir, { recursive: true, force: true });
+  }, 20_000);
 });
 
 describe("working-directory validation (§8)", () => {
