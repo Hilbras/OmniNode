@@ -37,5 +37,7 @@ jobs:
           node-version: 24
       - run: npm ci
       - run: npm run build
+      # CLI smoke test: the built binary must start outside the source tree.
+      - run: npm run smoke:cli
       # Version/changelog consistency, package contents, secret scan.
       - run: npm run gates
