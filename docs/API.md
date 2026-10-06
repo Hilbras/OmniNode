@@ -30,7 +30,7 @@ stability tier from [API_STABILITY.md](API_STABILITY.md).
 | `Report`, `Finding`, `Confidence`, `Evidence`, `EvidenceKind`, `EvidenceInput`, `FindingOrigin`, `ReportArtifact`, `CombinedReport`, `AggregatedFinding`, `FindingSource`, `ReportConflict`, `ConflictPosition` | report model (v2) | Stable |
 | `validateReport`, `normalizeEvidence`, `normalizeFinding`, `ReportValidationResult`, `detectConflicts` | report validation & conflict detection (§13–§14) | Stable |
 | `MemoryEntry`, `MemoryQuery`, `MemoryScope`, `MemoryCategory`, `MemoryProviderMetadata`, `IMemoryProvider` | memory contract (v2) | Stable |
-| `MemoryTaskContext`, `MemoryServiceOptions`, `MAX_CONTEXT_CHARS`, `defaultSearch`, `defaultMetadata` | context manager + contract helpers | Stable |
+| `MemoryTaskContext`, `MemoryServiceOptions`, `MemoryContextQuery`, `MAX_CONTEXT_CHARS`, `CONTEXT_TRUNCATION_MARKER` | context manager, budgeted context result (with `originalSize`/`finalSize`/`truncated`) and the explicit truncation marker; `defaultSearch`/`defaultMetadata` remain internal | Stable |
 | `Project` | project entity | Stable |
 | `ChatMessage`, `ChatRequest`, `ChatResponse`, `ChatRole`, `ChatUsage`, `ChatFn`, `ChatStreamChunk` | chat contracts (incl. streaming chunks); `ChatFn` was re-exported from `pipelines` in v1 and remains so | Stable |
 | `MessageEnvelope`, `AgentToNodeMessage`, `NodeToAgentMessage` | JSON-lines agent protocol envelope | Experimental |

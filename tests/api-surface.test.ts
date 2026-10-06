@@ -30,6 +30,7 @@ const STABLE_RUNTIME_EXPORTS = [
   "FilePlanStore",
   // memory
   "createMemoryProvider", "LocalMemoryProvider", "RememberaMemoryProvider", "MemoryService",
+  "MAX_CONTEXT_CHARS", "CONTEXT_TRUNCATION_MARKER",
   // persistence
   "JsonFileStore", "ProjectStores",
   // audit / logging / errors
