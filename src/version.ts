@@ -1,1 +1,1 @@
-export const OMNINODE_VERSION = "2.0.2";
+export const OMNINODE_VERSION = "2.0.3";

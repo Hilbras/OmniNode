@@ -1,6 +1,6 @@
 {
   "name": "@hilbras/omninode",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "Provider-agnostic multi-AI orchestration platform: coordinates CLI agents, AI providers, memory, roles, reports and planning into one execution system.",
   "type": "module",
   "license": "MIT",
@@ -58,6 +58,7 @@
     "format": "prettier --write .",
     "verify": "npm run lint && npm run typecheck && npm test && npm run build",
     "cli": "tsx src/cli/index.ts",
+    "smoke:cli": "node dist/cli/index.js --help >/dev/null && node dist/cli/index.js --version",
     "prepublishOnly": "npm run build && npm test",
     "validate:package": "node scripts/release-gates.mjs package",
     "scan:secrets": "node scripts/release-gates.mjs secrets",

@@ -4,6 +4,55 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [2.0.3] — final hardening & release polish (per the v2.0.3 plan)
+
+### Fixed
+
+- **Memory context truncation is boundary-safe** (Fix 01): the context
+  formatter now drops *complete* entries instead of slicing mid-entry, keeps
+  priority-ordered scopes first, always reports `originalSize`/`finalSize`,
+  preserves full entry metadata, and marks every cut with an explicit
+  `CONTEXT_TRUNCATION_MARKER` (`[CONTEXT TRUNCATED — earlier memory was
+  omitted]`).
+- **Audit failure isolation on every execution path** (Fix 02): the three
+  remaining unwrapped audit writes — `agent.started`/`agent.completed` in the
+  task engine, the final pipeline-run event, and provider-error records in the
+  OpenAI-compatible adapter — are now observational; a throwing audit sink can
+  no longer alter execution outcomes or replace a real provider error.
+- **Security documentation accuracy** (Fix 04): `SECURITY.md` limitations are
+  labeled for the current version, describe the published Remembera contract
+  (`remembera-api/v1`) instead of an "assumed API", and document
+  cross-platform cancellation limitations.
+- **CLI documentation matches the state machine** (Fix 05): `task list
+  --status` help lists the complete state model, `task status` explains
+  `unknown`/`timed_out`/`partially_completed`/`cancelled` with a `hint:` line,
+  and `docs/CLI.md` gains a full task-states section.
+- **Recovery/cancellation/replay semantics clarified** (Fix 06, Fix 07):
+  `ARCHITECTURE.md` defines interruption vs recovery vs cancellation vs retry
+  vs replay (OmniNode has no replayable execution; retry is a new attempt),
+  and documents the persistent-cancellation-request vs live-process-termination
+  distinction, echoed in `PIPELINES.md`.
+
+### Changed
+
+- **Documentation consistency** (Fix 03, Fix 15): README, `ROADMAP_V2.md`
+  (marked completed), `DEVELOPMENT_PLAN.md` (marked historical),
+  `CONTRIBUTING.md` and `docs/API.md` now consistently identify the current
+  release line; no contradictory current-version statements remain.
+- **Public API inventory** (Fix 08): `MAX_CONTEXT_CHARS` and
+  `CONTEXT_TRUNCATION_MARKER` are locked into the API surface test, and
+  `docs/API.md` no longer claims the intentionally-withheld
+  `defaultSearch`/`defaultMetadata` helpers are public.
+
+### Added
+
+- **Partial migration matrix coverage** (Fix 11): mixed v1/v2/corrupt store
+  directories migrate per file, and a repeated migration pass is a no-op.
+- **Process-tree cancellation test** (Fix 14): cancelling a running agent
+  reaps its grandchildren, mirroring the timeout path.
+- **CI CLI smoke gate** (Fix 16): the `gates` job runs the built binary
+  (`--help`, `--version`) via `npm run smoke:cli` before the release checks.
+
 ## [2.0.2] — hardening & fixes (per docs/ROADMAP_HARDENING.md)
 
 ### Fixed
