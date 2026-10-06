@@ -9,7 +9,7 @@
  */
 import { MemoryError } from "../errors/index.js";
 import { logger, type Logger } from "../logger/index.js";
-import type { IMemoryProvider, MemoryEntry } from "../types/memory.js";
+import type { IMemoryProvider, MemoryEntry, MemoryScope } from "../types/memory.js";
 import type { Task } from "../types/task.js";
 
 export interface MemoryContextQuery {
@@ -23,16 +23,32 @@ export interface MemoryContextQuery {
 export interface MemoryTaskContext {
   /** Prompt-ready context text ("" when nothing relevant was found). */
   text: string;
+  /**
+   * All retrieved entries — preserved even when their formatted text was cut,
+   * so callers never lose metadata (v2.0.3 Fix 01).
+   */
   entries: MemoryEntry[];
-  /** True when the character budget cut the context short. */
+  /** True whenever any content was omitted from `text`. */
   truncated: boolean;
-  /** Context size before and after truncation (§23 Fix 08 — no silent cuts). */
-  originalSize?: number;
-  finalSize?: number;
+  /** Formatted context size before truncation (0 when nothing was retrieved). */
+  originalSize: number;
+  /** Final `text` size after truncation. */
+  finalSize: number;
 }
 
 const DEFAULT_ENTRY_LIMIT = 8;
 export const MAX_CONTEXT_CHARS = 4_000;
+
+/**
+ * Appended (never silent) when the context budget omits content — the cut is
+ * always visible to the agent and to debugging (v2.0.3 Fix 01).
+ */
+export const CONTEXT_TRUNCATION_MARKER = "[CONTEXT TRUNCATED — earlier memory was omitted]";
+
+const SECTION_SEPARATOR = "\n\n";
+
+/** Scope rendering order = priority order: most task-relevant scopes first. */
+const SCOPE_PRIORITY: readonly MemoryScope[] = ["project", "task", "role", "knowledge"];
 
 export interface MemoryServiceOptions {
   /** When true, backend failures propagate instead of being logged. */
@@ -77,7 +93,13 @@ export class MemoryService {
         limit: query.limit ?? DEFAULT_ENTRY_LIMIT,
       });
     } catch (error) {
-      return this.handleFailure("retrieve", error, { text: "", entries: [], truncated: false });
+      return this.handleFailure("retrieve", error, {
+        text: "",
+        entries: [],
+        truncated: false,
+        originalSize: 0,
+        finalSize: 0,
+      });
     }
     return this.format(entries);
   }
@@ -118,28 +140,76 @@ export class MemoryService {
     }
   }
 
+  /**
+   * Formats entries into a budgeted, boundary-safe context (v2.0.3 Fix 01).
+   *
+   * Truncation drops *complete* entries — never a cut through the middle of
+   * one — keeps the highest-priority content first (scope priority, then the
+   * provider's relevance order within a scope), reports exact sizes, and marks
+   * the cut explicitly. The full `entries` metadata is always preserved.
+   */
   private format(entries: MemoryEntry[]): MemoryTaskContext {
-    if (entries.length === 0) return { text: "", entries, truncated: false };
-    const byScope = new Map<string, MemoryEntry[]>();
-    for (const entry of entries) {
-      byScope.set(entry.scope, [...(byScope.get(entry.scope) ?? []), entry]);
+    if (entries.length === 0) {
+      return { text: "", entries, truncated: false, originalSize: 0, finalSize: 0 };
     }
-    const parts: string[] = [];
-    for (const scope of ["project", "task", "role", "knowledge"]) {
-      const scopeEntries = byScope.get(scope) ?? [];
-      if (scopeEntries.length === 0) continue;
-      const lines = scopeEntries
-        .map((entry) => {
-          const category = entry.category ? `[${entry.category}] ` : "";
-          return `- ${category}${entry.content}`;
-        })
-        .join("\n");
-      parts.push(`### Relevant memory (${scope})\n${lines}`);
+
+    const sections = SCOPE_PRIORITY.map((scope) => ({
+      scope,
+      entries: entries.filter((entry) => entry.scope === scope),
+    })).filter((section) => section.entries.length > 0);
+
+    const originalText = sections
+      .map((section) => renderScope(section.scope, section.entries))
+      .join(SECTION_SEPARATOR);
+    const originalSize = originalText.length;
+
+    if (originalSize <= this.maxContextChars) {
+      return { text: originalText, entries, truncated: false, originalSize, finalSize: originalSize };
     }
-    let text = parts.join("\n\n");
-    const truncated = text.length > this.maxContextChars;
-    if (truncated) text = `${text.slice(0, this.maxContextChars - 1)}…`;
-    return { text, entries, truncated };
+
+    // Reserve space for the marker up front so the final text (marker
+    // included) stays within the configured budget. Budgets smaller than the
+    // marker itself are pathological: the explicit marker still wins.
+    const contentBudget = Math.max(0, this.maxContextChars - SECTION_SEPARATOR.length - CONTEXT_TRUNCATION_MARKER.length);
+
+    const kept: string[] = [];
+    let used = 0; // committed content length, separators included
+
+    for (const section of sections) {
+      const separatorLength = kept.length === 0 ? 0 : SECTION_SEPARATOR.length;
+      const header = `### Relevant memory (${section.scope})`;
+      const block = renderScope(section.scope, section.entries);
+      if (used + separatorLength + block.length <= contentBudget) {
+        kept.push(block);
+        used += separatorLength + block.length;
+        continue;
+      }
+      // The whole scope doesn't fit — keep as many complete entries from it
+      // as the remaining budget allows, then stop (everything later in the
+      // priority order is omitted and reported via the marker).
+      const entryBudget = Math.max(0, contentBudget - used - separatorLength - header.length - 1);
+      const fitted: MemoryEntry[] = [];
+      let fittedLength = 0;
+      for (const entry of section.entries) {
+        const line = renderEntryLine(entry);
+        const lineSeparator = fitted.length === 0 ? 0 : 1; // "\n" between lines
+        if (fittedLength + lineSeparator + line.length > entryBudget) break;
+        fitted.push(entry);
+        fittedLength += lineSeparator + line.length;
+      }
+      if (fitted.length > 0) {
+        kept.push(`${header}\n${fitted.map(renderEntryLine).join("\n")}`);
+      }
+      break;
+    }
+
+    const body = kept.join(SECTION_SEPARATOR);
+    const text =
+      kept.length === 0
+        ? CONTEXT_TRUNCATION_MARKER
+        : `${body}${SECTION_SEPARATOR}${CONTEXT_TRUNCATION_MARKER}`;
+
+    return { text, entries, truncated: true, originalSize, finalSize: text.length };
   }
 
   /**
@@ -154,6 +224,17 @@ export class MemoryService {
       );
     }
     this.log.warn(`Memory ${operation} failed (continuing without memory): ${message}`);
-    return fallback ?? { text: "", entries: [], truncated: false };
+    return fallback ?? { text: "", entries: [], truncated: false, originalSize: 0, finalSize: 0 };
   }
+}
+
+/** Renders one scope's entries as a `### Relevant memory (scope)` block. */
+function renderScope(scope: MemoryScope, scopeEntries: MemoryEntry[]): string {
+  return `### Relevant memory (${scope})\n${scopeEntries.map(renderEntryLine).join("\n")}`;
+}
+
+/** One bullet line — category tag optional. */
+function renderEntryLine(entry: MemoryEntry): string {
+  const category = entry.category ? `[${entry.category}] ` : "";
+  return `- ${category}${entry.content}`;
 }

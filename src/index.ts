@@ -166,6 +166,7 @@ export {
   RememberaMemoryProvider,
   MemoryService,
   MAX_CONTEXT_CHARS,
+  CONTEXT_TRUNCATION_MARKER,
 } from "./memory/index.js";
 export type {
   RememberaConfig,
