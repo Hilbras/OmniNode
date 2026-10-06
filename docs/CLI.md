@@ -13,7 +13,7 @@ omninode
 ├── model(s)                 discover and list models (provider:model keys)
 ├── agent                    add | list | inspect | test | run
 ├── role                     list
-├── task                     create | run | status | list | inspect | cancel | retry
+├── task                     create | run | status | list | inspect | cancel | recover | retry
 ├── pipeline                 create | validate | run | retry | list | runs | status | inspect | cancel
 ├── report                   list | combined | show
 ├── plan                     list | show
@@ -23,6 +23,35 @@ omninode
 ├── security                 audit (advisory posture review)
 └── status                   project state overview
 ```
+
+## Task states
+
+Tasks move through a strict state machine. `task status`, `task list
+--status`, `task inspect` and the JSON output all use these exact values:
+
+| State | Meaning |
+| --- | --- |
+| `created` | Task exists, not queued or started yet. |
+| `queued` | Accepted for execution, waiting to run. |
+| `running` | An agent is executing the task right now. |
+| `waiting` | Parked awaiting a future transition (e.g. scheduled work). |
+| `completed` | The agent finished and reported success. |
+| `failed` | The execution failed with a known error. |
+| `timed_out` | The execution exceeded its configured timeout. |
+| `cancelled` | Execution was explicitly cancelled (`task cancel`). |
+| `unknown` | The execution may have happened, but OmniNode cannot prove the final outcome — e.g. the process was killed after dispatch. Never treated as `failed` automatically, because the agent may already have performed side effects. |
+| `partially_completed` | Some pipeline or fan-out work completed while other work did not. |
+
+`task status <id>` prints a `hint:` line explaining `unknown`,
+`timed_out`, `partially_completed` and `cancelled` states.
+
+Recovery and retry interact with these states:
+
+- `task recover` finds tasks persisted as `running` after an interruption
+  (crash/restart) and marks them `unknown` — their outcome is unprovable.
+- `task retry <id>` resets a `failed`, `timed_out`, `unknown` or `cancelled`
+  task to `created` as a **new attempt**; it never rewrites history. Retrying
+  an `unknown` task prints a warning because side effects may be duplicated.
 
 ## Output modes
 

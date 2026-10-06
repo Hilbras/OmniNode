@@ -69,7 +69,10 @@ export function registerTaskCommands(program: Command): void {
   task
     .command("list")
     .description("List tasks in the project's task store.")
-    .option("-s, --status <status>", "Filter by status (created, queued, running, completed, failed, cancelled).")
+    .option(
+      "-s, --status <status>",
+      "Filter by status (created, queued, running, waiting, completed, failed, timed_out, cancelled, unknown, partially_completed).",
+    )
     .option("--json", "Emit tasks as JSON.")
     .action(async (options: { status?: string; json?: boolean }) => {
       const config = loadProjectConfig();
@@ -139,9 +142,23 @@ export function registerTaskCommands(program: Command): void {
   registerTaskInspect(task);
 }
 
+/**
+ * One-line explanations for states whose meaning is not obvious from the name
+ * (v2.0.3 Fix 05 — the CLI documents the actual state machine).
+ */
+const STATUS_HINTS: Partial<Record<Task["status"], string>> = {
+  unknown:
+    "the execution may have happened, but its outcome could not be proven — inspect results before retrying (a retry may duplicate side effects)",
+  timed_out: "the execution exceeded its configured timeout",
+  partially_completed: "some of the work completed while other work did not",
+  cancelled: "execution was explicitly cancelled",
+};
+
 function printOutcome(task: Task, options: { verbose?: boolean } = {}): void {
   console.log(`  id:      ${task.id}`);
   console.log(`  status:  ${task.status}`);
+  const hint = STATUS_HINTS[task.status];
+  if (hint) console.log(`  hint:    ${hint}`);
   console.log(`  created: ${task.createdAt}`);
   if (options.verbose) {
     console.log(`  project: ${task.project ?? "(none)"}`);
