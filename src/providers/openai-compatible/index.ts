@@ -13,8 +13,8 @@ import type { AuditSink } from "../../audit/index.js";
 import type { Modality, ModelInfo } from "../../types/model.js";
 import type { IChatProvider, ProviderConfig, ProviderStatus } from "../../types/provider.js";
 import { authHeaders } from "../auth.js";
-import { requestJson } from "../http.js";
-import { providerHttpError, providerTransportError } from "../errors.js";
+import { requestJson, type HttpResponse } from "../http.js";
+import { parseRetryAfter, providerHttpError, providerTransportError } from "../errors.js";
 import type { ProviderAuthentication } from "../../types/provider.js";
 
 interface OpenAIModelEntry {
@@ -43,7 +43,7 @@ export class OpenAICompatibleProvider implements IChatProvider {
   /** Discovered models, so getModel() answers without another round-trip. */
   private discovered?: ModelInfo[];
 
-  private readonly env: Record<string, string | undefined>;
+  protected readonly env: Record<string, string | undefined>;
 
   private readonly audit?: AuditSink;
 
@@ -89,8 +89,8 @@ export class OpenAICompatibleProvider implements IChatProvider {
     return response.body;
   }
 
-  private async modelsRequest(): Promise<{ status: number; body: unknown }> {
-    let response: { status: number; body: unknown; durationMs: number };
+  private async modelsRequest(): Promise<HttpResponse> {
+    let response: HttpResponse;
     try {
       response = await requestJson(`${this.config.baseUrl}/models`, {
         headers: authHeaders(this.config, this.env),
@@ -118,6 +118,9 @@ export class OpenAICompatibleProvider implements IChatProvider {
         body,
         durationMs: response.durationMs,
         dispatched: true,
+        ...(response.retryAfter !== undefined
+          ? { retryAfterMs: parseRetryAfter(response.retryAfter) }
+          : {}),
       });
       await this.recordProviderError("listModels", httpError);
       throw httpError;
@@ -127,7 +130,15 @@ export class OpenAICompatibleProvider implements IChatProvider {
 
   async listModels(): Promise<ModelInfo[]> {
     const body = await this.rawModelsResponse();
+    return this.modelsFromBody(body);
+  }
 
+  /**
+   * Maps a raw `/models` body onto the normalized model list. Exposed so a
+   * subclass can reuse a response it already fetched instead of issuing a
+   * second request.
+   */
+  protected modelsFromBody(body: unknown): ModelInfo[] {
     const entries = extractModelEntries(body, this.config);
     const models: ModelInfo[] = [];
     let skipped = 0;
@@ -243,7 +254,7 @@ export class OpenAICompatibleProvider implements IChatProvider {
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
-    let response: { status: number; body: unknown; durationMs: number };
+    let response: HttpResponse;
     try {
       response = await requestJson(`${this.config.baseUrl}/chat/completions`, {
         method: "POST",
@@ -274,6 +285,9 @@ export class OpenAICompatibleProvider implements IChatProvider {
         operation: "chat",
         status,
         body,
+        ...(response.retryAfter !== undefined
+          ? { retryAfterMs: parseRetryAfter(response.retryAfter) }
+          : {}),
         ...(status === 404
           ? {
               code: "MODEL_NOT_FOUND" as const,
@@ -347,7 +361,15 @@ export async function streamChatCompletion(
   }
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => undefined);
-    throw providerHttpError({ provider: config.name, operation: "stream", status: response.status, body });
+    throw providerHttpError({
+      provider: config.name,
+      operation: "stream",
+      status: response.status,
+      body,
+      ...(response.headers.get("retry-after") !== null
+        ? { retryAfterMs: parseRetryAfter(response.headers.get("retry-after")) }
+        : {}),
+    });
   }
   if (!response.body) {
     throw providerHttpError({
@@ -364,30 +386,41 @@ export async function streamChatCompletion(
   const decoder = new TextDecoder();
   let buffer = "";
 
-  for await (const piece of response.body as unknown as AsyncIterable<Uint8Array>) {
-    buffer += decoder.decode(piece, { stream: true });
-    let newline = buffer.indexOf("\n");
-    while (newline >= 0) {
-      const line = buffer.slice(0, newline).trim();
-      buffer = buffer.slice(newline + 1);
-      newline = buffer.indexOf("\n");
-      if (line.length === 0 || line.startsWith(":")) continue;
-      const data = line.startsWith("data:") ? line.slice(5).trim() : line;
-      if (data === "[DONE]") continue;
-      let event: Record<string, unknown>;
-      try {
-        event = JSON.parse(data) as Record<string, unknown>;
-      } catch {
-        continue; // tolerate non-JSON SSE noise
+  try {
+    for await (const piece of response.body as unknown as AsyncIterable<Uint8Array>) {
+      buffer += decoder.decode(piece, { stream: true });
+      let newline = buffer.indexOf("\n");
+      while (newline >= 0) {
+        const line = buffer.slice(0, newline).trim();
+        buffer = buffer.slice(newline + 1);
+        newline = buffer.indexOf("\n");
+        if (line.length === 0 || line.startsWith(":")) continue;
+        const data = line.startsWith("data:") ? line.slice(5).trim() : line;
+        if (data === "[DONE]") continue;
+        let event: Record<string, unknown>;
+        try {
+          event = JSON.parse(data) as Record<string, unknown>;
+        } catch {
+          continue; // tolerate non-JSON SSE noise
+        }
+        if (typeof event.model === "string") model = event.model;
+        const choices = Array.isArray(event.choices) ? event.choices : [];
+        const first = choices[0] as { delta?: { content?: unknown }; finish_reason?: unknown } | undefined;
+        const delta = typeof first?.delta?.content === "string" ? first.delta.content : "";
+        if (delta.length > 0) content += delta;
+        if (typeof first?.finish_reason === "string") finishReason = first.finish_reason;
+        onChunk({ delta, ...(finishReason !== undefined ? { finishReason } : {}), raw: event });
       }
-      if (typeof event.model === "string") model = event.model;
-      const choices = Array.isArray(event.choices) ? event.choices : [];
-      const first = choices[0] as { delta?: { content?: unknown }; finish_reason?: unknown } | undefined;
-      const delta = typeof first?.delta?.content === "string" ? first.delta.content : "";
-      if (delta.length > 0) content += delta;
-      if (typeof first?.finish_reason === "string") finishReason = first.finish_reason;
-      onChunk({ delta, ...(finishReason !== undefined ? { finishReason } : {}), raw: event });
     }
+  } catch (error) {
+    // A stream that breaks mid-flight is a transport failure. Left raw it
+    // escapes the provider error contract, so a caller cannot classify it
+    // like every other provider failure.
+    throw providerTransportError({
+      provider: config.name,
+      operation: "stream",
+      cause: error,
+    });
   }
 
   return { model, content, ...(finishReason !== undefined ? { finishReason } : {}) };

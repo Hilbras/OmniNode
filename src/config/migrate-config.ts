@@ -24,13 +24,21 @@ export interface ConfigMigrationResult {
   applied: boolean;
 }
 
+/** The number of entries in a YAML sequence node (0 when absent or not a sequence). */
+function sequenceLength(node: unknown): number {
+  const items = (node as { items?: unknown } | undefined)?.items;
+  return Array.isArray(items) ? items.length : 0;
+}
+
 /** Detects v1-isms without modifying anything (the `--check` view). */
 export function findConfigV1Patterns(path: string): ConfigMigrationFinding[] {
   const doc = parseDocument(readFileSync(path, "utf8"));
   const findings: ConfigMigrationFinding[] = [];
 
   const agents = doc.getIn(["project", "agents"]);
-  const agentCount = agents ? Number(doc.getIn(["project", "agents", "length"]) ?? 0) : 0;
+  // A YAML sequence has no "length" key: asking the document for one always
+  // returned undefined, so the whole agent migration was dead code.
+  const agentCount = sequenceLength(agents);
   for (let index = 0; index < agentCount; index += 1) {
     const prefix = `project.agents.${index}`;
     if (doc.getIn(["project", "agents", index, "inherit_env"]) === false) {
@@ -59,7 +67,7 @@ export function applyConfigMigration(path: string): ConfigMigrationResult {
   }
 
   const doc = parseDocument(readFileSync(path, "utf8"));
-  const agentCount = Number(doc.getIn(["project", "agents", "length"]) ?? 0);
+  const agentCount = sequenceLength(doc.getIn(["project", "agents"]));
   for (let index = 0; index < agentCount; index += 1) {
     const prefix = ["project", "agents", index];
     if (doc.getIn([...prefix, "inherit_env"]) === false) {

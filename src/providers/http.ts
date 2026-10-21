@@ -23,6 +23,8 @@ export interface HttpResponse {
   body: unknown;
   /** Wall-clock duration of the request (§23 Fix 04 — timeout detail model). */
   durationMs: number;
+  /** The `Retry-After` header, when the server sent one. */
+  retryAfter?: string;
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -54,5 +56,11 @@ export async function requestJson(
     throw new HttpResponseError(`Response from ${url} was not valid JSON.`, response.status, error);
   }
 
-  return { status: response.status, body: parsed, durationMs: Date.now() - startedAt };
+  const retryAfter = response.headers.get("retry-after") ?? undefined;
+  return {
+    status: response.status,
+    body: parsed,
+    durationMs: Date.now() - startedAt,
+    ...(retryAfter !== undefined ? { retryAfter } : {}),
+  };
 }

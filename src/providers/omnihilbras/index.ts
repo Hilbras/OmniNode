@@ -28,11 +28,12 @@ export class OmniHilbrasProvider extends OpenAICompatibleProvider {
   private gateway?: Record<string, unknown>;
 
   override async listModels(): Promise<ModelInfo[]> {
-    // Capture gateway-level metadata from the discovery response, then
-    // delegate to the shared OpenAI-compatible discovery.
+    // Capture gateway-level metadata from the discovery response, then map
+    // the models from that SAME response — fetching twice made every
+    // listModels() call two requests.
     const raw = await this.rawModelsResponse();
     await this.extractGatewayMetadata(raw);
-    const models = await super.listModels();
+    const models = this.modelsFromBody(raw);
     return this.gateway
       ? models.map((model) => ({ ...model, metadata: { ...model.metadata, gateway: this.gateway } }))
       : models;
@@ -60,7 +61,9 @@ export class OmniHilbrasProvider extends OpenAICompatibleProvider {
 
   async connectAndRegister(registry?: ModelRegistry): Promise<OmniHilbrasConnectionResult> {
     // Authenticate — throws PROVIDER_AUTH_FAILED when the referenced env var is unset.
-    const apiKey = resolveApiKey(this.config);
+    // The provider's injected environment is used, not process.env, so a
+    // caller-supplied env is honoured.
+    const apiKey = resolveApiKey(this.config, this.env);
 
     // Fetch models — throws on transport errors and non-2xx responses.
     const discovered = await this.listModels();

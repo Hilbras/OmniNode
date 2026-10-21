@@ -40,16 +40,20 @@ function assertProviderConfig(config: ProviderConfig): void {
 
 export function createProvider(config: ProviderConfig, options: CreateProviderOptions = {}): IChatProvider {
   assertProviderConfig(config);
-  const shared = {
-    ...(options.env !== undefined ? { env: options.env } : {}),
-    ...(options.audit !== undefined ? { audit: options.audit } : {}),
-  };
+  // A provider can be configured but switched off. The flag was parsed and
+  // displayed but never honoured, so a disabled provider was still created
+  // and used.
+  if (config.enabled === false) {
+    throw new ConfigError(
+      "CONFIG_INVALID",
+      `Provider "${config.name}" is disabled (enabled: false) in the project configuration.`,
+    );
+  }
   if (config.type === "omnihilbras") {
     return new OmniHilbrasProvider(config, undefined, options.env, options.audit);
   }
   if (OPENAI_COMPATIBLE_TYPES.includes(config.type)) {
     return new OpenAICompatibleProvider(config, undefined, options.env, options.audit);
   }
-  void shared;
   throw new OmniNodeError("NOT_IMPLEMENTED", `Provider type "${config.type}" has no adapter yet.`);
 }
