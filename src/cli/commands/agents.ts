@@ -7,7 +7,13 @@ import { exitCodeForStatus } from "../exit-codes.js";
 import { appendToConfigList } from "./shared.js";
 import { registerAgentInspect } from "./inspect.js";
 import { loadProjectConfig } from "../options.js";
-const collectArgs = (value: string, previous: string[]): string[] => [...previous, value];
+// Commander passes `undefined` as `previous` for a repeatable option that has
+// no default value, so the accumulator must tolerate it — otherwise
+// `--allow-env` / `--deny-env` crash with "previous is not iterable".
+const collectArgs = (value: string, previous: string[] | undefined): string[] => [
+  ...(previous ?? []),
+  value,
+];
 
 interface AddAgentOptions {
   name: string;
