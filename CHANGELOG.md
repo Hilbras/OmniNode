@@ -4,6 +4,46 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+
+- **The published package no longer advertises exports that do not exist**
+  (v3 audit M0): `dist/index.d.ts` exported `MemoryStore` and
+  `TERMINAL_TASK_STATUSES` as values while `dist/index.js` did not provide
+  them, so a consumer importing either name in a value position failed at
+  import time with `SyntaxError: The requested module ... does not provide an
+  export named ...`. `MemoryStore` is now a type-alias declaration, and
+  `TERMINAL_TASK_STATUSES` moved out of the type-only `src/types` barrel into
+  the tasks layer and is exported as a real value. A new
+  `tests/package-exports.test.ts` asserts `.d.ts`↔runtime parity and that
+  every public name in `docs/API.md` resolves in the package.
+- **The agent-protocol message budget is measured in bytes, not characters**
+  (v3 audit M4.1): `decodeMessage`/`encodeMessage` compared UTF-16 code units
+  against the 1 MiB limit, so a multi-byte payload could exceed the documented
+  limit by a large factor. The violation message now reports bytes.
+- **`ProtocolDecoder` is linear on a newline-free stream** (v3 audit M4.2):
+  `push()` re-scanned the whole buffer on every chunk, making a long
+  newline-free agent stream quadratic — slow enough to trip the suite's
+  5-second default timeout. Chunks are now accumulated and joined only when a
+  newline is present.
+- **The protocol decoder resynchronises after an oversized line** (v3 audit
+  M4.3): the rest of an oversized line was re-parsed, producing a second, bogus
+  `INVALID_JSON` violation on the task's `protocol.violations`.
+- **The legacy (v1) protocol branch keeps the agent's own timestamp**
+  (v3 audit M4.4): it hardcoded the decoder's clock, so v1 agents were not
+  traceable, and it accepted a non-string timestamp that v2 rejects.
+
+### Changed
+
+- **The test suite no longer depends on the 5-second default timeout**
+  (v3 audit M8.4): `vitest.config.ts` sets an explicit 30 s test and hook
+  timeout so slow integration tests fail on their assertion rather than on the
+  clock.
+- **`docs/API.md` no longer lists withheld internals as public**
+  (v3 audit M7a): `STORE_FILES` is documented as an internal implementation
+  detail, matching the public-surface guard in `tests/public-api.test.ts`.
+
 ## [2.0.3] — final hardening & release polish (per the v2.0.3 plan)
 
 ### Fixed
