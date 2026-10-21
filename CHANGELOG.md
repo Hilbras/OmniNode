@@ -4,7 +4,12 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
-## [2.0.4] — v3 audit remediation (data loss, crashes, CI)
+## [2.0.4-alpha.1] — v3 audit remediation (data loss, crashes, CI)
+
+> **Prerelease.** This is the v3 audit remediation, published on the `next`
+> channel. The `2.0.4` version was briefly published to `latest` and has been
+> deprecated — install `2.0.4-alpha.1` for the fixes, or `2.0.3` for the last
+> stable release.
 
 ### Fixed
 

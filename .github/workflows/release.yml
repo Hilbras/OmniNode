@@ -59,3 +59,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          # A prerelease tag (vX.Y.Z-alpha.N) must be marked as a prerelease
+          # on GitHub too — otherwise it shows up as "Latest" while the npm
+          # `latest` dist-tag still points at the previous stable version.
+          prerelease: ${{ contains(github.ref_name, '-') }}
