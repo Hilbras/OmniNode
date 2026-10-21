@@ -412,6 +412,11 @@ Every confirmed critical and high finding, and where it was fixed. Branch:
 `fix/audit-m0-m4-correctness`. Each fix ships with a regression test that
 fails without it.
 
+**Status: every confirmed critical and high finding is fixed.** The gate is
+green: `npm run verify` (lint + typecheck + 70 test files / 1017 tests +
+build), `npm run test:coverage` (97.12% statements / 90.48% branches / 98.37%
+functions / 97.63% lines, and a per-file floor), and `npm run gates`.
+
 | # | Finding | Fixed in | Test |
 | --- | --- | --- | --- |
 | 1.1 | Published package advertises two non-existent exports | `563c489` | `tests/package-exports.test.ts` |
@@ -424,20 +429,20 @@ fails without it.
 | 1.8 | A store file from a newer OmniNode is destroyed | `755a152` | `tests/persistence-durability.test.ts` |
 | 1.9 | `pipeline create` can brick a project | `6defc34` | `tests/cli-correctness.test.ts` |
 | 1.10 | Empty config crashes with an opaque `TypeError` | `dbbdea5` | `tests/config-provider-correctness.test.ts` |
-| H1 | Documented profile example does not load | `M7a` | `tests/docs-examples.test.ts` |
+| H1 | Documented profile example does not load | `2bd3cfd` | `tests/docs-examples.test.ts` |
 | H2 | `config` group ignores `--config` / `--profile` | `6defc34` | `tests/cli-correctness.test.ts` |
 | H3 | A timed-out task exits 0 | `6defc34` | `tests/cli-correctness.test.ts` |
 | H4 | Protocol message budget counted in code units | `bb5d23b` | `tests/protocol-codec.test.ts` |
 | H5 | `ProtocolDecoder` is O(n²) | `bb5d23b` | `tests/protocol-codec.test.ts` |
 | H6 | Decoder does not resync after OVERSIZED | `bb5d23b` | `tests/protocol-codec.test.ts` |
 | H7 | `max_output_bytes` counted in code units | `3bed470` | `tests/process-lifecycle.test.ts` |
-| H8 | Agreement counted per occurrence, not per agent | `M7a` | `tests/report-aggregation.test.ts` |
-| H9 | Every agent's fix attributed to the first | `M7a` | `tests/report-aggregation.test.ts` |
+| H8 | Agreement counted per occurrence, not per agent | `928c20d` | `tests/report-aggregation.test.ts` |
+| H9 | Every agent's fix attributed to the first | `928c20d` | `tests/report-aggregation.test.ts` |
 | H10 | `connectAndRegister` reads `process.env` | `dbbdea5` | `tests/config-provider-correctness.test.ts` |
 | H11 | `listModels()` performs two requests | `dbbdea5` | `tests/config-provider-correctness.test.ts` |
 | H12 | Mid-stream failure escapes un-normalized | `dbbdea5` | `tests/config-provider-correctness.test.ts` |
 | H13 | The agent half of the config migration never runs | `dbbdea5` | `tests/config-provider-correctness.test.ts` |
-| H14 | QUESTION → RESPONSE round trip unreachable | doc-corrected in `M7a` | `docs/PROTOCOL.md` |
+| H14 | QUESTION → RESPONSE round trip unreachable | doc-corrected in `2bd3cfd` | `docs/PROTOCOL.md` |
 | H15 | Legacy v1 branch discards the timestamp | `bb5d23b` | `tests/protocol-codec.test.ts` |
 | H16 | `Retry-After` never read | `dbbdea5` | `tests/config-provider-correctness.test.ts` |
 | H17 | Memory write-back rejects after success | `f07b7b8` | `tests/state-integrity.test.ts` |
@@ -451,13 +456,19 @@ fails without it.
 | — | stderr flooding truncates but does not kill | `3bed470` | `tests/process-lifecycle.test.ts` |
 | — | `cancel()` has no SIGKILL escalation | `3bed470` | `tests/process-lifecycle.test.ts` |
 | — | Unknown `env_policy` fails open | `3bed470` | `tests/process-lifecycle.test.ts` |
-| — | Release path never runs the gates | `M8` | — |
-| — | Tag never compared to the package version | `M8` | — |
-| — | `npm.cmd` on Windows fails the package gate | `M8` | `tests/release-gates.test.ts` |
+| — | Release path never runs the gates | `63bdefe` | — |
+| — | Tag never compared to the package version | `63bdefe` | — |
+| — | `npm.cmd` on Windows fails the package gate | `63bdefe` | `tests/release-gates.test.ts` |
 | — | No `testTimeout` in the vitest config | `f679f77` | — |
-| — | Coverage gate is a tree-wide average | `M8` | — |
-| — | The package-contents test is vacuous | `M8` | `tests/release-gates.test.ts` |
+| — | Coverage gate is a tree-wide average | `b736436` | — |
+| — | The package-contents test is vacuous | `63bdefe` | `tests/release-gates.test.ts` |
 | — | The api-surface guard checks the wrong contract | `563c489` | `tests/package-exports.test.ts` |
+
+### Extra defects found while closing the coverage gaps
+
+| Finding | Fixed in | Test |
+| --- | --- | --- |
+| `omninode agent add --allow-env HOME` crashed with `TypeError: previous is not iterable` — the repeatable-option accumulator spread `previous` directly, but Commander passes `undefined` for an option with no default | `2ed3ae4` | `tests/cli-agents-audit-roles-coverage.test.ts` |
 
 **Deferred to v3.0.0** (public-API or semantic changes, per
 `docs/ROADMAP_V3.md` principle 4): the `HELLO_ACK` / `CANCEL` / `ARTIFACT`
