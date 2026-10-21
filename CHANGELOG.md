@@ -147,6 +147,42 @@ All notable changes to `@hilbras/omninode`. Format follows
   M6.6): a mid-stream failure escaped as a raw error instead of the
   normalized provider error, and the `Retry-After` header was never read, so
   `details.retryAfterMs` was always absent.
+- **The release path now runs the release gates and checks the tag**
+  (v3 audit M8.1, M8.2): the publish workflow skipped the version, package
+  and secret gates entirely, and never compared the git tag with the
+  package version — a mismatched tag published silently. Both checks now run
+  before `npm publish`.
+- **The release gates work on Windows** (v3 audit M8.3): the package gate
+  shelled out to `npm`, which on Windows is `npm.cmd` and cannot be spawned
+  directly, so the gate always failed there. The failure was invisible
+  because the asserting test is skipped on the Windows lane. The gate now
+  uses the right executable and the CI `gates` job runs on Windows too.
+- **The coverage gate is per-file, not a tree-wide average** (v3 audit
+  M8.5): the v3 roadmap asked for a per-file floor so a new module with no
+  tests cannot be absorbed by the average, and the configuration only
+  enforced the average. Every file under `src/` must now meet the floor on
+  its own.
+- **The package-contents test is no longer vacuous** (v3 audit M8.6): it
+  asserted against the real file list, which is empty whenever the npm
+  invocation fails — so it passed on Windows even if the package shipped
+  `tests/` and `src/`. The rule is now asserted directly against a
+  synthetic file list.
+- **The documented configuration examples load** (v3 audit M7a): the profile
+  example in `docs/CONFIGURATION.md` put `memory` at the root of the overlay
+  instead of inside `project:`, so the documented file failed to load with
+  `CONFIG_INVALID`. A new test loads the documented examples so the docs
+  cannot drift again.
+- **The protocol documentation states what is not implemented yet** (v3
+  audit M7a): `HELLO_ACK`, the `RESPONSE` answer to an agent `QUESTION`, and
+  `ARTIFACT` persistence are described as available. `docs/PROTOCOL.md` now
+  says plainly that they are not wired up in v2.x and names v3.0.0.
+- **Report agreement needs two distinct agents** (v3 audit M7a): agreement
+  was counted per report occurrence, so one agent reporting the same finding
+  twice created a fake consensus.
+- **A report conflict names each agent's own fix** (v3 audit M7a): when
+  agents proposed different fixes, every position was attributed the first
+  agent's recommendation. Each agent's fix is now kept, and the aggregated
+  finding carries `recommendationBySource`.
 - **`docs/API.md` no longer lists withheld internals as public**
   (v3 audit M7a): `STORE_FILES` is documented as an internal implementation
   detail, matching the public-surface guard in `tests/public-api.test.ts`.

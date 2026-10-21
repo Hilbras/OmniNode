@@ -406,6 +406,65 @@ They are listed so they are not re-investigated.
 
 ---
 
+## 8. Remediation status
+
+Every confirmed critical and high finding, and where it was fixed. Branch:
+`fix/audit-m0-m4-correctness`. Each fix ships with a regression test that
+fails without it.
+
+| # | Finding | Fixed in | Test |
+| --- | --- | --- | --- |
+| 1.1 | Published package advertises two non-existent exports | `563c489` | `tests/package-exports.test.ts` |
+| 1.2 | A throwing step leaves the run `running` forever | `f07b7b8` | `tests/state-integrity.test.ts` |
+| 1.3 | Concurrent `run()` executes the agent twice | `f07b7b8` | `tests/state-integrity.test.ts` |
+| 1.4 | `cancel()` destroys the attempt's result/history | `f07b7b8` | `tests/state-integrity.test.ts` |
+| 1.5 | stdin never closed in `arg` mode | `3bed470` | `tests/process-lifecycle.test.ts` |
+| 1.6 | Un-awaited `session.handle()` can crash the process | `3bed470` | `tests/process-lifecycle.test.ts` |
+| 1.7 | SIGINT listener removes Node's default exit | `3bed470` | `tests/process-lifecycle.test.ts` |
+| 1.8 | A store file from a newer OmniNode is destroyed | `755a152` | `tests/persistence-durability.test.ts` |
+| 1.9 | `pipeline create` can brick a project | `6defc34` | `tests/cli-correctness.test.ts` |
+| 1.10 | Empty config crashes with an opaque `TypeError` | `dbbdea5` | `tests/config-provider-correctness.test.ts` |
+| H1 | Documented profile example does not load | `M7a` | `tests/docs-examples.test.ts` |
+| H2 | `config` group ignores `--config` / `--profile` | `6defc34` | `tests/cli-correctness.test.ts` |
+| H3 | A timed-out task exits 0 | `6defc34` | `tests/cli-correctness.test.ts` |
+| H4 | Protocol message budget counted in code units | `bb5d23b` | `tests/protocol-codec.test.ts` |
+| H5 | `ProtocolDecoder` is O(n²) | `bb5d23b` | `tests/protocol-codec.test.ts` |
+| H6 | Decoder does not resync after OVERSIZED | `bb5d23b` | `tests/protocol-codec.test.ts` |
+| H7 | `max_output_bytes` counted in code units | `3bed470` | `tests/process-lifecycle.test.ts` |
+| H8 | Agreement counted per occurrence, not per agent | `M7a` | `tests/report-aggregation.test.ts` |
+| H9 | Every agent's fix attributed to the first | `M7a` | `tests/report-aggregation.test.ts` |
+| H10 | `connectAndRegister` reads `process.env` | `dbbdea5` | `tests/config-provider-correctness.test.ts` |
+| H11 | `listModels()` performs two requests | `dbbdea5` | `tests/config-provider-correctness.test.ts` |
+| H12 | Mid-stream failure escapes un-normalized | `dbbdea5` | `tests/config-provider-correctness.test.ts` |
+| H13 | The agent half of the config migration never runs | `dbbdea5` | `tests/config-provider-correctness.test.ts` |
+| H14 | QUESTION → RESPONSE round trip unreachable | doc-corrected in `M7a` | `docs/PROTOCOL.md` |
+| H15 | Legacy v1 branch discards the timestamp | `bb5d23b` | `tests/protocol-codec.test.ts` |
+| H16 | `Retry-After` never read | `dbbdea5` | `tests/config-provider-correctness.test.ts` |
+| H17 | Memory write-back rejects after success | `f07b7b8` | `tests/state-integrity.test.ts` |
+| H18 | The cwd "access" check can never fail | `3bed470` | `tests/process-lifecycle.test.ts` |
+| H19 | `models --capability` can never return a model | v3.0.0 | — |
+| H20 | `PLANNER_FAILED` never thrown | v3.0.0 | — |
+| — | `provider.enabled` parsed but never honoured | `dbbdea5` | `tests/config-provider-correctness.test.ts` |
+| — | `OMNINODE_CONFIG` documented but never read | v3.0.0 | — |
+| — | `AgentConfig.allowedModels` never honoured | v3.0.0 | — |
+| — | Concurrent atomic writes corrupt each other | `755a152` | `tests/persistence-durability.test.ts` |
+| — | stderr flooding truncates but does not kill | `3bed470` | `tests/process-lifecycle.test.ts` |
+| — | `cancel()` has no SIGKILL escalation | `3bed470` | `tests/process-lifecycle.test.ts` |
+| — | Unknown `env_policy` fails open | `3bed470` | `tests/process-lifecycle.test.ts` |
+| — | Release path never runs the gates | `M8` | — |
+| — | Tag never compared to the package version | `M8` | — |
+| — | `npm.cmd` on Windows fails the package gate | `M8` | `tests/release-gates.test.ts` |
+| — | No `testTimeout` in the vitest config | `f679f77` | — |
+| — | Coverage gate is a tree-wide average | `M8` | — |
+| — | The package-contents test is vacuous | `M8` | `tests/release-gates.test.ts` |
+| — | The api-surface guard checks the wrong contract | `563c489` | `tests/package-exports.test.ts` |
+
+**Deferred to v3.0.0** (public-API or semantic changes, per
+`docs/ROADMAP_V3.md` principle 4): the `HELLO_ACK` / `CANCEL` / `ARTIFACT`
+protocol round trips, `OMNINODE_CONFIG`, model `capabilities`, agent
+`allowedModels`, the public-API pruning listed in §3.2–§3.3, and the
+remaining 301 medium/low findings in the appendix.
+
 ## Appendix — all 391 findings
 
 ### `src/agents/` — 34 findings
