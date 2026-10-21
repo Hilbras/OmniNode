@@ -10,6 +10,12 @@ import { defineConfig } from "vitest/config";
 // change erodes coverage, not because of an aspirational target.
 export default defineConfig({
   test: {
+    // The default 5 s timeout is too tight for the slower integration tests
+    // (child processes, local HTTP servers) on a loaded CI runner, which made
+    // them fail intermittently. Failures should come from the assertion, not
+    // from the clock.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
