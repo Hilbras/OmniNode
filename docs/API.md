@@ -75,7 +75,7 @@ for `loadConfig`/`AppConfig`/schemas; helpers Experimental.
 | `createProvider`, `OPENAI_COMPATIBLE_TYPES` | config→adapter factory | Stable |
 | `resolveApiKey`, `authHeaders`, `AuthRef` | credential resolution from env | Stable |
 | `providerHttpError`, `providerTransportError`, `kindFromStatus`, `isTimeoutError`, `isNetworkError`, `isRetryable`, `extractMessage`, `parseRetryAfter`, `ProviderErrorKind` | error normalization (§10) | Stable |
-| `requestJson`, `HttpResponseError` | transport-level HTTP helper | Experimental |
+| `requestJson` | transport-level HTTP helper | Experimental |
 
 ## Registry, agents, roles (`src/registry`, `src/agents`, `src/roles`)
 
@@ -119,8 +119,9 @@ Stable.
 
 `JsonFileStore`, `ProjectStores`, `SCHEMA_VERSION`, `inspectDocument`,
 `readDocument`, `writeFileAtomic`, `migrateProjectStores`, `MigrationReport`,
-`STORE_FILES`, `DocumentState` — Stable (v2). Canonical interface aliases
+`DocumentState` — Stable (v2). Canonical interface aliases
 (`PipelineStore`, `MemoryStore`, `AuditStore`) in `store-types.ts` — Stable.
+`STORE_FILES` is an internal implementation detail and is not exported.
 
 ## CLI helpers (`src/cli`)
 
