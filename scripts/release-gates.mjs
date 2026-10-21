@@ -114,6 +114,18 @@ const ALLOWLISTED_FILES = new Set([
   "tests/release-gates.test.ts", // synthetic patterns for the scanner's own tests
 ]);
 
+/**
+ * Whether a repository-relative path is on the secret-scanner allowlist.
+ *
+ * The allowlist is written with forward slashes, so the path is normalized
+ * first: on Windows `path.relative` yields backslashes, and without this
+ * every allowlisted file would be reported as a false positive — the gate
+ * failed there on every run.
+ */
+export function isAllowlistedSecretFile(relative) {
+  return ALLOWLISTED_FILES.has(relative.replace(/\\/g, "/"));
+}
+
 export function scanSecrets(repoRoot = root) {
   const findings = [];
   const walk = (dir) => {
@@ -125,7 +137,7 @@ export function scanSecrets(repoRoot = root) {
         continue;
       }
       const relative = path.relative(repoRoot, full);
-      if (ALLOWLISTED_FILES.has(relative)) continue;
+      if (isAllowlistedSecretFile(relative)) continue;
       // Secrets hide in .key/.pem/.env files as often as in source files.
       if (!/\.(ts|mts|cts|js|mjs|cjs|json|ya?ml|sh|md|txt|key|pem|env|npmrc|conf)$/.test(full) && !/(^|\/)\.env(\..+)?$/.test(full)) {
         continue;

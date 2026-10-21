@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   checkVersionConsistency,
   forbiddenPackFiles,
+  isAllowlistedSecretFile,
   scanSecrets,
   validatePackContents,
 } from "../scripts/release-gates.mjs";
@@ -74,6 +75,18 @@ describe("secret scanning gate", () => {
       "README.md": "How to configure providers.",
     });
     expect(scanSecrets(dir).ok).toBe(true);
+  });
+
+  it("honours the allowlist regardless of the path separator", () => {
+    // The allowlist is written with forward slashes. On Windows
+    // `path.relative` yields backslashes, so without normalization every
+    // allowlisted file would be reported as a false positive — the gate
+    // failed there on every run.
+    expect(isAllowlistedSecretFile("docs/SECURITY.md")).toBe(true);
+    expect(isAllowlistedSecretFile("docs\\SECURITY.md")).toBe(true);
+    expect(isAllowlistedSecretFile("CHANGELOG.md")).toBe(true);
+    expect(isAllowlistedSecretFile("src/app.ts")).toBe(false);
+    expect(isAllowlistedSecretFile("src\\app.ts")).toBe(false);
   });
 
   it("flags committed credentials and private keys", () => {

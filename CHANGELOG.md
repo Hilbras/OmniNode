@@ -183,6 +183,11 @@ All notable changes to `@hilbras/omninode`. Format follows
   agents proposed different fixes, every position was attributed the first
   agent's recommendation. Each agent's fix is now kept, and the aggregated
   finding carries `recommendationBySource`.
+- **The secret-scan gate no longer fails on Windows** (v3 audit CI): the
+  allowlist is written with forward slashes, but `path.relative` yields
+  backslashes on Windows, so every allowlisted file was reported as a false
+  positive and the gate failed on every run. The path is normalized before
+  the lookup.
 - **The dependency audit gate is green again** (v3 audit CI): two upstream
   advisories had been published since the last release — a `high` severity
   `vite` `launch-editor` issue on Windows and a `low` severity `esbuild`
