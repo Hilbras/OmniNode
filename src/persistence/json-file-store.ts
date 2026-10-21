@@ -47,6 +47,27 @@ export interface JsonFileStoreOptions {
 export type Durability = "rename" | "fsync";
 
 /**
+ * Renames a file, retrying the transient failures Windows reports when the
+ * destination is briefly locked — an indexer, an antivirus scanner, or another
+ * writer that still has the file open. `fs.rename` on Windows maps to
+ * `MoveFileEx`, which fails with EPERM/EBUSY in that situation, so without
+ * the retry an "atomic" write can fail on a perfectly healthy filesystem.
+ */
+async function renameWithRetry(from: string, to: string, attempts = 6): Promise<void> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      await rename(from, to);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      const transient = code === "EPERM" || code === "EBUSY" || code === "EACCES";
+      if (!transient || attempt === attempts - 1) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 10 * (attempt + 1)));
+    }
+  }
+}
+
+/**
  * Writes a file atomically: temp → rename. The rename guarantees readers
  * never observe a torn file. With `durability: "fsync"` the data and the
  * directory entry are also flushed, which additionally survives power loss —
@@ -74,7 +95,7 @@ export async function writeFileAtomic(
     await writeFile(tmp, contents, "utf8");
   }
 
-  await rename(tmp, target);
+  await renameWithRetry(tmp, target);
 
   if (durability === "fsync") {
     try {

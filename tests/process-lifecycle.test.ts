@@ -107,7 +107,10 @@ describe("M3.2 — the protocol handler cannot crash the process", () => {
 });
 
 describe("M3.3 — Ctrl+C still ends the process", () => {
-  it("exits the process on a repeated signal", async () => {
+  // Windows has no catchable SIGINT for a child process: `process.kill(pid,
+  // "SIGINT")` terminates the target outright, so the handler cannot be
+  // exercised there. The POSIX behaviour is what the fix is about.
+  it.skipIf(process.platform === "win32")("exits the process on a repeated signal", async () => {
     // The adapter installs a signal listener, which by itself removes Node's
     // default terminate behaviour. The process must still be able to exit:
     // the first signal asks the agents to stop, the second ends OmniNode.
@@ -236,7 +239,9 @@ describe("M3.7 — an unknown environment policy fails closed", () => {
 });
 
 describe("M3.8 — the working directory is really checked for access", () => {
-  it("rejects a directory that cannot be written to", () => {
+  // Windows permission bits do not restrict a directory the way POSIX mode
+  // bits do, so the check cannot be provoked there.
+  it.skipIf(process.platform === "win32")("rejects a directory that cannot be written to", () => {
     const dir = tmp();
     const target = path.join(dir, "readonly");
     try {

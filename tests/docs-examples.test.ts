@@ -15,10 +15,15 @@ import { tmpdir } from "node:os";
 
 const DOCS = path.resolve(__dirname, "..", "docs");
 
-/** Extracts every fenced YAML block from a markdown document. */
+/**
+ * Extracts every fenced YAML block from a markdown document.
+ *
+ * The line ending is matched explicitly: a checkout on Windows may carry CRLF,
+ * and a bare `\n` would find no blocks at all.
+ */
 function yamlBlocks(markdown: string): string[] {
   const blocks: string[] = [];
-  const pattern = /```ya?ml\n([\s\S]*?)```/g;
+  const pattern = /```ya?ml\r?\n([\s\S]*?)```/g;
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(markdown)) !== null) {
     blocks.push(match[1]!);
@@ -31,8 +36,9 @@ function section(markdown: string, heading: string): string {
   const start = markdown.indexOf(heading);
   if (start < 0) return "";
   const rest = markdown.slice(start + heading.length);
-  const next = rest.indexOf("\n## ");
-  return next < 0 ? rest : rest.slice(0, next);
+  const next = rest.search(/\r?\n## /);
+  if (next >= 0) return rest.slice(0, next);
+  return rest;
 }
 
 function loadBlock(name: string, content: string): ReturnType<typeof loadConfigDetailed> {

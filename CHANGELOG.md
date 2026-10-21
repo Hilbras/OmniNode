@@ -183,6 +183,13 @@ All notable changes to `@hilbras/omninode`. Format follows
   agents proposed different fixes, every position was attributed the first
   agent's recommendation. Each agent's fix is now kept, and the aggregated
   finding carries `recommendationBySource`.
+- **An atomic write no longer fails when Windows briefly locks the file**
+  (v3 audit CI): `fs.rename` on Windows cannot replace a file that another
+  process still has open — an indexer, an antivirus scanner, a concurrent
+  writer — and failed with `EPERM`. The atomic write now retries a transient
+  refusal before giving up.
+- **The documented examples load on a Windows checkout** (v3 audit CI): the
+  doc test matched a bare `\n`, so a CRLF checkout found no code block at all.
 - **`omninode agent add --allow-env <name>` no longer crashes** (v3 audit
   M8.5): the repeatable-option accumulator spread `previous` directly, but
   Commander passes `undefined` for an option that has no default value, so
