@@ -103,6 +103,8 @@ export interface AggregatedFinding {
   confidenceBySource?: Record<string, Confidence>;
   /** Distinct recommendations attached to this finding across reports. */
   recommendations?: string[];
+  /** Per-agent recommendation, so a conflict can name each agent's own fix. */
+  recommendationBySource?: Record<string, string>;
   /** Typed evidence, normalized from strings when reports were ingested. */
   evidence: Evidence[];
 }

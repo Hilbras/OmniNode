@@ -57,13 +57,17 @@ export function aggregateReports(reports: Report[], options: AggregateOptions = 
   const sources = [...new Set(reports.map((r) => r.agent))].sort();
   const totalRawFindings = reports.reduce((sum, r) => sum + r.findings.length, 0);
   const conflicts = detectConflicts(findingGroups);
-  // Agreement = independently reported by 2+ agents with the same severity.
-  const agreements = findingGroups.filter(
-    (group) =>
-      group.sources.length > 1 &&
+  // Agreement = independently reported by 2+ DISTINCT agents with the same
+  // severity. Counting report occurrences instead would let one agent that
+  // reported the same finding twice create a fake consensus.
+  const agreements = findingGroups.filter((group) => {
+    const agents = new Set(group.sources.map((s) => s.agent));
+    return (
+      agents.size > 1 &&
       group.severity !== undefined &&
-      new Set(Object.values(group.severityBySource ?? {})).size === 1,
-  );
+      new Set(Object.values(group.severityBySource ?? {})).size === 1
+    );
+  });
   // Bound memory: keep the highest-severity groups, count the rest (§24).
   const maxFindings = options.maxFindings ?? MAX_COMBINED_FINDINGS;
   const orderedFindings = findingGroups.sort((a, b) => rank(b) - rank(a));
@@ -154,7 +158,9 @@ function position(
     ...(group.confidenceBySource?.[source.agent] !== undefined
       ? { confidence: group.confidenceBySource[source.agent] }
       : {}),
-    ...(group.recommendations?.[0] !== undefined ? { recommendation: group.recommendations[0] } : {}),
+    ...(group.recommendationBySource?.[source.agent] !== undefined
+      ? { recommendation: group.recommendationBySource[source.agent] }
+      : {}),
   };
 }
 
@@ -183,8 +189,13 @@ function mergeFinding(groups: AggregatedFinding[], finding: Finding, report: Rep
     if (finding.confidence) {
       group.confidenceBySource = { ...group.confidenceBySource, [report.agent]: finding.confidence };
     }
-    if (finding.recommendation && !group.recommendations?.includes(finding.recommendation)) {
-      group.recommendations = [...(group.recommendations ?? []), finding.recommendation];
+    if (finding.recommendation) {
+      if (!group.recommendations?.includes(finding.recommendation)) {
+        group.recommendations = [...(group.recommendations ?? []), finding.recommendation];
+      }
+      // The recommendation belongs to the agent that proposed it — a flat
+      // list cannot say who said what.
+      group.recommendationBySource = { ...group.recommendationBySource, [report.agent]: finding.recommendation };
     }
     return;
   }
@@ -198,6 +209,7 @@ function mergeFinding(groups: AggregatedFinding[], finding: Finding, report: Rep
     ...(finding.severity ? { severityBySource: { [report.agent]: finding.severity } } : {}),
     ...(finding.confidence ? { confidenceBySource: { [report.agent]: finding.confidence } } : {}),
     ...(finding.recommendation ? { recommendations: [finding.recommendation] } : {}),
+    ...(finding.recommendation ? { recommendationBySource: { [report.agent]: finding.recommendation } } : {}),
     evidence: [...(normalizeEvidence(finding.evidence) ?? [])],
   });
 }
