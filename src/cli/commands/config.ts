@@ -5,9 +5,23 @@
 import type { Command } from "commander";
 import { readFileSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
-import { configDiagnostics, loadConfigDetailed, scanForInlineSecrets } from "../../config/index.js";
+import { configDiagnostics, loadConfigDetailed, scanForInlineSecrets, type LoadConfigResult } from "../../config/index.js";
 import { OmniNodeError } from "../../errors/index.js";
-import { activeConfigPath } from "../options.js";
+import { activeConfigPath, cliConfigOptions } from "../options.js";
+
+/**
+ * Loads the configuration honoring the global `--config` / `--profile`
+ * options. The `config` command group used to call `loadConfigDetailed()`
+ * directly, so `--config` and `--profile` were silently ignored here while
+ * every other command group honoured them.
+ */
+function loadActiveConfig(): LoadConfigResult {
+  return loadConfigDetailed({
+    ...(cliConfigOptions.path !== undefined ? { path: cliConfigOptions.path } : {}),
+    ...(cliConfigOptions.profile !== undefined ? { profile: cliConfigOptions.profile } : {}),
+  });
+}
+
 export function registerConfigCommands(program: Command): void {
   const config = program
     .command("config")
@@ -26,7 +40,7 @@ export function registerConfigCommands(program: Command): void {
     .description("Print the effective configuration (credential references only, never values).")
     .option("--json", "Emit the configuration as JSON.")
     .action((options: { json?: boolean }) => {
-      const resolved = loadConfigDetailed().config;
+      const resolved = loadActiveConfig().config;
       const payload = {
         project: resolved.project.name,
         providers: resolved.project.providers.map((p) => ({
@@ -60,7 +74,7 @@ export function registerConfigCommands(program: Command): void {
       const path = activeConfigPath();
       const raw = path ? (parseYaml(readFileSync(path, "utf8")) as { profile?: string; profiles?: Record<string, unknown> }) : {};
       const names = Object.keys(raw.profiles ?? {});
-      const active = loadConfigDetailed().sources.profile;
+      const active = loadActiveConfig().sources.profile;
       console.log(`active:  ${active}`);
       console.log(`defined: ${names.length > 0 ? names.join(", ") : "none (add a `profiles:` section)"}`);
     });
@@ -78,7 +92,7 @@ export function registerConfigCommands(program: Command): void {
           `${path} contains ${findings.length} inline secret(s) (line ${findings.map((f) => f.line).join(", ")}). Use environment-variable references.`,
         );
       }
-      const { config: resolved, sources } = loadConfigDetailed();
+      const { config: resolved, sources } = loadActiveConfig();
       console.log(
         `${path} is valid — project "${resolved.project.name}" with ${resolved.project.providers.length} provider(s), ${resolved.project.agents.length} agent(s), ${resolved.project.pipelines.length} pipeline(s).`,
       );

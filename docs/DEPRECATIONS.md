@@ -13,6 +13,18 @@ until the next major release after it is listed here (see
 The re-export exists so v1 code keeps compiling; new code should treat
 `ChatFn` as a plain function type in the chat contracts.
 
+## Behaviour changes
+
+| Behaviour | Changed in | Before | After |
+| --- | --- | --- | --- |
+| `omninode task run` exit code for a task that ends in status `unknown` | v2.0.4 | `0` (success) | `6` (timeout) |
+
+`unknown` is the normal outcome of an agent timeout: the agent was dispatched
+and its completion could not be proven. Reporting success made a CI pipeline
+treat a timed-out task as a pass. Scripts that relied on the old `0` must now
+distinguish the timeout exit code — see [CLI.md](CLI.md) for the exit-code
+table.
+
 ## Planned renames (designed in v2 roadmap Phase 1 / Phase 23)
 
 These v1 names are kept stable; the roadmap's target names will be

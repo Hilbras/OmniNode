@@ -154,6 +154,26 @@ describe("M1.1 — a step that throws leaves the run in a terminal state", () =>
 
 describe("M1.2 — a task cannot be run twice at once", () => {
   it("executes the agent exactly once for two concurrent run() calls", async () => {
+    const agent = new CountingAgent();
+    const engine = taskEngineFor(agent);
+    const task = await engine.create({ objective: "work", agent: "counting" });
+
+    // Two concurrent runs of the same task. Which of the two promises wins
+    // the race is not deterministic (the store reads resolve in arbitrary
+    // order), so the assertion is on the observable outcome: the agent runs
+    // exactly once and the other call is refused.
+    const outcomes = await Promise.allSettled([engine.run(task.id), engine.run(task.id)]);
+
+    const fulfilled = outcomes.filter((o) => o.status === "fulfilled");
+    const rejected = outcomes.filter((o) => o.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason).toMatchObject({ code: "TASK_INVALID" });
+    expect((fulfilled[0] as PromiseFulfilledResult<{ status: string }>).value.status).toBe("completed");
+    expect(agent.runs).toBe(1);
+  });
+
+  it("refuses a second run while the first is still in flight", async () => {
     let release!: () => void;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
@@ -165,10 +185,14 @@ describe("M1.2 — a task cannot be run twice at once", () => {
     const task = await engine.create({ objective: "work", agent: "counting" });
 
     const first = engine.run(task.id);
-    const second = engine.run(task.id);
-    release();
+    // Wait until the agent is actually executing, so the first run provably
+    // holds the task.
+    while (agent.runs === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
 
-    await expect(second).rejects.toMatchObject({ code: "TASK_INVALID" });
+    await expect(engine.run(task.id)).rejects.toMatchObject({ code: "TASK_INVALID" });
+    release();
     const result = await first;
     expect(result.status).toBe("completed");
     expect(agent.runs).toBe(1);

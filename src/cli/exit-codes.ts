@@ -44,10 +44,15 @@ export function exitCodeForStatus(status: string): number {
       return EXIT.cancelled;
     case "timed_out":
       return EXIT.timeout;
+    // `unknown` means the agent was dispatched and its outcome could not be
+    // proven — the normal result of an agent timeout. Reporting success
+    // would make a CI pipeline treat a timed-out task as a pass.
+    case "unknown":
+      return EXIT.timeout;
     case "failed":
       return EXIT.general;
     default:
-      // partial / unknown / queued / running are not failures of the CLI call
+      // partial / queued / running are not failures of the CLI call
       return EXIT.success;
   }
 }
