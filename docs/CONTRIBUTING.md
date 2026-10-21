@@ -71,12 +71,33 @@ which re-runs the full gate (lint, typecheck, tests, build) before publishing
 to npm and creating the GitHub release. Prerelease tags (`vX.Y.Z-*`) publish
 to the `next` tag; plain tags publish to `latest`.
 
-**One-time setup — the `NPM_TOKEN` secret.** Publish requires an npm
-automation token with publish access for the `@hilbras` scope:
+**One-time setup — the `NPM_TOKEN` secret.** Publish requires an npm token
+with write access to the `@hilbras` scope. Create it with:
 
-1. Create an automation token in npm (*Access Tokens → Automation*, or an npm
-   user for the `@hilbras` org).
-2. Add it under *Settings → Secrets and variables → Actions* as `NPM_TOKEN`.
+```bash
+npm token create --name github-actions \
+  --scopes @hilbras \
+  --packages-and-scopes-permission read-write \
+  --expires 365
+```
+
+Then add the printed token under *Settings → Secrets and variables → Actions*
+as `NPM_TOKEN`. The CLI prints the token **once** — copy it immediately.
+
+Three properties matter, and two ways of creating a token get them wrong:
+
+- **Scope it to `@hilbras`.** A token with write access to *all* packages
+  (`--scopes` omitted) is over-privileged for CI: any workflow in the repo
+  could publish under your whole npm account.
+- **Do not bypass two-factor authentication.** npm refuses to *unpublish* with
+  a token that has 2FA bypass enabled
+  (`Granular access tokens that bypass two-factor authentication may not
+  perform this action`). Since the scope is what makes the token safe, create
+  it as a scoped granular token and leave 2FA bypass off.
+- **Give it a long expiry and know when it ends.** A token that lapses makes
+  the **Publish to npm** step fail with `ENEEDAUTH`; releases then need the
+  manual fallback below. `npm token list` shows the expiry, and
+  `npm token revoke <id>` removes one.
 
 Without that secret, the gate steps pass but the **Publish to npm** step fails
 with `ENEEDAUTH` and the release never publishes or creates a GitHub release.
@@ -87,6 +108,16 @@ publisher:
 npm login
 npm publish --access public      # from a clean tree at the release version
 gh release create vX.Y.Z --title "..." --notes "..."
+```
+
+**If a version was published by mistake**, deprecate it rather than
+unpublishing it — unpublishing is blocked for 2FA-bypassing tokens and, on
+npm, is only possible within 72 hours of the publish:
+
+```bash
+npm deprecate @hilbras/omninode@X.Y.Z "Superseded by X.Y.Z-alpha.1, which carries …"
+npm dist-tag add @hilbras/omninode@X.Y.Z-1 next    # move the fix to the prerelease channel
+npm dist-tag add @hilbras/omninode@A.B.C latest    # put the last stable back on `latest`
 ```
 
 **Verify a release** from anywhere:

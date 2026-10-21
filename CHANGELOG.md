@@ -188,6 +188,16 @@ All notable changes to `@hilbras/omninode`. Format follows
   agents proposed different fixes, every position was attributed the first
   agent's recommendation. Each agent's fix is now kept, and the aggregated
   finding carries `recommendationBySource`.
+- **The release flow now fails with an actionable message when the npm token
+  is missing or expired** (v3 audit CI): the publish step failed with a bare
+  `ENEEDAUTH`. It is now preflighted with `npm whoami`, and the error says
+  what to do and points at the setup in `docs/CONTRIBUTING.md`.
+- **`docs/CONTRIBUTING.md` now documents the release token properly**
+  (v3 audit CI): the one-time setup named the right scope but not the right
+  flags. It now gives the exact `npm token create` command, explains that a
+  token with write access to *all* packages is over-privileged for CI, and
+  records that npm refuses to unpublish with a 2FA-bypassing token — which is
+  why a mistakenly published version is deprecated rather than unpublished.
 - **The secret-scan gate no longer fails on Windows** (v3 audit CI): the
   allowlist is written with forward slashes, but `path.relative` yields
   backslashes on Windows, so every allowlisted file was reported as a false

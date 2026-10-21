@@ -44,6 +44,21 @@ jobs:
             echo "::error::Tag $GITHUB_REF_NAME does not match package version $package_version"
             exit 1
           fi
+      - name: Verify the npm token
+        # Fail with an actionable message instead of a bare ENEEDAUTH when the
+        # secret is missing, invalid, or has expired.
+        shell: bash
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::NPM_TOKEN is not set on this repository. See docs/CONTRIBUTING.md for the one-time setup."
+            exit 1
+          fi
+          if ! npm whoami; then
+            echo "::error::NPM_TOKEN is invalid or has expired. See docs/CONTRIBUTING.md to rotate it."
+            exit 1
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish to npm
         # Prereleases (v2.0.0-alpha.1) go to the `next` tag; stable releases
         # to `latest`.
