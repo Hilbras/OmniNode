@@ -46,8 +46,9 @@ export {
   pipelineConfigSchema,
   pipelineStepConfigSchema,
   plannerConfigSchema,
+  KNOWN_PROFILES,
 } from "./config/index.js";
-export type { AppConfig, LoadConfigOptions, LoadConfigResult } from "./config/index.js";
+export type { AppConfig, LoadConfigOptions, LoadConfigResult, ConfigSources } from "./config/index.js";
 
 // Providers
 export {
@@ -68,6 +69,7 @@ export {
   parseRetryAfter,
 } from "./providers/index.js";
 export type { CreateProviderOptions } from "./providers/factory.js";
+export type { AuthRef, ProviderErrorKind } from "./providers/index.js";
 
 // Model registry
 export { ModelRegistry, registryKey } from "./registry/index.js";
@@ -96,7 +98,12 @@ export type { IAgentAdapter, CwdValidation, EnvPolicy } from "./agents/index.js"
 export { RoleRegistry, buildRoleRegistry } from "./roles/index.js";
 
 // Tasks
-export { TaskEngine, createTaskEngine, FileTaskStore } from "./tasks/index.js";
+export {
+  TaskEngine,
+  createTaskEngine,
+  FileTaskStore,
+  TERMINAL_TASK_STATUSES,
+} from "./tasks/index.js";
 export type {
   TaskEngineOptions,
   RunTaskOptions,
@@ -137,6 +144,7 @@ export {
   MAX_COMBINED_FINDINGS,
 } from "./reports/index.js";
 export type { ReportStore, ReportFilter, CombinedReportFilter } from "./reports/index.js";
+export type { ReportValidationResult } from "./reports/index.js";
 
 // Planner
 export {
@@ -233,5 +241,10 @@ export type {
   SessionIds,
   QuestionResponder,
 } from "./agent-protocol/index.js";
+
+// CLI exit codes — stable and documented, so scripts can branch on the
+// failure class of a CLI invocation.
+export { EXIT, exitCodeFor, exitCodeForStatus } from "./cli/exit-codes.js";
+export type { ExitCode } from "./cli/exit-codes.js";
 
 export { OMNINODE_VERSION } from "./version.js";
