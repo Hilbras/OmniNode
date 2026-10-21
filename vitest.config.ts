@@ -25,6 +25,10 @@ export default defineConfig({
         branches: 75,
         functions: 88,
         lines: 85,
+        // The v3 roadmap (quick win C) asks for a per-file floor: a new
+        // module with no tests must fail the gate on its own instead of
+        // being absorbed by the tree-wide average.
+        perFile: true,
       },
     },
   },
