@@ -38,8 +38,9 @@ profiles:
   development:
     logging:
       level: debug
-    memory:
-      provider: local
+    project:
+      memory:
+        provider: local
   production:
     logging:
       level: warn
@@ -47,6 +48,10 @@ profiles:
     logging:
       format: json
 ```
+
+A profile overlay is a partial configuration, so a nested key such as
+`memory` keeps its place inside `project:` — putting it at the top of the
+overlay makes the file fail to load.
 
 Selecting an unknown profile fails loudly with the list of known ones.
 `omninode config profiles` shows the active and defined profiles.
