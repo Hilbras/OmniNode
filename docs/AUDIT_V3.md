@@ -1,6 +1,6 @@
 # v3 Deep Audit — Full-System Scan
 
-A full-surface audit of OmniNode v2.0.3: every module, every cross-cutting
+A full-surface audit of OmniNode v2.0.3 (fixed in v2.0.4): every module, every cross-cutting
 concern, and every documented surface were scanned for bugs, unimplemented
 features, dead code, and contract breaks.
 

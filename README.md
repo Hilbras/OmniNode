@@ -9,7 +9,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@hilbras/omninode)](https://www.npmjs.com/package/@hilbras/omninode)
 [![Node.js support](https://img.shields.io/node/v/@hilbras/omninode)](https://www.npmjs.com/package/@hilbras/omninode)
 [![License: MIT](https://img.shields.io/github/license/Hilbras/OmniNode)](LICENSE)
-[![v2.0.2](https://img.shields.io/badge/v2.0.2-stable-4F46E5)](docs/ROADMAP_V2.md)
+[![v2.0.4](https://img.shields.io/badge/v2.0.4-stable-4F46E5)](docs/AUDIT_V3.md)
 
 **OmniNode** is a provider-agnostic multi-AI orchestration platform. It coordinates
 CLI-based AI agents, AI providers, persistent memory, roles, reports and planning
@@ -22,10 +22,14 @@ existing intelligence; it does not try to become another model.
 
 ## Status
 
-**v2.0.2 is the current stable release.** The v2.0.0 reliability and
-interoperability release shipped all 24 roadmap phases; v2.0.1 and v2.0.2
-were hardening and consistency releases on top of it. **v2.0.3 — the final
-hardening and release-polish pass — is in progress.**
+**v2.0.4 is the current stable release.** The v2.0.0 reliability and
+interoperability release shipped all 24 roadmap phases; v2.0.1 – v2.0.3 were
+hardening and consistency releases on top of it, and **v2.0.4 is the v3 audit
+remediation release** — it fixes every confirmed critical and high finding of
+the full-system audit ([`docs/AUDIT_V3.md`](docs/AUDIT_V3.md)): the published
+package no longer advertises exports that do not exist, pipeline and task state
+is no longer lost, a store file from a newer OmniNode is never destroyed, and a
+misbehaving agent can no longer crash the orchestrator.
 
 ### v1.0.0 delivered
 
@@ -104,7 +108,7 @@ The v1 plan (phases 0–11) is complete and shipped as **v1.0.0** — see
 roadmap (24 phases) is complete and shipped as **v2.0.0** — see
 [docs/ROADMAP_V2.md](docs/ROADMAP_V2.md). Subsequent v2.0.x releases are
 hardening, consistency and release-quality passes over that completed
-architecture (the current release is **v2.0.3**). The forward-looking v3
+architecture (the current release is **v2.0.4**). The forward-looking v3
 direction — advanced orchestration capabilities that build on the v2
 foundation — is in [docs/ROADMAP_V3.md](docs/ROADMAP_V3.md).
 
@@ -114,6 +118,7 @@ foundation — is in [docs/ROADMAP_V3.md](docs/ROADMAP_V3.md).
 | **v1.0.0** | Production Release (v1 plan complete) |
 | **v2.0.0** | Reliability & interoperability release (all 24 phases complete) |
 | v2.0.1 – v2.0.3 | Hardening, fixes, docs consistency & release polish |
+| **v2.0.4** | **v3 audit remediation** — data loss, crashes, CI hardening |
 | **v3.0.0** | Advanced orchestration (roadmap in progress — see v3 roadmap) |
 
 Install the stable release with:
@@ -129,8 +134,8 @@ required for the core engine.
 ## Install
 
 ```bash
-npm install -g @hilbras/omninode          # stable (v2.0.2)
-npm install -g @hilbras/omninode@next    # v2.0.3 prereleases
+npm install -g @hilbras/omninode          # stable (v2.0.4)
+npm install -g @hilbras/omninode@next    # prereleases
 ```
 
 Or as a library: `npm install @hilbras/omninode`. Node.js 20+.

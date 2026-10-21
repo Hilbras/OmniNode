@@ -4,7 +4,7 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
-## [Unreleased]
+## [2.0.4] — v3 audit remediation (data loss, crashes, CI)
 
 ### Fixed
 

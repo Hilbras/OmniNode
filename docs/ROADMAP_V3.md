@@ -8,7 +8,7 @@
 > interfaces that already exist, and to remain an optional, opt-in layer.
 
 **Project:** Hilbras OmniNode
-**Current Version:** v2.0.3
+**Current Version:** v2.0.4
 **Target:** v3.0.0
 **Package:** `@hilbras/omninode`
 **License:** MIT
@@ -37,18 +37,18 @@ The v2 core is strong enough to support the future. The rules of the road:
 
 ---
 
-## 2. v2.0.4 — quick wins (ship before any v3 feature)
+## 2. v2.0.4 — quick wins (ship before any v3 feature) — **SHIPPED**
 
 Small, low-risk hardening items that close operational gaps left by v2.0.3.
 These are independent of v3 and are safe to land on the `v2` line.
 
-| # | Item | Why |
-| --- | --- | --- |
-| A | **Windows CI lane** | Platform behavior (process groups, grandchild reaping, cancellation) is *documented* in SECURITY.md / AGENTS.md but only exercised on `ubuntu-latest`. Add a `windows-latest` runner so those claims are verified, not just asserted. Group-kill tests graceful-skip where unsupported. |
-| B | **Release automation token** | Document the one-time `NPM_TOKEN` repo secret so tag-triggered npm publish + GitHub release runs fully automatically (today the publish step fails without it and requires a manual `npm publish`). |
-| C | **Coverage gate** | Add a `vitest --coverage` floor (target ≥ 85% on `src/`) so new features cannot erode the v2 hardening silently. Report per-file and fail CI below threshold. |
-| D | **Protocol fuzz tests** | The JSON-lines agent protocol is an untrusted-input boundary. Add a fuzz harness over `ProtocolDecoder` / `decodeMessage` (truncated, malformed, oversized, garbage, and non-UTF-8 envelopes) to keep "malformed input never crashes the orchestrator" proven. |
-| E | **Docs: NPM_TOKEN + release flow** | Fold item B into CONTRIBUTING.md so a fresh maintainer can wire up release automation in one step. |
+| # | Item | Status | Why |
+| --- | --- | --- | --- |
+| A | **Windows CI lane** | ✅ | Platform behavior (process groups, grandchild reaping, cancellation) is *documented* in SECURITY.md / AGENTS.md but only exercised on `ubuntu-latest`. Add a `windows-latest` runner so those claims are verified, not just asserted. Group-kill tests graceful-skip where unsupported. |
+| B | **Release automation token** | ✅ | Document the one-time `NPM_TOKEN` repo secret so tag-triggered npm publish + GitHub release runs fully automatically (today the publish step fails without it and requires a manual `npm publish`). |
+| C | **Coverage gate** | ✅ | Add a `vitest --coverage` floor (target ≥ 85% on `src/`) so new features cannot erode the v2 hardening silently. Report per-file and fail CI below threshold. |
+| D | **Protocol fuzz tests** | ✅ | The JSON-lines agent protocol is an untrusted-input boundary. Add a fuzz harness over `ProtocolDecoder` / `decodeMessage` (truncated, malformed, oversized, garbage, and non-UTF-8 envelopes) to keep "malformed input never crashes the orchestrator" proven. |
+| E | **Docs: NPM_TOKEN + release flow** | ✅ | Fold item B into CONTRIBUTING.md so a fresh maintainer can wire up release automation in one step. |
 
 Definition of done: `v2.0.4` passes every existing gate **plus** the Windows
 lane and coverage floor, and the release pipeline is green end-to-end.
