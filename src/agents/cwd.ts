@@ -2,7 +2,7 @@
  * Working-directory validation for agent processes (roadmap §8): existence,
  * directory-ness, access, path normalization and project boundaries.
  */
-import { statSync } from "node:fs";
+import { accessSync, constants, statSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { AgentError } from "../errors/index.js";
 
@@ -35,14 +35,15 @@ export function validateWorkingDirectory(
       details: { cwd: normalized },
     });
   }
-  // Access check: attempt to list it.
+  // Access check: the directory must be readable and writable, not merely
+  // present — a re-stat of the path above can never fail.
   try {
-    statSync(resolve(normalized, "."));
+    accessSync(normalized, constants.R_OK | constants.W_OK);
   } catch (error) {
     throw new AgentError(
       "AGENT_NOT_FOUND",
-      `Working directory "${normalized}" is not accessible.`,
-      { cause: error },
+      `Working directory "${normalized}" is not accessible for reading and writing.`,
+      { cause: error, details: { cwd: normalized } },
     );
   }
 

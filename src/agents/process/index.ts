@@ -127,6 +127,8 @@ export class ProcessAgent implements IAgent {
 
       let stdout = "";
       let stderr = "";
+      let stdoutBytes = 0;
+      let stderrBytes = 0;
       let timedOut = false;
       let outputLimitExceeded = false;
       let settled = false;
@@ -155,25 +157,38 @@ export class ProcessAgent implements IAgent {
 
       // Output protection (roadmap §8): runaway/binary output is truncated at
       // a byte budget, and a flooding agent is killed rather than allowed to
-      // exhaust memory.
+      // exhaust memory. The budget is measured in BYTES, so a multi-byte
+      // payload cannot exceed it by encoding more than one byte per
+      // character.
       const collect = (into: "stdout" | "stderr", chunk: Buffer): void => {
         if (outputLimitExceeded) return;
         const text = sanitizeChunk(chunk);
+        const bytes = Buffer.byteLength(text, "utf8");
         if (into === "stdout") {
-          if (stdout.length + text.length > maxOutputBytes) {
-            stdout = (stdout + text).slice(0, maxOutputBytes);
+          if (stdoutBytes + bytes > maxOutputBytes) {
+            stdout += truncateToBytes(text, Math.max(0, maxOutputBytes - stdoutBytes));
+            stdoutBytes = maxOutputBytes;
             outputLimitExceeded = true;
             this.log.warn(`Agent "${this.config.name}" exceeded the ${maxOutputBytes} byte output limit — killing it.`);
             killTree(child, "SIGKILL");
             return;
           }
           stdout += text;
+          stdoutBytes += bytes;
         } else {
-          if (stderr.length + text.length > maxOutputBytes) {
-            stderr = (stderr + text).slice(0, maxOutputBytes);
+          if (stderrBytes + bytes > maxOutputBytes) {
+            stderr += truncateToBytes(text, Math.max(0, maxOutputBytes - stderrBytes));
+            stderrBytes = maxOutputBytes;
+            // A flooding stderr is the same runaway as a flooding stdout: the
+            // agent is killed, otherwise it could fill memory while the run
+            // still reported success.
+            outputLimitExceeded = true;
+            this.log.warn(`Agent "${this.config.name}" exceeded the ${maxOutputBytes} byte stderr limit — killing it.`);
+            killTree(child, "SIGKILL");
             return;
           }
           stderr += text;
+          stderrBytes += bytes;
         }
       };
       child.stdout?.on("data", (chunk: Buffer) => collect("stdout", chunk));
@@ -188,8 +203,11 @@ export class ProcessAgent implements IAgent {
             ? buildProtocolMessages(input, this.config.name).join("\n") + "\n"
             : composeTaskText(input) + "\n";
         child.stdin?.write(payload);
-        child.stdin?.end();
       }
+      // stdin is closed in EVERY mode. In "arg" mode the task text is an
+      // argument, so the pipe stays open and an agent that also reads stdin
+      // would wait for EOF until the task times out.
+      child.stdin?.end();
 
       child.on("error", (error) => {
         settle(() => {
@@ -238,21 +256,16 @@ export class ProcessAgent implements IAgent {
 
           const logs = stderr.trim().length > 0 ? stderr.split("\n") : undefined;
           if (mode === "protocol") {
-            // interpretProtocolRun can reject (e.g. protocol violations); throwing
-            // inside this event callback would escape the promise entirely.
-            try {
-              resolve(
-                interpretProtocolRun({
-                  input,
-                  agentName: this.config.name,
-                  stdout,
-                  exitCode: code,
-                  logs,
-                }),
-              );
-            } catch (error) {
-              reject(error);
-            }
+            // interpretProtocolRun can reject (e.g. protocol violations);
+            // the promise is settled explicitly so a throw inside it cannot
+            // escape as an unhandled rejection.
+            interpretProtocolRun({
+              input,
+              agentName: this.config.name,
+              stdout,
+              exitCode: code,
+              logs,
+            }).then(resolve, reject);
             return;
           }
 
@@ -275,10 +288,14 @@ export class ProcessAgent implements IAgent {
     });
   }
 
-  /** Ask the agent to stop current work (SIGTERM). */
+  /** Ask the agent to stop current work (SIGTERM), escalating to SIGKILL. */
   async cancel(taskId: string): Promise<void> {
     const child = this.running.get(taskId);
-    if (child) killTree(child, "SIGTERM");
+    if (!child) return;
+    killTree(child, "SIGTERM");
+    // Escalate if the agent ignores the polite request — the timeout path
+    // already does this, and a cancel must not wait for the full timeout.
+    setTimeout(() => killTree(child, "SIGKILL"), KILL_GRACE_MS).unref();
   }
 
   runningTaskIds(): string[] {
@@ -295,14 +312,14 @@ interface ProtocolRunInput {
   responder?: QuestionResponder;
 }
 
-function interpretProtocolRun({
+async function interpretProtocolRun({
   input,
   agentName,
   stdout,
   exitCode,
   logs,
   responder,
-}: ProtocolRunInput): AgentTaskOutput {
+}: ProtocolRunInput): Promise<AgentTaskOutput> {
   const session = new ProtocolSession(
     {
       requestId: `req-${input.taskId}`,
@@ -315,12 +332,13 @@ function interpretProtocolRun({
   );
 
   // The stream was drained line-by-line already; re-decode deterministically.
+  // `handle` is async, so it must be awaited: a rejection that escaped here
+  // would become an unhandled rejection and terminate the whole process.
   for (const result of session.decoder.push(stdout)) {
-    // handled synchronously below via handle(); questions are resolved eagerly
-    session.handle(result);
+    await session.handle(result);
   }
   for (const result of session.decoder.flush()) {
-    session.handle(result);
+    await session.handle(result);
   }
 
   const reports = session.reports
@@ -383,17 +401,34 @@ function interpretProtocolRun({
  */
 const GLOBAL_RUNNING = new Set<ChildProcess>();
 let signalForwardingInstalled = false;
+let signalsReceived = 0;
 
 function installSignalForwarding(): void {
   if (signalForwardingInstalled) return;
   signalForwardingInstalled = true;
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, () => {
+      signalsReceived += 1;
       for (const child of GLOBAL_RUNNING) {
         killTree(child, "SIGTERM");
       }
+      // Registering a signal listener removes Node's default terminate
+      // behaviour, so the exit is restored explicitly: the first signal
+      // asks the agents to stop, a second one ends the process.
+      if (signalsReceived > 1) {
+        process.exit(130);
+      }
     });
   }
+}
+
+/** Truncates text so its UTF-8 encoding fits in `maxBytes`. */
+function truncateToBytes(text: string, maxBytes: number): string {
+  if (maxBytes <= 0) return "";
+  const buffer = Buffer.from(text, "utf8");
+  if (buffer.length <= maxBytes) return text;
+  // The cut can land inside a multi-byte sequence — drop the broken tail.
+  return buffer.subarray(0, maxBytes).toString("utf8").replace(/�+$/, "");
 }
 
 /** Kills a child and, on POSIX, its whole process group (roadmap §8 tree cleanup). */
