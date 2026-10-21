@@ -10,7 +10,7 @@ import { logger, type Logger } from "../../logger/index.js";
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 import type { ChatRequest, ChatResponse, ChatStreamChunk } from "../../types/chat.js";
 import type { AuditSink } from "../../audit/index.js";
-import type { Modality, ModelInfo } from "../../types/model.js";
+import type { Modality, ModelCapabilities, ModelInfo } from "../../types/model.js";
 import type { IChatProvider, ProviderConfig, ProviderStatus } from "../../types/provider.js";
 import { authHeaders } from "../auth.js";
 import { requestJson, type HttpResponse } from "../http.js";
@@ -168,12 +168,21 @@ export class OpenAICompatibleProvider implements IChatProvider {
           : undefined;
     const inputTypes = normalizeModalities(entry.input_modalities);
     const outputTypes = normalizeModalities(entry.output_modalities);
+    // The `capabilities` map is what `omninode models --capability <c>`
+    // filters on. It was never populated, so that filter could never return
+    // a model.
+    const capabilities = deriveModelCapabilities({
+      ...(parameters !== undefined ? { parameters } : {}),
+      ...(inputTypes !== undefined ? { inputTypes } : {}),
+      ...(outputTypes !== undefined ? { outputTypes } : {}),
+    });
     return {
       provider: this.config.name,
       id: entry.id,
       displayName: entry.id,
       ...(typeof entry.name === "string" ? { name: entry.name } : {}),
       status: "available",
+      ...(capabilities !== undefined ? { capabilities } : {}),
       ...(contextWindow !== undefined ? { contextWindow } : {}),
       ...(inputTypes !== undefined ? { inputTypes } : {}),
       ...(outputTypes !== undefined ? { outputTypes } : {}),
@@ -424,6 +433,38 @@ export async function streamChatCompletion(
   }
 
   return { model, content, ...(finishReason !== undefined ? { finishReason } : {}) };
+}
+
+/**
+ * Derives the capability map that `omninode models --capability <c>` filters
+ * on. Only the capabilities the provider actually advertised are claimed —
+ * an unknown model is not assumed to support anything.
+ */
+function deriveModelCapabilities(input: {
+  parameters?: string[];
+  inputTypes?: Modality[];
+  outputTypes?: Modality[];
+}): ModelCapabilities | undefined {
+  const { parameters, inputTypes, outputTypes } = input;
+  const capabilities: ModelCapabilities = {};
+
+  // A model is chat-capable unless it only produces embeddings.
+  if (outputTypes?.includes("embedding")) {
+    capabilities.embeddings = true;
+  } else {
+    capabilities.chat = true;
+  }
+  if (parameters?.includes("tools") || parameters?.includes("tool_choice")) {
+    capabilities.tools = true;
+  }
+  if (inputTypes?.includes("image")) {
+    capabilities.vision = true;
+  }
+  // A coding model is one that advertises code generation support.
+  if (parameters?.includes("code") || parameters?.includes("code_completion")) {
+    capabilities.coding = true;
+  }
+  return Object.keys(capabilities).length > 0 ? capabilities : undefined;
 }
 
 /** Normalizes provider modality lists ("text", ["text","image"], …). */

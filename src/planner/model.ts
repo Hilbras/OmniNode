@@ -53,7 +53,14 @@ export class ModelPlanner implements IPlanner {
     try {
       responseText = await this.options.chat(this.options.model, messages);
     } catch (error) {
-      return this.degrade(request, `planner model call failed: ${describe(error)}`);
+      // A transport failure is a PLANNER failure, not a PLAN failure: the
+      // model was never reached, so there is no plan to reject.
+      return this.degrade(
+        request,
+        `planner model call failed: ${describe(error)}`,
+        [],
+        "PLANNER_FAILED",
+      );
     }
 
     const parsed = parsePlanJson(responseText);
@@ -91,13 +98,14 @@ export class ModelPlanner implements IPlanner {
     request: PlanRequest,
     reason: string,
     issues: Array<{ path: string; message: string }> = [],
+    code: "PLANNER_FAILED" | "PLAN_INVALID" = "PLAN_INVALID",
   ): Promise<Plan> {
     if (this.options.fallback) {
       this.log.warn(`${reason} — using the heuristic fallback planner.`);
       return this.options.fallback.plan(request);
     }
     // Structured error: the caller sees exactly what was rejected (§15).
-    throw new PlannerError("PLAN_INVALID", `Planner failed: ${reason}.`, {
+    throw new PlannerError(code, `Planner failed: ${reason}.`, {
       details: { reason, issues },
     });
   }
