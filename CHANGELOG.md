@@ -183,6 +183,12 @@ All notable changes to `@hilbras/omninode`. Format follows
   agents proposed different fixes, every position was attributed the first
   agent's recommendation. Each agent's fix is now kept, and the aggregated
   finding carries `recommendationBySource`.
+- **The dependency audit gate is green again** (v3 audit CI): two upstream
+  advisories had been published since the last release — a `high` severity
+  `vite` `launch-editor` issue on Windows and a `low` severity `esbuild`
+  dev-server file read. `vite` is bumped to 7.3.7, which fixes the high
+  severity one; the remaining `low` severity advisory is dev-only and already
+  documented in `docs/AUDIT_V2.md`.
 - **An atomic write no longer fails when Windows briefly locks the file**
   (v3 audit CI): `fs.rename` on Windows cannot replace a file that another
   process still has open — an indexer, an antivirus scanner, a concurrent

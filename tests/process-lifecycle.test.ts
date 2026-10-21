@@ -162,8 +162,15 @@ describe("M3.4 — cancel escalates to SIGKILL", () => {
     });
     const running = agent.run({ taskId: "cancel-1", objective: "wait" });
     await new Promise((resolve) => setTimeout(resolve, 150));
+    const cancelledAt = Date.now();
     await agent.cancel("cancel-1");
     const result = await running.catch((error) => error);
+    // On POSIX the agent ignores SIGTERM, so the run only settles once the
+    // scheduled SIGKILL escalation fires. On Windows the child is terminated
+    // outright and the run settles immediately — so wait out the escalation
+    // window either way, or the scheduled escalation is never exercised.
+    const remaining = 5_200 - (Date.now() - cancelledAt);
+    if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
     // The process was killed rather than left running until the timeout.
     expect((result as { status?: string }).status ?? "killed").toBeDefined();
   });
