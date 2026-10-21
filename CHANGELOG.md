@@ -66,6 +66,19 @@ All notable changes to `@hilbras/omninode`. Format follows
   memory backend made `TaskEngine.run()` reject even though the task had
   already succeeded, contradicting the documented contract. The write-back is
   now logged and swallowed; the task record remains the source of truth.
+- **A store file written by a newer OmniNode is never destroyed** (v3 audit
+  M2.1): `readDocument` returned an empty list for a document with a newer
+  `schemaVersion`, and the next write then overwrote it at the current
+  version — silently discarding data the running version could not even read.
+  The write path now refuses with a new `StoreVersionError` (code
+  `STORE_VERSION`) and leaves the file untouched. A future file is not
+  corruption, so it is not quarantined either. The fix covers every store
+  that shares the persistence helper: tasks, plans, reports, memory and
+  pipeline runs.
+- **Concurrent atomic writes no longer corrupt each other** (v3 audit M2.2):
+  `writeFileAtomic` used a fixed `<target>.tmp` path, so two writers
+  interleaved each other's content. The temp file name is now unique per
+  writer.
 - **`docs/API.md` no longer lists withheld internals as public**
   (v3 audit M7a): `STORE_FILES` is documented as an internal implementation
   detail, matching the public-surface guard in `tests/public-api.test.ts`.
