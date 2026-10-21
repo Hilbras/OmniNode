@@ -40,6 +40,32 @@ All notable changes to `@hilbras/omninode`. Format follows
   (v3 audit M8.4): `vitest.config.ts` sets an explicit 30 s test and hook
   timeout so slow integration tests fail on their assertion rather than on the
   clock.
+- **A pipeline step that throws no longer leaves the run `running` forever**
+  (v3 audit M1.1): the step-execution phase was not exception-safe, so the
+  persisted run kept `status: "running"` with no `finishedAt`, no failure audit
+  event, and a leaked `activeRuns` entry that made the run impossible to
+  cancel or re-run. A step that throws is now a *failed step* — matching
+  `docs/PIPELINES.md`, where a hard failure makes the run `failed` and
+  on-success downstream steps are skipped — and the run records the step's
+  error. A failure outside a step (e.g. the store rejecting a write) is
+  recorded on the run, audited as `pipeline.run.failed`, and re-thrown.
+- **A task can no longer be run twice at once** (v3 audit M1.2): two
+  concurrent `TaskEngine.run()` calls both passed the status guard and both
+  invoked the agent, executing it twice and losing one update. The engine now
+  claims the task before the adapter is called.
+- **Cancelling a task no longer destroys the in-flight attempt's history**
+  (v3 audit M1.3): `cancel()` wrote a stale snapshot of the task, erasing the
+  result and execution history produced since. The engine now serializes its
+  own read-modify-write cycles per task, and every decision is made against
+  the record as it is at that moment.
+- **A cancellation is no longer overwritten by a failure** (v3 audit M1.4): a
+  task cancelled while its agent was failing was resurrected as `failed` /
+  `unknown`. A cancellation is terminal, and the interrupted attempt is still
+  recorded in the execution history.
+- **The memory write-back is best-effort again** (v3 audit M1.5): a failing
+  memory backend made `TaskEngine.run()` reject even though the task had
+  already succeeded, contradicting the documented contract. The write-back is
+  now logged and swallowed; the task record remains the source of truth.
 - **`docs/API.md` no longer lists withheld internals as public**
   (v3 audit M7a): `STORE_FILES` is documented as an internal implementation
   detail, matching the public-surface guard in `tests/public-api.test.ts`.
