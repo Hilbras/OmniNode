@@ -61,8 +61,9 @@ then splits the result into three honest sections:
 
 - **findings** — every finding group, with `severityBySource` /
   `confidenceBySource` so nothing is flattened silently.
-- **agreements** — groups independently reported by 2+ agents *with the same
-  severity*: actual consensus.
+- **agreements** — groups independently reported by 2+ *distinct agents* with
+  the same severity: actual consensus. A single agent reporting the same
+  finding twice is not an agreement.
 - **conflicts** — when agents disagree, both positions are preserved:
 
   ```jsonc
@@ -79,7 +80,9 @@ then splits the result into three honest sections:
 
   Conflict types: `severity` (different severities for the same finding) and
   `recommendation` (different proposed fixes). OmniNode never silently
-  chooses one side.
+  chooses one side: each position carries the recommendation of the agent
+  that proposed it, and the aggregated finding keeps the full map in
+  `recommendationBySource`.
 
 Confidence is preserved as the strongest reported value, with the per-source
 values kept alongside.

@@ -50,7 +50,9 @@ describe("exit codes (§19)", () => {
     expect(exitCodeForStatus("completed")).toBe(EXIT.success);
     expect(exitCodeForStatus("failed")).toBe(EXIT.general);
     expect(exitCodeForStatus("cancelled")).toBe(EXIT.cancelled);
-    expect(exitCodeForStatus("unknown")).toBe(EXIT.success); // not a CLI failure
+    // `unknown` is the normal outcome of an agent timeout. Reporting
+    // success made a CI pipeline treat a timed-out task as a pass.
+    expect(exitCodeForStatus("unknown")).toBe(EXIT.timeout);
   });
 });
 

@@ -224,11 +224,28 @@ function readConfigDocument(path: string, optionsEnv: Record<string, string | un
   }
   // ${VAR} / ${VAR:-fallback} references are expanded before parsing.
   const expanded = expandEnvRefs(raw, optionsEnv, path);
+  let parsed: unknown;
   try {
-    return parseYaml(expanded) as AppConfigInput;
+    parsed = parseYaml(expanded);
   } catch (error) {
     throw new ConfigError("CONFIG_INVALID", `Failed to parse ${path}.`, { cause: error });
   }
+  // An empty or comment-only file parses to null, and a document that is
+  // not a mapping cannot be merged. Both are user errors and must be
+  // reported as such — not as a TypeError from deep inside the loader.
+  if (parsed === null || parsed === undefined) {
+    throw new ConfigError(
+      "CONFIG_INVALID",
+      `${path} is empty — it must define a project.`,
+    );
+  }
+  if (typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new ConfigError(
+      "CONFIG_INVALID",
+      `${path} must contain a top-level mapping.`,
+    );
+  }
+  return parsed as AppConfigInput;
 }
 
 /** Backwards-compatible wrapper: the composed configuration. */

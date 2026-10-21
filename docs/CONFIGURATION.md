@@ -38,8 +38,9 @@ profiles:
   development:
     logging:
       level: debug
-    memory:
-      provider: local
+    project:
+      memory:
+        provider: local
   production:
     logging:
       level: warn
@@ -47,6 +48,10 @@ profiles:
     logging:
       format: json
 ```
+
+A profile overlay is a partial configuration, so a nested key such as
+`memory` keeps its place inside `project:` — putting it at the top of the
+overlay makes the file fail to load.
 
 Selecting an unknown profile fails loudly with the list of known ones.
 `omninode config profiles` shows the active and defined profiles.
@@ -61,6 +66,21 @@ providers:
     base_url: https://api.example.com/v1
     api_key_env_var: MY_API_KEY
 ```
+
+A provider can be configured but switched off:
+
+```yaml
+providers:
+  - name: gw
+    base_url: https://api.example.com/v1
+    api_key_env_var: MY_API_KEY
+    enabled: false
+```
+
+A disabled provider is listed by `omninode provider list` with a
+`(disabled)` marker, and is never used: creating it fails with
+`CONFIG_INVALID`, so a step that references its model reports the provider as
+unavailable instead of silently calling it.
 
 Inline secrets (`api_key: sk-…`) are rejected at load time with redacted
 excerpts, and `${VAR}` / `${VAR:-fallback}` references are expanded at load.

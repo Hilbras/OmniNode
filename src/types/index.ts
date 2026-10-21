@@ -10,4 +10,4 @@ export * from "./project.js";
 export * from "./provider.js";
 export * from "./report.js";
 export * from "./role.js";
-export * from "./task.js";
+export type * from "./task.js";

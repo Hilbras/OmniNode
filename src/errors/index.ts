@@ -25,6 +25,7 @@ export type OmniNodeErrorCode =
   | "REPORT_NOT_FOUND"
   | "NOT_IMPLEMENTED"
   | "CLI_USAGE"
+  | "STORE_VERSION"
   | "INTERNAL";
 
 export interface OmniNodeErrorOptions {
@@ -117,6 +118,17 @@ export class PlannerError extends OmniNodeError {
 export class MemoryError extends OmniNodeError {
   constructor(message: string, options: OmniNodeErrorOptions = {}) {
     super("MEMORY_UNAVAILABLE", message, options);
+  }
+}
+
+/**
+ * A persisted document was written by a newer OmniNode than this one
+ * understands. The file is never overwritten: the data belongs to a newer
+ * version and destroying it would lose work this version cannot even read.
+ */
+export class StoreVersionError extends OmniNodeError {
+  constructor(message: string, options: OmniNodeErrorOptions = {}) {
+    super("STORE_VERSION", message, options);
   }
 }
 

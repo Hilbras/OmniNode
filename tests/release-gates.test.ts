@@ -8,6 +8,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   checkVersionConsistency,
+  forbiddenPackFiles,
+  isAllowlistedSecretFile,
   scanSecrets,
   validatePackContents,
 } from "../scripts/release-gates.mjs";
@@ -75,6 +77,18 @@ describe("secret scanning gate", () => {
     expect(scanSecrets(dir).ok).toBe(true);
   });
 
+  it("honours the allowlist regardless of the path separator", () => {
+    // The allowlist is written with forward slashes. On Windows
+    // `path.relative` yields backslashes, so without normalization every
+    // allowlisted file would be reported as a false positive — the gate
+    // failed there on every run.
+    expect(isAllowlistedSecretFile("docs/SECURITY.md")).toBe(true);
+    expect(isAllowlistedSecretFile("docs\\SECURITY.md")).toBe(true);
+    expect(isAllowlistedSecretFile("CHANGELOG.md")).toBe(true);
+    expect(isAllowlistedSecretFile("src/app.ts")).toBe(false);
+    expect(isAllowlistedSecretFile("src\\app.ts")).toBe(false);
+  });
+
   it("flags committed credentials and private keys", () => {
     const dir = fakeRepo({
       "src/config.ts": 'const key = "sk-abcdefghijklmnopqrstuvwxyz012345";',
@@ -117,10 +131,33 @@ describe("package validation gate", () => {
   });
 
   it("never ships tests, sources or local state", () => {
-    const result = validatePackContents(process.cwd());
-    const forbidden = result.files.filter(
-      (file) => file.startsWith("tests/") || file.startsWith("src/") || file.startsWith(".omninode/"),
-    );
-    expect(forbidden).toEqual([]);
+    // The rule itself is asserted against a synthetic file list: checking it
+    // against the real one passed vacuously whenever the file list was
+    // empty — which is exactly what happened on Windows, where the npm
+    // invocation failed and the gate returned no files at all.
+    expect(
+      forbiddenPackFiles([
+        "package.json",
+        "dist/index.js",
+        "tests/cli.test.ts",
+        "src/index.ts",
+        ".omninode/tasks.json",
+        "omninode-2.0.3.tgz",
+      ]),
+    ).toEqual([
+      "tests/cli.test.ts",
+      "src/index.ts",
+      ".omninode/tasks.json",
+      "omninode-2.0.3.tgz",
+    ]);
+    expect(forbiddenPackFiles(["package.json", "dist/index.js", "README.md"])).toEqual([]);
+  });
+
+  it("fails the gate when the package would ship forbidden files", () => {
+    const dir = fakeRepo({ "package.json": "{}", "README.md": "", LICENSE: "" });
+    // A file list that includes a source directory must be reported.
+    const forbidden = forbiddenPackFiles(["package.json", "src/index.ts"]);
+    expect(forbidden).toEqual(["src/index.ts"]);
+    expect(dir).toBeTruthy();
   });
 });

@@ -11,6 +11,8 @@
  */
 import { open, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { randomBytes } from "node:crypto";
+import { StoreVersionError } from "../errors/index.js";
 import { logger, type Logger } from "../logger/index.js";
 
 /** Current on-disk schema version. */
@@ -45,6 +47,27 @@ export interface JsonFileStoreOptions {
 export type Durability = "rename" | "fsync";
 
 /**
+ * Renames a file, retrying the transient failures Windows reports when the
+ * destination is briefly locked — an indexer, an antivirus scanner, or another
+ * writer that still has the file open. `fs.rename` on Windows maps to
+ * `MoveFileEx`, which fails with EPERM/EBUSY in that situation, so without
+ * the retry an "atomic" write can fail on a perfectly healthy filesystem.
+ */
+async function renameWithRetry(from: string, to: string, attempts = 6): Promise<void> {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      await rename(from, to);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      const transient = code === "EPERM" || code === "EBUSY" || code === "EACCES";
+      if (!transient || attempt === attempts - 1) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 10 * (attempt + 1)));
+    }
+  }
+}
+
+/**
  * Writes a file atomically: temp → rename. The rename guarantees readers
  * never observe a torn file. With `durability: "fsync"` the data and the
  * directory entry are also flushed, which additionally survives power loss —
@@ -55,7 +78,9 @@ export async function writeFileAtomic(
   contents: string,
   durability: Durability = "rename",
 ): Promise<void> {
-  const tmp = `${target}.tmp`;
+  // The temp name must be unique per writer: a fixed `<target>.tmp` lets two
+  // concurrent writers truncate and interleave each other's file.
+  const tmp = `${target}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
   await mkdir(dirname(target), { recursive: true });
 
   if (durability === "fsync") {
@@ -70,7 +95,7 @@ export async function writeFileAtomic(
     await writeFile(tmp, contents, "utf8");
   }
 
-  await rename(tmp, target);
+  await renameWithRetry(tmp, target);
 
   if (durability === "fsync") {
     try {
@@ -207,6 +232,22 @@ export class JsonFileStore<T> {
   /** Read-modify-write helper: applies `mutate` to the current items. */
   protected async mutate<R>(mutate: (items: T[]) => Promise<[T[], R]> | [T[], R]): Promise<R> {
     return this.synchronized(async () => {
+      // A document written by a newer OmniNode is never overwritten: its
+      // data belongs to a version this one cannot read, and writing would
+      // destroy it silently.
+      const state = await inspectDocument(this.filePath);
+      if (state.status === "future") {
+        throw new StoreVersionError(
+          `${this.filePath} was written by a newer OmniNode (schema v${state.schemaVersion} > v${this.schemaVersion}) — refusing to overwrite it.`,
+          {
+            details: {
+              path: this.filePath,
+              schemaVersion: state.schemaVersion,
+              supported: this.schemaVersion,
+            },
+          },
+        );
+      }
       const items = await this.readAll();
       const [next, result] = await mutate(items);
       await this.writeAll(next);

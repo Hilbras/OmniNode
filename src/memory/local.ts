@@ -91,6 +91,18 @@ export class LocalMemoryProvider extends JsonFileStore<MemoryEntry> implements I
     }
 
     const queryKeywords = keywords(query.text);
+    if (queryKeywords.size === 0) {
+      // A short query ("api") yields no keyword under the 4-character rule.
+      // Scoring every entry 0 would silently return nothing — indistinguishable
+      // from "no such memory" — so fall back to a substring match on the
+      // entry's key and content.
+      const needle = query.text.trim().toLowerCase();
+      if (needle.length < 2) return [];
+      return filtered
+        .filter((entry) => `${entry.key} ${entry.content}`.toLowerCase().includes(needle))
+        .sort((a, b) => (b.updatedAt ?? b.createdAt ?? "").localeCompare(a.updatedAt ?? a.createdAt ?? ""))
+        .slice(0, query.limit ?? 10);
+    }
     return filtered
       .map((entry) => ({ entry, score: relevanceScore(queryKeywords, entry) }))
       .filter(({ score }) => score > 0)

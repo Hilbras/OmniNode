@@ -22,15 +22,6 @@ export type TaskStatus =
   | "unknown"
   | "partially_completed";
 
-/** States from which no further automatic transition happens. */
-export const TERMINAL_TASK_STATUSES: readonly TaskStatus[] = [
-  "completed",
-  "failed",
-  "timed_out",
-  "cancelled",
-  "partially_completed",
-];
-
 /** One execution attempt (roadmap §6.5 identity: task + attempt + execution id). */
 export interface ExecutionRecord {
   executionId: string;

@@ -54,7 +54,7 @@ Every message, in both directions, is one JSON object on one line:
 | `CONTEXT` | `{ body }` or `{ role }` | background context / role definition |
 | `INSTRUCTION` | `{ text }` | explicit execution instruction |
 | `RESPONSE` | `{ questionId, body }` | answer to an agent `QUESTION` |
-| `CANCEL` | `{ reason? }` | stop current work |
+| `CANCEL` | `{ reason? }` | stop current work — **not sent yet (v2.x)**; a cancelled task is terminated with `SIGTERM` instead |
 
 ### Agent → OmniNode
 
@@ -82,6 +82,11 @@ OmniNode → Agent    HELLO_ACK { ok: true, protocol: "omninode-agent-protocol/2
 Agents that skip `HELLO` still interoperate; the adapter reports them as
 `protocol.legacy = true` in the task diagnostics.
 
+> **Not implemented yet (v2.x).** OmniNode decodes an agent's `HELLO` and
+> records the descriptor in the task diagnostics, but it does **not** send
+> `HELLO_ACK` back. The `HELLO_ACK` message type is reserved and will be
+> wired up in v3.0.0; until then, treat the handshake as one-way.
+
 ## Interactive questions
 
 ```
@@ -94,11 +99,23 @@ Questions are answered at the protocol level by OmniNode's responder (never a
 human-approval workflow — that is explicitly out of scope). With no responder
 configured, the question is recorded and the run continues unanswered.
 
+> **Not implemented yet (v2.x).** The process adapter does not currently
+> install a responder, so no `RESPONSE` is written back to the agent's
+> stdout: a `QUESTION` is decoded and recorded in
+> `protocol.questions`, and the run continues unanswered. The
+> `QuestionResponder` hook exists in the protocol session and will be wired
+> to the CLI in v3.0.0.
+
 ## Artifacts
 
 `ARTIFACT` payloads carry `kind` ∈ `file | patch | report | log | screenshot |
 document | data`, a `ref` (path/URL/name), optional `description`, `mediaType`
-and `bytes`. OmniNode records them on the run for later inspection.
+and `bytes`.
+
+> **Not implemented yet (v2.x).** `ARTIFACT` messages are decoded and
+> collected in the protocol session, but the process adapter does not surface
+> them on the task result — they are dropped. Persisting artifacts is a
+> v3.0.0 item.
 
 ## Robustness contract (§7.5)
 

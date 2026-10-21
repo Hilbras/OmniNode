@@ -25,8 +25,10 @@ export function exitCodeFor(error: unknown): number {
   const code = error.code;
   if (code === "NOT_IMPLEMENTED") return EXIT.notImplemented;
   if (code === "AGENT_TIMEOUT") return EXIT.timeout;
-  if (code.startsWith("CONFIG_")) return EXIT.config;
-  if (code.startsWith("PROVIDER_") || code === "MODEL_NOT_FOUND") return EXIT.provider;
+  if (code.startsWith("CONFIG_") || code === "STORE_VERSION") return EXIT.config;
+  if (code.startsWith("PROVIDER_") || code === "MODEL_NOT_FOUND" || code === "PLANNER_FAILED") {
+    return EXIT.provider;
+  }
   if (code.startsWith("AGENT_")) return EXIT.agent;
   if (code.endsWith("_NOT_FOUND")) return EXIT.notFound;
   if (code.endsWith("_INVALID") || code === "CLI_USAGE" || code === "PROTOCOL_VIOLATION") {
@@ -44,10 +46,15 @@ export function exitCodeForStatus(status: string): number {
       return EXIT.cancelled;
     case "timed_out":
       return EXIT.timeout;
+    // `unknown` means the agent was dispatched and its outcome could not be
+    // proven — the normal result of an agent timeout. Reporting success
+    // would make a CI pipeline treat a timed-out task as a pass.
+    case "unknown":
+      return EXIT.timeout;
     case "failed":
       return EXIT.general;
     default:
-      // partial / unknown / queued / running are not failures of the CLI call
+      // partial / queued / running are not failures of the CLI call
       return EXIT.success;
   }
 }

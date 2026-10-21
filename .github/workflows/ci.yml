@@ -52,7 +52,14 @@ jobs:
       - run: npm run smoke:cli
 
   gates:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The gates are exercised on Windows too: the package gate shells out
+        # to npm, and a Windows-only defect there stayed hidden because the
+        # gate job ran on Linux only.
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

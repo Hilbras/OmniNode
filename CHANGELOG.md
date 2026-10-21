@@ -4,6 +4,212 @@ All notable changes to `@hilbras/omninode`. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow
 [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+
+- **The published package no longer advertises exports that do not exist**
+  (v3 audit M0): `dist/index.d.ts` exported `MemoryStore` and
+  `TERMINAL_TASK_STATUSES` as values while `dist/index.js` did not provide
+  them, so a consumer importing either name in a value position failed at
+  import time with `SyntaxError: The requested module ... does not provide an
+  export named ...`. `MemoryStore` is now a type-alias declaration, and
+  `TERMINAL_TASK_STATUSES` moved out of the type-only `src/types` barrel into
+  the tasks layer and is exported as a real value. A new
+  `tests/package-exports.test.ts` asserts `.d.ts`↔runtime parity and that
+  every public name in `docs/API.md` resolves in the package.
+- **The agent-protocol message budget is measured in bytes, not characters**
+  (v3 audit M4.1): `decodeMessage`/`encodeMessage` compared UTF-16 code units
+  against the 1 MiB limit, so a multi-byte payload could exceed the documented
+  limit by a large factor. The violation message now reports bytes.
+- **`ProtocolDecoder` is linear on a newline-free stream** (v3 audit M4.2):
+  `push()` re-scanned the whole buffer on every chunk, making a long
+  newline-free agent stream quadratic — slow enough to trip the suite's
+  5-second default timeout. Chunks are now accumulated and joined only when a
+  newline is present.
+- **The protocol decoder resynchronises after an oversized line** (v3 audit
+  M4.3): the rest of an oversized line was re-parsed, producing a second, bogus
+  `INVALID_JSON` violation on the task's `protocol.violations`.
+- **The legacy (v1) protocol branch keeps the agent's own timestamp**
+  (v3 audit M4.4): it hardcoded the decoder's clock, so v1 agents were not
+  traceable, and it accepted a non-string timestamp that v2 rejects.
+
+### Changed
+
+- **The test suite no longer depends on the 5-second default timeout**
+  (v3 audit M8.4): `vitest.config.ts` sets an explicit 30 s test and hook
+  timeout so slow integration tests fail on their assertion rather than on the
+  clock.
+- **A pipeline step that throws no longer leaves the run `running` forever**
+  (v3 audit M1.1): the step-execution phase was not exception-safe, so the
+  persisted run kept `status: "running"` with no `finishedAt`, no failure audit
+  event, and a leaked `activeRuns` entry that made the run impossible to
+  cancel or re-run. A step that throws is now a *failed step* — matching
+  `docs/PIPELINES.md`, where a hard failure makes the run `failed` and
+  on-success downstream steps are skipped — and the run records the step's
+  error. A failure outside a step (e.g. the store rejecting a write) is
+  recorded on the run, audited as `pipeline.run.failed`, and re-thrown.
+- **A task can no longer be run twice at once** (v3 audit M1.2): two
+  concurrent `TaskEngine.run()` calls both passed the status guard and both
+  invoked the agent, executing it twice and losing one update. The engine now
+  claims the task before the adapter is called.
+- **Cancelling a task no longer destroys the in-flight attempt's history**
+  (v3 audit M1.3): `cancel()` wrote a stale snapshot of the task, erasing the
+  result and execution history produced since. The engine now serializes its
+  own read-modify-write cycles per task, and every decision is made against
+  the record as it is at that moment.
+- **A cancellation is no longer overwritten by a failure** (v3 audit M1.4): a
+  task cancelled while its agent was failing was resurrected as `failed` /
+  `unknown`. A cancellation is terminal, and the interrupted attempt is still
+  recorded in the execution history.
+- **The memory write-back is best-effort again** (v3 audit M1.5): a failing
+  memory backend made `TaskEngine.run()` reject even though the task had
+  already succeeded, contradicting the documented contract. The write-back is
+  now logged and swallowed; the task record remains the source of truth.
+- **A store file written by a newer OmniNode is never destroyed** (v3 audit
+  M2.1): `readDocument` returned an empty list for a document with a newer
+  `schemaVersion`, and the next write then overwrote it at the current
+  version — silently discarding data the running version could not even read.
+  The write path now refuses with a new `StoreVersionError` (code
+  `STORE_VERSION`) and leaves the file untouched. A future file is not
+  corruption, so it is not quarantined either. The fix covers every store
+  that shares the persistence helper: tasks, plans, reports, memory and
+  pipeline runs.
+- **Concurrent atomic writes no longer corrupt each other** (v3 audit M2.2):
+  `writeFileAtomic` used a fixed `<target>.tmp` path, so two writers
+  interleaved each other's content. The temp file name is now unique per
+  writer.
+- **An agent's stdin is now closed in every input mode** (v3 audit M3.1): in
+  `arg` mode the task text is an argument, so the stdin pipe stayed open and
+  an agent that also read stdin waited for EOF until the task timed out.
+- **A misbehaving agent can no longer crash OmniNode** (v3 audit M3.2): the
+  protocol session's async handler was called without `await`, so a rejection
+  inside it became an unhandled rejection, which terminates the process by
+  default. The handler is now awaited and its failure is routed into the
+  task's outcome.
+- **Ctrl+C ends OmniNode again** (v3 audit M3.3): installing a SIGINT/SIGTERM
+  listener removed Node's default terminate behaviour, so the first Ctrl+C
+  only asked the agents to stop and nothing else. The first signal now
+  forwards `SIGTERM` to the agent tree and a second one exits the process
+  (130), as Node's default would have.
+- **Cancelling a task escalates to SIGKILL** (v3 audit M3.4): `cancel()` sent
+  `SIGTERM` with no escalation, so an agent that ignored it kept running
+  until the task timeout.
+- **The agent output budget is measured in bytes** (v3 audit M3.5): the
+  budget was compared against UTF-16 code units, so a multi-byte payload
+  could exceed the documented limit and the runaway kill never fired.
+- **A flooding stderr now kills the agent** (v3 audit M3.6): stderr over the
+  limit was truncated but the agent kept running and the run still reported
+  success, unlike stdout.
+- **An unrecognised environment policy now fails closed** (v3 audit M3.7):
+  `buildChildEnv` had no default branch, so an unknown `env_policy` returned
+  `undefined` and the child inherited the **entire** parent environment —
+  API keys included. The config file is unaffected (the schema validates the
+  value); this is the programmatic API.
+- **The working directory is really checked for access** (v3 audit M3.8): the
+  access check re-stat'ed the path it had just checked, so it could never
+  fail. It now requires read and write permission.
+- **The `config` command group now honours `--config` and `--profile`**
+  (v3 audit M5.1): it called the config loader directly, so `config show
+  --config <path>` read the wrong file and `config profiles --profile X`
+  ignored the profile, while every other command group honoured them.
+- **`pipeline create` no longer accepts a duplicate name** (v3 audit M5.2):
+  creating a pipeline whose name already existed wrote a second pipeline with
+  the same id and exited 0 — after which *every* config-loading command failed
+  with `CONFIG_INVALID` and the only recovery was `omninode init --force`,
+  which destroys the whole project configuration. The duplicate is now
+  refused before anything is written.
+- **A task that ends in `unknown` no longer exits 0** (v3 audit M5.3):
+  `unknown` is the normal outcome of an agent timeout, and reporting success
+  made a CI pipeline treat a timed-out task as a pass. It now exits with the
+  timeout code (6). See [DEPRECATIONS.md](docs/DEPRECATIONS.md).
+- **An empty configuration file is now a clear error** (v3 audit M6.1): an
+  empty or comment-only `omninode.yaml` crashed with an opaque `TypeError`
+  from deep inside the loader. It now reports `CONFIG_INVALID` with the file
+  name and what is wrong.
+- **A disabled provider is no longer used** (v3 audit M6.2): `enabled: false`
+  was parsed and displayed as `(disabled)` but never honoured, so the
+  provider was still created and called. Creating a disabled provider now
+  fails with `CONFIG_INVALID`. See
+  [CONFIGURATION.md](docs/CONFIGURATION.md).
+- **The agent half of the v1→v2 config migration runs again** (v3 audit
+  M6.3): the migration asked the YAML document for a `length` key, which a
+  sequence never has, so the count was always zero and v1 configs with
+  `agents:` were silently not migrated.
+- **The OmniHilbras provider uses its injected environment** (v3 audit M6.4):
+  `connectAndRegister` read `process.env` instead of the environment the
+  provider was constructed with, so a caller-supplied environment — and its
+  API key — was ignored.
+- **`listModels()` makes one request, not two** (v3 audit M6.5): the
+  OmniHilbras adapter fetched `/models` and then called the base
+  implementation, which fetched it again.
+- **A broken stream and a `Retry-After` header are handled** (v3 audit
+  M6.6): a mid-stream failure escaped as a raw error instead of the
+  normalized provider error, and the `Retry-After` header was never read, so
+  `details.retryAfterMs` was always absent.
+- **The release path now runs the release gates and checks the tag**
+  (v3 audit M8.1, M8.2): the publish workflow skipped the version, package
+  and secret gates entirely, and never compared the git tag with the
+  package version — a mismatched tag published silently. Both checks now run
+  before `npm publish`.
+- **The release gates work on Windows** (v3 audit M8.3): the package gate
+  shelled out to `npm`, which on Windows is `npm.cmd` and cannot be spawned
+  directly, so the gate always failed there. The failure was invisible
+  because the asserting test is skipped on the Windows lane. The gate now
+  uses the right executable and the CI `gates` job runs on Windows too.
+- **The coverage gate is per-file, not a tree-wide average** (v3 audit
+  M8.5): the v3 roadmap asked for a per-file floor so a new module with no
+  tests cannot be absorbed by the average, and the configuration only
+  enforced the average. Every file under `src/` must now meet the floor on
+  its own.
+- **The package-contents test is no longer vacuous** (v3 audit M8.6): it
+  asserted against the real file list, which is empty whenever the npm
+  invocation fails — so it passed on Windows even if the package shipped
+  `tests/` and `src/`. The rule is now asserted directly against a
+  synthetic file list.
+- **The documented configuration examples load** (v3 audit M7a): the profile
+  example in `docs/CONFIGURATION.md` put `memory` at the root of the overlay
+  instead of inside `project:`, so the documented file failed to load with
+  `CONFIG_INVALID`. A new test loads the documented examples so the docs
+  cannot drift again.
+- **The protocol documentation states what is not implemented yet** (v3
+  audit M7a): `HELLO_ACK`, the `RESPONSE` answer to an agent `QUESTION`, and
+  `ARTIFACT` persistence are described as available. `docs/PROTOCOL.md` now
+  says plainly that they are not wired up in v2.x and names v3.0.0.
+- **Report agreement needs two distinct agents** (v3 audit M7a): agreement
+  was counted per report occurrence, so one agent reporting the same finding
+  twice created a fake consensus.
+- **A report conflict names each agent's own fix** (v3 audit M7a): when
+  agents proposed different fixes, every position was attributed the first
+  agent's recommendation. Each agent's fix is now kept, and the aggregated
+  finding carries `recommendationBySource`.
+- **The secret-scan gate no longer fails on Windows** (v3 audit CI): the
+  allowlist is written with forward slashes, but `path.relative` yields
+  backslashes on Windows, so every allowlisted file was reported as a false
+  positive and the gate failed on every run. The path is normalized before
+  the lookup.
+- **The dependency audit gate is green again** (v3 audit CI): two upstream
+  advisories had been published since the last release — a `high` severity
+  `vite` `launch-editor` issue on Windows and a `low` severity `esbuild`
+  dev-server file read. `vite` is bumped to 7.3.7, which fixes the high
+  severity one; the remaining `low` severity advisory is dev-only and already
+  documented in `docs/AUDIT_V2.md`.
+- **An atomic write no longer fails when Windows briefly locks the file**
+  (v3 audit CI): `fs.rename` on Windows cannot replace a file that another
+  process still has open — an indexer, an antivirus scanner, a concurrent
+  writer — and failed with `EPERM`. The atomic write now retries a transient
+  refusal before giving up.
+- **The documented examples load on a Windows checkout** (v3 audit CI): the
+  doc test matched a bare `\n`, so a CRLF checkout found no code block at all.
+- **`omninode agent add --allow-env <name>` no longer crashes** (v3 audit
+  M8.5): the repeatable-option accumulator spread `previous` directly, but
+  Commander passes `undefined` for an option that has no default value, so
+  `--allow-env` and `--deny-env` died with `TypeError: previous is not
+  iterable`.
+- **`docs/API.md` no longer lists withheld internals as public**
+  (v3 audit M7a): `STORE_FILES` is documented as an internal implementation
+  detail, matching the public-surface guard in `tests/public-api.test.ts`.
+
 ## [2.0.3] — final hardening & release polish (per the v2.0.3 plan)
 
 ### Fixed

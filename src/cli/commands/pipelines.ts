@@ -215,6 +215,20 @@ async function createPipelineFromFile(id: string, file: string): Promise<void> {
   engine.validate({ id, ...(candidate.data as object) } as never);
 
   const doc = parseDocument(readFileSync(configPath, "utf8"));
+  // A duplicate id would make EVERY later config load fail with
+  // CONFIG_INVALID — the project becomes unusable and the only recovery is
+  // `omninode init --force`, which destroys the whole configuration. Refuse
+  // the duplicate before anything is written.
+  const pipelinesNode = doc.getIn(["project", "pipelines"]) as { toJSON?: () => unknown } | undefined;
+  const existing = (
+    pipelinesNode && typeof pipelinesNode.toJSON === "function" ? pipelinesNode.toJSON() : []
+  ) as { id?: string }[];
+  if (Array.isArray(existing) && existing.some((pipeline) => pipeline?.id === id)) {
+    throw new PipelineError(
+      "PIPELINE_INVALID",
+      `A pipeline named "${id}" already exists in ${configPath}. Choose a different name, or edit the existing pipeline.`,
+    );
+  }
   if (doc.getIn(["project", "pipelines"]) === undefined) {
     doc.setIn(["project", "pipelines"], [candidate.data]);
   } else {

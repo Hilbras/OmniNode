@@ -99,6 +99,8 @@ export interface PipelineRun {
   planId?: string;
   /** Outcome summary of the final executed step (§28 — Result). */
   resultSummary?: string;
+  /** Why the run failed, when it ended in an unexpected error. */
+  error?: string;
   /** Per-attempt history (§9.1). */
   attempts?: PipelineRunAttempt[];
 }

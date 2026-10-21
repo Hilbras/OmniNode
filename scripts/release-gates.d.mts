@@ -17,4 +17,6 @@ export interface SecretScanResult {
 
 export declare function checkVersionConsistency(repoRoot?: string): VersionCheckResult;
 export declare function validatePackContents(repoRoot?: string): PackCheckResult;
+export declare function forbiddenPackFiles(files: string[]): string[];
+export declare function isAllowlistedSecretFile(relative: string): boolean;
 export declare function scanSecrets(repoRoot?: string): SecretScanResult;

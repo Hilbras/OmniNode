@@ -56,5 +56,10 @@ export function buildChildEnv(config: AgentConfig): NodeJS.ProcessEnv {
       }
       return { ...filtered, ...configured };
     }
+    default:
+      // An unknown policy must fail CLOSED. Returning `undefined` here would
+      // make `spawn` inherit the entire parent environment — API keys
+      // included — for an agent the operator asked to be isolated.
+      return { ...base, ...configured };
   }
 }

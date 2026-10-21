@@ -38,14 +38,33 @@ export function checkVersionConsistency(repoRoot = root) {
   return { ok: problems.length === 0, version: pkg.version, problems };
 }
 
+/**
+ * Files that must never appear in the published tarball. Exported so the
+ * rule can be tested directly instead of against a possibly-empty file list.
+ */
+export function forbiddenPackFiles(files) {
+  return files.filter(
+    (file) =>
+      file.startsWith("tests/") ||
+      file.startsWith("src/") ||
+      file.startsWith(".omninode/") ||
+      file.endsWith(".tgz"),
+  );
+}
+
 /** The published tarball must ship dist + metadata only — no tests or sources. */
 export function validatePackContents(repoRoot = root) {
   let output;
   try {
-    output = execFileSync("npm", ["pack", "--dry-run", "--json"], {
+    // On Windows npm is `npm.cmd`, which Node cannot spawn directly — and
+    // since v20 it refuses to spawn `.cmd`/`.bat` files at all without a
+    // shell. The arguments are static, so the shell is not a risk here.
+    const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+    output = execFileSync(npmCommand, ["pack", "--dry-run", "--json"], {
       cwd: repoRoot,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
+      ...(process.platform === "win32" ? { shell: true } : {}),
     });
   } catch (error) {
     return { ok: false, problems: [`npm pack --dry-run failed: ${error.message}`], files: [] };
@@ -65,14 +84,7 @@ export function validatePackContents(repoRoot = root) {
   if (!files.some((file) => file.startsWith("dist/"))) {
     problems.push("the package contains no dist/ output");
   }
-  const forbidden = files.filter(
-    (file) =>
-      file.startsWith("tests/") ||
-      file.startsWith("src/") ||
-      file.startsWith(".omninode/") ||
-      file.endsWith(".tgz"),
-  );
-  problems.push(...forbidden.map((file) => `must not be published: ${file}`));
+  problems.push(...forbiddenPackFiles(files).map((file) => `must not be published: ${file}`));
   return { ok: problems.length === 0, problems, files };
 }
 
@@ -102,6 +114,18 @@ const ALLOWLISTED_FILES = new Set([
   "tests/release-gates.test.ts", // synthetic patterns for the scanner's own tests
 ]);
 
+/**
+ * Whether a repository-relative path is on the secret-scanner allowlist.
+ *
+ * The allowlist is written with forward slashes, so the path is normalized
+ * first: on Windows `path.relative` yields backslashes, and without this
+ * every allowlisted file would be reported as a false positive — the gate
+ * failed there on every run.
+ */
+export function isAllowlistedSecretFile(relative) {
+  return ALLOWLISTED_FILES.has(relative.replace(/\\/g, "/"));
+}
+
 export function scanSecrets(repoRoot = root) {
   const findings = [];
   const walk = (dir) => {
@@ -113,7 +137,7 @@ export function scanSecrets(repoRoot = root) {
         continue;
       }
       const relative = path.relative(repoRoot, full);
-      if (ALLOWLISTED_FILES.has(relative)) continue;
+      if (isAllowlistedSecretFile(relative)) continue;
       // Secrets hide in .key/.pem/.env files as often as in source files.
       if (!/\.(ts|mts|cts|js|mjs|cjs|json|ya?ml|sh|md|txt|key|pem|env|npmrc|conf)$/.test(full) && !/(^|\/)\.env(\..+)?$/.test(full)) {
         continue;

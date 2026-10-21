@@ -154,7 +154,7 @@ describe("ModelPlanner", () => {
     });
     // Transport failures are PLANNER_FAILED; schema failures are PLAN_INVALID (§15).
     await expect(planner.plan(request)).rejects.toMatchObject({
-      code: "PLAN_INVALID",
+      code: "PLANNER_FAILED",
       message: expect.stringContaining("gateway down"),
     });
   });
