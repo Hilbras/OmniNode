@@ -109,6 +109,20 @@ All notable changes to `@hilbras/omninode`. Format follows
 - **The working directory is really checked for access** (v3 audit M3.8): the
   access check re-stat'ed the path it had just checked, so it could never
   fail. It now requires read and write permission.
+- **The `config` command group now honours `--config` and `--profile`**
+  (v3 audit M5.1): it called the config loader directly, so `config show
+  --config <path>` read the wrong file and `config profiles --profile X`
+  ignored the profile, while every other command group honoured them.
+- **`pipeline create` no longer accepts a duplicate name** (v3 audit M5.2):
+  creating a pipeline whose name already existed wrote a second pipeline with
+  the same id and exited 0 — after which *every* config-loading command failed
+  with `CONFIG_INVALID` and the only recovery was `omninode init --force`,
+  which destroys the whole project configuration. The duplicate is now
+  refused before anything is written.
+- **A task that ends in `unknown` no longer exits 0** (v3 audit M5.3):
+  `unknown` is the normal outcome of an agent timeout, and reporting success
+  made a CI pipeline treat a timed-out task as a pass. It now exits with the
+  timeout code (6). See [DEPRECATIONS.md](docs/DEPRECATIONS.md).
 - **`docs/API.md` no longer lists withheld internals as public**
   (v3 audit M7a): `STORE_FILES` is documented as an internal implementation
   detail, matching the public-surface guard in `tests/public-api.test.ts`.
