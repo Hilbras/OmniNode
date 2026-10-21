@@ -79,6 +79,36 @@ All notable changes to `@hilbras/omninode`. Format follows
   `writeFileAtomic` used a fixed `<target>.tmp` path, so two writers
   interleaved each other's content. The temp file name is now unique per
   writer.
+- **An agent's stdin is now closed in every input mode** (v3 audit M3.1): in
+  `arg` mode the task text is an argument, so the stdin pipe stayed open and
+  an agent that also read stdin waited for EOF until the task timed out.
+- **A misbehaving agent can no longer crash OmniNode** (v3 audit M3.2): the
+  protocol session's async handler was called without `await`, so a rejection
+  inside it became an unhandled rejection, which terminates the process by
+  default. The handler is now awaited and its failure is routed into the
+  task's outcome.
+- **Ctrl+C ends OmniNode again** (v3 audit M3.3): installing a SIGINT/SIGTERM
+  listener removed Node's default terminate behaviour, so the first Ctrl+C
+  only asked the agents to stop and nothing else. The first signal now
+  forwards `SIGTERM` to the agent tree and a second one exits the process
+  (130), as Node's default would have.
+- **Cancelling a task escalates to SIGKILL** (v3 audit M3.4): `cancel()` sent
+  `SIGTERM` with no escalation, so an agent that ignored it kept running
+  until the task timeout.
+- **The agent output budget is measured in bytes** (v3 audit M3.5): the
+  budget was compared against UTF-16 code units, so a multi-byte payload
+  could exceed the documented limit and the runaway kill never fired.
+- **A flooding stderr now kills the agent** (v3 audit M3.6): stderr over the
+  limit was truncated but the agent kept running and the run still reported
+  success, unlike stdout.
+- **An unrecognised environment policy now fails closed** (v3 audit M3.7):
+  `buildChildEnv` had no default branch, so an unknown `env_policy` returned
+  `undefined` and the child inherited the **entire** parent environment —
+  API keys included. The config file is unaffected (the schema validates the
+  value); this is the programmatic API.
+- **The working directory is really checked for access** (v3 audit M3.8): the
+  access check re-stat'ed the path it had just checked, so it could never
+  fail. It now requires read and write permission.
 - **`docs/API.md` no longer lists withheld internals as public**
   (v3 audit M7a): `STORE_FILES` is documented as an internal implementation
   detail, matching the public-surface guard in `tests/public-api.test.ts`.
