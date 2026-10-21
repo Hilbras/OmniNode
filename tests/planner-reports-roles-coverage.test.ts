@@ -6,31 +6,10 @@
  * without severity, HTTP vs. transport failures, oversized and malformed
  * reports, and role ordering.
  */
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { HeuristicPlanner } from "../src/planner/heuristic.js";
-import {
-  extractMessage,
-  isNetworkError,
-  isRetryable,
-  isTimeoutError,
-  kindFromStatus,
-  parseRetryAfter,
-  providerHttpError,
-  providerTransportError,
-} from "../src/providers/errors.js";
-import { normalizeEvidence, normalizeFinding, validateReport } from "../src/reports/schema.js";
-import { MAX_REPORT_BYTES, ReportService } from "../src/reports/service.js";
-import { FileReportStore } from "../src/reports/store.js";
-import { Logger, type LogSink } from "../src/logger/index.js";
-import { RoleRegistry, buildRoleRegistry } from "../src/roles/index.js";
-import type { AppConfig } from "../src/config/index.js";
 import type { CombinedReport, Report } from "../src/types/report.js";
 import type { Plan, PlanStep } from "../src/types/plan.js";
-import type { RoleDefinition } from "../src/types/role.js";
-import type { Task } from "../src/types/task.js";
 
 /* ------------------------------------------------------------------ */
 /* fixtures                                                            */
@@ -52,31 +31,6 @@ function report(over: Partial<Report> = {}): Report {
     createdAt: new Date().toISOString(),
     ...over,
   };
-}
-
-function task(id: string, result?: Task["result"], agent?: string): Task {
-  const now = new Date().toISOString();
-  return {
-    id,
-    objective: "audit the service",
-    ...(agent !== undefined ? { agent } : {}),
-    status: "completed",
-    attempt: 0,
-    createdAt: now,
-    updatedAt: now,
-    ...(result !== undefined ? { result } : {}),
-  };
-}
-
-/** A logger that keeps every emitted line so warnings can be asserted. */
-function capturingLogger(): { log: Logger; lines: string[] } {
-  const lines: string[] = [];
-  const sink: LogSink = {
-    write(level, line) {
-      lines.push(`${level}: ${line}`);
-    },
-  };
-  return { log: new Logger({ level: "debug", sink }), lines };
 }
 
 /* ------------------------------------------------------------------ */

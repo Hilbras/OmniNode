@@ -77,17 +77,6 @@ function writeConfig(body: string): void {
   writeFileSync(configPath(), body, "utf8");
 }
 
-/** A minimal but valid project configuration. */
-function baseConfig(extra = ""): string {
-  return `project:
-  name: Diag
-  providers: []
-  agents: []
-  roles: []
-  pipelines: []
-${extra}`;
-}
-
 async function initProject(): Promise<void> {
   await createProgram().parseAsync(["node", "omninode", "init", "--name", "Diag"]);
 }

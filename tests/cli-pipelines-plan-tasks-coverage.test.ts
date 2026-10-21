@@ -53,7 +53,7 @@ function readStore<T>(file: string): T[] {
   return Array.isArray(parsed) ? parsed : parsed.items;
 }
 
-function writeStore(file: string, items: unknown[]): void {
+function writeStore<T>(file: string, items: T[]): void {
   mkdirSync(path.join(workDir, ".omninode"), { recursive: true });
   writeFileSync(
     path.join(workDir, ".omninode", file),
@@ -233,6 +233,26 @@ describe("CLI pipeline commands — uncovered paths", () => {
     const output = outputOf(log);
     expect(output).toContain("started:    ?");
     expect(output).toContain("cancellation requested at ?");
+  });
+
+  it("shows a '?' for a listed run without a start time", async () => {
+    await initProject();
+    writeStore<PipelineRun>("pipelines.json", [
+      {
+        id: "run-unstarted",
+        pipelineId: "flow",
+        attempt: 1,
+        status: "pending",
+        stepRuns: [],
+      },
+    ]);
+
+    const log = capture();
+    await createProgram().parseAsync(["node", "omninode", "pipeline", "runs", "flow"]);
+    const output = outputOf(log);
+    expect(output).toContain("run-unstarted");
+    expect(output).toContain("pending");
+    expect(output).toContain("?");
   });
 
   it("raises PIPELINE_NOT_FOUND for an unknown run id", async () => {
@@ -576,6 +596,30 @@ describe("CLI plan commands — uncovered paths", () => {
     expect(output).toContain("- a risk worth noting");
   });
 
+  it("shows a plan without risks, targets or acceptance criteria", async () => {
+    await initProject();
+    writeStore("plans.json", [
+      {
+        id: "plan-bare",
+        objective: "look around",
+        summary: "Nothing to do",
+        steps: [{ id: "s1", title: "Only step", order: 1 }],
+        generatedBy: "heuristic",
+        createdAt: "2024-01-01T00:00:00.000Z",
+      },
+    ]);
+
+    const log = capture();
+    await createProgram().parseAsync(["node", "omninode", "plan", "show", "plan-bare"]);
+    const output = outputOf(log);
+    expect(output).toContain("Plan plan-bare");
+    expect(output).toContain("1. Only step");
+    // No risks, no targets and no acceptance criteria were printed.
+    expect(output).not.toContain("risks:");
+    expect(output).not.toContain("accept:");
+    expect(output).not.toContain("[");
+  });
+
   it("raises PLAN_INVALID for an unknown plan id", async () => {
     await initProject();
     capture();
@@ -589,6 +633,51 @@ describe("CLI plan commands — uncovered paths", () => {
 });
 
 describe("CLI task commands — uncovered paths", () => {
+  it("runs a task and reports the outcome of the agent", async () => {
+    await initProject();
+    await createProgram().parseAsync([
+      "node", "omninode", "agent", "add", "--name", "worker",
+      "--command", "node",
+      "--arg=-e", "--arg=process.stdout.write('WORK DONE')",
+    ]);
+    capture();
+    await createProgram().parseAsync([
+      "node", "omninode", "task", "create", "do the work", "--agent", "worker",
+    ]);
+    const tasks = readStore<Task>("tasks.json");
+    const taskId = tasks[0]!.id;
+
+    const log = capture();
+    await createProgram().parseAsync(["node", "omninode", "task", "run", taskId]);
+    const output = outputOf(log);
+    expect(output).toContain(`Running task ${taskId}...`);
+    expect(output).toContain("status:  completed");
+    expect(output).toContain("summary: WORK DONE");
+    expect(process.exitCode).toBe(0);
+  });
+
+  it("cancels a task that has not started", async () => {
+    await initProject();
+    await createProgram().parseAsync([
+      "node", "omninode", "agent", "add", "--name", "worker",
+      "--command", "node",
+      "--arg=-e", "--arg=process.stdout.write('NEVER RUNS')",
+    ]);
+    capture();
+    await createProgram().parseAsync([
+      "node", "omninode", "task", "create", "cancel me", "--agent", "worker",
+    ]);
+    const tasks = readStore<Task>("tasks.json");
+    const taskId = tasks[0]!.id;
+
+    const log = capture();
+    await createProgram().parseAsync(["node", "omninode", "task", "cancel", taskId]);
+    expect(outputOf(log)).toContain(`Task ${taskId} is now "cancelled".`);
+
+    const after = readStore<Task>("tasks.json");
+    expect(after[0]?.status).toBe("cancelled");
+  });
+
   it("reports that no tasks were found", async () => {
     await initProject();
     const log = capture();
@@ -752,5 +841,71 @@ describe("CLI task commands — uncovered paths", () => {
     const objective = output.slice(output.indexOf("created") + "created".length).trim();
     expect(objective).toBe(`${"x".repeat(59)}…`);
     expect(output).not.toContain(long);
+  });
+
+  it("counts the structured reports a task produced", async () => {
+    await initProject();
+    writeStore<Task>("tasks.json", [
+      {
+        id: "task-reported",
+        objective: "collect findings",
+        status: "completed",
+        attempt: 1,
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T00:01:00.000Z",
+        result: {
+          summary: "found two problems",
+          finishedAt: "2024-01-01T00:01:00.000Z",
+          reports: [
+            {
+              id: "rep-1",
+              taskId: "task-reported",
+              agent: "worker",
+              summary: "first report",
+              findings: [],
+              recommendations: [],
+              createdAt: "2024-01-01T00:01:00.000Z",
+            },
+            {
+              id: "rep-2",
+              taskId: "task-reported",
+              agent: "worker",
+              summary: "second report",
+              findings: [],
+              recommendations: [],
+              createdAt: "2024-01-01T00:01:00.000Z",
+            },
+          ],
+        },
+      },
+    ]);
+
+    const log = capture();
+    await createProgram().parseAsync(["node", "omninode", "task", "status", "task-reported"]);
+    const output = outputOf(log);
+    expect(output).toContain("summary: found two problems");
+    expect(output).toContain("reports: 2 structured report(s)");
+    expect(output).toContain("ended:   2024-01-01T00:01:00.000Z");
+  });
+
+  it("omits the end timestamp of a result that never finished", async () => {
+    await initProject();
+    writeStore<Task>("tasks.json", [
+      {
+        id: "task-open",
+        objective: "still running",
+        status: "running",
+        attempt: 1,
+        createdAt: "2024-01-01T00:00:00.000Z",
+        updatedAt: "2024-01-01T00:01:00.000Z",
+        result: { summary: "partial output" },
+      },
+    ]);
+
+    const log = capture();
+    await createProgram().parseAsync(["node", "omninode", "task", "status", "task-open"]);
+    const output = outputOf(log);
+    expect(output).toContain("summary: partial output");
+    expect(output).not.toContain("ended:");
   });
 });

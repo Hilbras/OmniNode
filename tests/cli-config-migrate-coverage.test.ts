@@ -453,6 +453,44 @@ describe("config: show", () => {
     expect(payload.logging.level).toBe("info");
   });
 
+  it("reports no logging section as null in JSON output", async () => {
+    // A configuration that resolves without any logging section at all: the
+    // JSON payload must say so with null rather than omit the key.
+    write("omninode.yaml", MINIMAL_CONFIG);
+    vi.resetModules();
+    vi.doMock("../src/config/index.js", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("../src/config/index.js")>();
+      return {
+        ...actual,
+        loadConfigDetailed: vi.fn(() => ({
+          config: {
+            project: {
+              name: "NoLogging",
+              providers: [],
+              agents: [],
+              roles: [],
+              pipelines: [],
+            },
+          },
+          sources: { profile: "default", envOverrides: [], defaults: [] },
+        })),
+      };
+    });
+    try {
+      const { createProgram: createMockedProgram } = await import("../src/cli/index.js");
+      const program = createMockedProgram();
+      program.exitOverride();
+      const log = capture();
+      await program.parseAsync(["node", "omninode", "config", "show", "--json"]);
+      const payload = JSON.parse(output(log)) as { project: string; logging: unknown };
+      expect(payload.project).toBe("NoLogging");
+      expect(payload.logging).toBeNull();
+    } finally {
+      vi.doUnmock("../src/config/index.js");
+      vi.resetModules();
+    }
+  });
+
   it("prints the memory provider and whether it is required", async () => {
     write(
       "omninode.yaml",
@@ -552,6 +590,14 @@ describe("config: profiles", () => {
       "profiles",
     ]);
     expect(output(log)).toContain("defined: staging");
+  });
+
+  it("refuses to list profiles when there is no configuration file", async () => {
+    // Without a configuration there is nothing to read the `profiles:`
+    // section from, and the profile overlay cannot be resolved either.
+    await expect(
+      createProgram().parseAsync(["node", "omninode", "config", "profiles"]),
+    ).rejects.toMatchObject({ code: "CONFIG_NOT_FOUND" });
   });
 });
 
@@ -670,6 +716,20 @@ describe("config: validate", () => {
     const text = output(log);
     expect(text).toContain("defaults applied:");
     expect(text).toContain("logging.level");
+  });
+
+  it("prints no defaults line when the file already sets every default", async () => {
+    // `logging.level` and `logging.format` are the only built-in defaults, so
+    // a file that sets both leaves nothing to apply.
+    write(
+      "omninode.yaml",
+      `${MINIMAL_CONFIG}logging:\n  level: info\n  format: text\n`,
+    );
+    const log = capture();
+    await createProgram().parseAsync(["node", "omninode", "config", "validate"]);
+    const text = output(log);
+    expect(text).toContain("is valid");
+    expect(text).not.toContain("defaults applied:");
   });
 
   it("prints diagnostics for a provider that is missing its key reference", async () => {
@@ -919,5 +979,37 @@ describe("migrate: configuration", () => {
     write("omninode.yaml", MINIMAL_CONFIG);
     await createProgram().parseAsync(["node", "omninode", "migrate"]);
     expect(existsSync(path.join(workDir, ".omninode"))).toBe(false);
+  });
+});
+
+describe("migrate: reports without item counts", () => {
+  it("prints zero for stores that report no item counts", async () => {
+    // A report without `before`/`after` still has to render a count: the
+    // command substitutes 0 rather than printing "undefined".
+    write("omninode.yaml", MINIMAL_CONFIG);
+    vi.resetModules();
+    vi.doMock("../src/persistence/index.js", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("../src/persistence/index.js")>();
+      return {
+        ...actual,
+        migrateProjectStores: vi.fn(async () => [
+          { file: "tasks.json", state: "v1-legacy", migrated: false },
+          { file: "reports.json", state: "current", migrated: false },
+        ]),
+      };
+    });
+    try {
+      const { createProgram: createMockedProgram } = await import("../src/cli/index.js");
+      const program = createMockedProgram();
+      program.exitOverride();
+      const log = capture();
+      await program.parseAsync(["node", "omninode", "migrate"]);
+      const text = output(log);
+      expect(text).toContain("tasks.json       v1-legacy  would migrate 0 → 0 item(s)");
+      expect(text).toContain("reports.json     current  0 item(s)");
+    } finally {
+      vi.doUnmock("../src/persistence/index.js");
+      vi.resetModules();
+    }
   });
 });
