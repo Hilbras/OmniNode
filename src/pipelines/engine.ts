@@ -312,168 +312,211 @@ export class PipelineEngine implements IPipelineExecutor {
     const allReports: Report[] = [];
     let cancelled = false;
 
-    while (pending.size > 0) {
-      // §9.2 cancellation check point: stop scheduling, terminate what runs.
-      const persisted = await this.options.store.get(run.id);
-      if (persisted?.cancellationRequested === true) {
-        cancelled = true;
-        run.cancellationRequested = true;
-        run.cancellationRequestedAt = persisted.cancellationRequestedAt;
-        await this.activeRuns.get(run.id)?.cancelTasks();
-        for (const step of def.steps.filter((s) => pending.has(s.id))) {
-          const stepRun: PipelineStepRun = { stepId: step.id, status: "cancelled" };
+    try {
+      while (pending.size > 0) {
+        // §9.2 cancellation check point: stop scheduling, terminate what runs.
+        const persisted = await this.options.store.get(run.id);
+        if (persisted?.cancellationRequested === true) {
+          cancelled = true;
+          run.cancellationRequested = true;
+          run.cancellationRequestedAt = persisted.cancellationRequestedAt;
+          await this.activeRuns.get(run.id)?.cancelTasks();
+          for (const step of def.steps.filter((s) => pending.has(s.id))) {
+            const stepRun: PipelineStepRun = { stepId: step.id, status: "cancelled" };
+            run.stepRuns.push(stepRun);
+            options.onStep?.(stepRun);
+          }
+          pending.clear();
+          break;
+        }
+
+        const ready = def.steps.filter(
+          (step) => pending.has(step.id) && (deps.get(step.id) ?? []).every((d) => outcomes.has(d)),
+        );
+        if (ready.length === 0) {
+          // Cycle — already rejected by validate(), but never hang.
+          throw new PipelineError("PIPELINE_FAILED", `Pipeline "${def.id}" scheduling stalled.`);
+        }
+
+        const settled: StepOutcome[] = [];
+        const limit = Math.max(1, this.options.maxParallelSteps ?? DEFAULT_MAX_PARALLEL_STEPS);
+        for (let offset = 0; offset < ready.length; offset += limit) {
+          const batch = ready.slice(offset, offset + limit);
+          settled.push(
+            ...(await Promise.all(
+              batch.map(async (step): Promise<StepOutcome> => {
+                if (!this.shouldRun(step, deps.get(step.id) ?? [], outcomes)) {
+                  return { status: "skipped", summary: "", taskIds: [], reports: [] };
+                }
+                const ctx: StepContext = {
+                  maxContextChars: this.options.maxContextChars,
+                  objective,
+                  ...(role ? { role } : {}),
+                  combinedContext: budgetContext(
+                    contextParts.join("\n\n"),
+                    this.options.maxContextChars ?? MAX_COMBINED_CONTEXT_CHARS,
+                  ),
+                  reports: [...allReports],
+                  pipelineRunId: run.id,
+                  runId: run.id,
+                  pipelineDefId: def.id,
+                  taskId: run.id,
+                };
+                try {
+                  return await this.executeStep(step, ctx);
+                } catch (error) {
+                  // A step that throws is a failed step, not a crashed run:
+                  // the error becomes data on the step, so the run still
+                  // reaches a terminal state (docs/PIPELINES.md — a hard
+                  // failure makes the run `failed`, and on-success
+                  // downstream steps are skipped).
+                  const message = error instanceof Error ? error.message : String(error);
+                  this.log.warn(`Step "${step.id}" failed: ${message}`);
+                  return {
+                    status: "failed",
+                    summary: "",
+                    taskIds: [],
+                    reports: [],
+                    error: message,
+                  };
+                }
+              }),
+            )),
+          );
+        }
+
+        ready.forEach((step, index) => {
+          const outcome = settled[index]!;
+          outcomes.set(step.id, outcome);
+          pending.delete(step.id);
+          allReports.push(...outcome.reports);
+          if (outcome.status !== "skipped" && outcome.summary.length > 0) {
+            const contribution = outcome.contextContribution ?? outcome.summary;
+            contextParts.push(`## Step "${step.id}" (${step.kind})\n${contribution}`);
+          }
+          const stepRun: PipelineStepRun = {
+            stepId: step.id,
+            attempt: outcome.attempt ?? 1,
+            ...(outcome.executionIds && outcome.executionIds.length > 0
+              ? { executionIds: outcome.executionIds }
+              : {}),
+            status:
+              outcome.status === "skipped"
+                ? "cancelled"
+                : outcome.status === "failed"
+                  ? "failed"
+                  : outcome.status === "partial"
+                    ? "partially_completed"
+                    : "completed",
+            ...(outcome.taskIds.length > 0 ? { taskIds: outcome.taskIds } : {}),
+            ...(outcome.planId !== undefined ? { planId: outcome.planId } : {}),
+            ...(outcome.error !== undefined ? { error: outcome.error } : {}),
+          };
           run.stepRuns.push(stepRun);
           options.onStep?.(stepRun);
-        }
-        pending.clear();
+        });
+        run.reports = [...allReports];
+        await this.persist(run);
+      }
+
+      const allOutcomes = [...outcomes.values()];
+      const failed = !cancelled && allOutcomes.some((o) => o.status === "failed");
+      const partial = !cancelled && !failed && allOutcomes.some((o) => o.status === "partial");
+      const finalStatus: PipelineRunStatus = cancelled
+        ? "cancelled"
+        : failed
+          ? "failed"
+          : partial
+            ? "partial"
+            : "completed";
+      const planId = [...outcomes.values()].find((o) => o.planId !== undefined)?.planId;
+
+      // §28 — Result: the outcome of the last completed step with tasks.
+      let resultSummary: string | undefined;
+      for (let i = def.steps.length - 1; i >= 0; i -= 1) {
+        const step = def.steps[i]!;
+        const outcome = outcomes.get(step.id);
+        if (outcome?.status !== "completed" || outcome.taskIds.length === 0) continue;
+        const stepTasks = (
+          await Promise.all(outcome.taskIds.map((id) => this.options.tasks.get(id)))
+        ).filter((task): task is NonNullable<typeof task> => task !== undefined);
+        const summaries = stepTasks
+          .map((task) => task.result?.summary)
+          .filter((summary): summary is string => summary !== undefined);
+        if (summaries.length > 0) resultSummary = summaries.join("\n");
         break;
       }
 
-      const ready = def.steps.filter(
-        (step) => pending.has(step.id) && (deps.get(step.id) ?? []).every((d) => outcomes.has(d)),
-      );
-      if (ready.length === 0) {
-        // Cycle — already rejected by validate(), but never hang.
-        throw new PipelineError("PIPELINE_FAILED", `Pipeline "${def.id}" scheduling stalled.`);
+      // Report system (§16–§17): collect, store and combine reports from the
+      // analysis tasks (research/analyze) — execution output is a result, not a report.
+      let combinedReportId: string | undefined;
+      if (this.options.reports) {
+        const taskIds = def.steps
+          .filter((step) => step.kind === "research" || step.kind === "analyze")
+          .flatMap((step) => outcomes.get(step.id)?.taskIds ?? []);
+        const tasks = (
+          await Promise.all(taskIds.map((id) => this.options.tasks.get(id)))
+        ).filter((task): task is NonNullable<typeof task> => task !== undefined);
+        const collected = await this.options.reports.collectFromTasks(tasks);
+        await this.options.reports.saveReports(collected);
+        const combined = await this.options.reports.generateCombined(collected, {
+          objective,
+          pipelineRunId: run.id,
+          taskIds,
+        });
+        combinedReportId = combined?.id;
+        if (collected.length > 0) {
+          run.reports = collected;
+        }
       }
 
-      const settled: StepOutcome[] = [];
-      const limit = Math.max(1, this.options.maxParallelSteps ?? DEFAULT_MAX_PARALLEL_STEPS);
-      for (let offset = 0; offset < ready.length; offset += limit) {
-        const batch = ready.slice(offset, offset + limit);
-        settled.push(
-          ...(await Promise.all(
-            batch.map(async (step): Promise<StepOutcome> => {
-          if (!this.shouldRun(step, deps.get(step.id) ?? [], outcomes)) {
-            return { status: "skipped", summary: "", taskIds: [], reports: [] };
-          }
-          const ctx: StepContext = {
-            maxContextChars: this.options.maxContextChars,
-            objective,
-            ...(role ? { role } : {}),
-            combinedContext: budgetContext(
-              contextParts.join("\n\n"),
-              this.options.maxContextChars ?? MAX_COMBINED_CONTEXT_CHARS,
-            ),
-            reports: [...allReports],
-            pipelineRunId: run.id,
-            runId: run.id,
-            pipelineDefId: def.id,
-            taskId: run.id,
-          };
-              return this.executeStep(step, ctx);
-            }),
-          )),
+      const finishedAt = new Date().toISOString();
+      this.activeRuns.delete(run.id);
+      const finished: PipelineRun = {
+        ...run,
+        status: finalStatus,
+        finishedAt,
+        attempts: [...(run.attempts ?? []), { attempt: run.attempt, startedAt: run.startedAt ?? finishedAt, finishedAt, status: finalStatus }],
+        ...(run.reports !== undefined && run.reports.length > 0 ? { reports: run.reports } : {}),
+        ...(combinedReportId !== undefined ? { combinedReportId } : {}),
+        ...(planId !== undefined ? { planId } : {}),
+        ...(resultSummary !== undefined ? { resultSummary } : {}),
+      };
+      await this.persist(finished);
+      this.log.info(`Pipeline ${def.id} finished: ${finalStatus}.`);
+      await this.auditSafely({
+        at: new Date().toISOString(),
+        action: cancelled ? "pipeline.run.cancelled" : finalStatus === "failed" ? "pipeline.run.failed" : "pipeline.run.finished",
+        id: run.id,
+        pipelineId: def.id,
+        detail: { pipeline: def.id, status: finalStatus },
+      });
+      return finished;
+    } catch (error) {
+      // A failure outside a step (e.g. the store rejecting a write) must not
+      // leave the run persisted as `running` forever: record it as failed,
+      // release the active run so it can be cancelled or re-run, and let the
+      // error reach the caller.
+      const failedAt = new Date().toISOString();
+      const message = error instanceof Error ? error.message : String(error);
+      this.activeRuns.delete(run.id);
+      try {
+        await this.persist({ ...run, status: "failed", finishedAt: failedAt, error: message });
+      } catch (persistError) {
+        this.log.warn(
+          `Could not record the failed run ${run.id}: ${persistError instanceof Error ? persistError.message : String(persistError)}`,
         );
       }
-
-      ready.forEach((step, index) => {
-        const outcome = settled[index]!;
-        outcomes.set(step.id, outcome);
-        pending.delete(step.id);
-        allReports.push(...outcome.reports);
-        if (outcome.status !== "skipped" && outcome.summary.length > 0) {
-          const contribution = outcome.contextContribution ?? outcome.summary;
-          contextParts.push(`## Step "${step.id}" (${step.kind})\n${contribution}`);
-        }
-        const stepRun: PipelineStepRun = {
-          stepId: step.id,
-          attempt: outcome.attempt ?? 1,
-          ...(outcome.executionIds && outcome.executionIds.length > 0
-            ? { executionIds: outcome.executionIds }
-            : {}),
-          status:
-            outcome.status === "skipped"
-              ? "cancelled"
-              : outcome.status === "failed"
-                ? "failed"
-                : outcome.status === "partial"
-                  ? "partially_completed"
-                  : "completed",
-          ...(outcome.taskIds.length > 0 ? { taskIds: outcome.taskIds } : {}),
-          ...(outcome.planId !== undefined ? { planId: outcome.planId } : {}),
-          ...(outcome.error !== undefined ? { error: outcome.error } : {}),
-        };
-        run.stepRuns.push(stepRun);
-        options.onStep?.(stepRun);
+      this.log.warn(`Pipeline ${def.id} failed: ${message}`);
+      await this.auditSafely({
+        at: failedAt,
+        action: "pipeline.run.failed",
+        id: run.id,
+        pipelineId: def.id,
+        detail: { pipeline: def.id, error: message },
       });
-      run.reports = [...allReports];
-      await this.persist(run);
+      throw error;
     }
-
-    const allOutcomes = [...outcomes.values()];
-    const failed = !cancelled && allOutcomes.some((o) => o.status === "failed");
-    const partial = !cancelled && !failed && allOutcomes.some((o) => o.status === "partial");
-    const finalStatus: PipelineRunStatus = cancelled
-      ? "cancelled"
-      : failed
-        ? "failed"
-        : partial
-          ? "partial"
-          : "completed";
-    const planId = [...outcomes.values()].find((o) => o.planId !== undefined)?.planId;
-
-    // §28 — Result: the outcome of the last completed step with tasks.
-    let resultSummary: string | undefined;
-    for (let i = def.steps.length - 1; i >= 0; i -= 1) {
-      const step = def.steps[i]!;
-      const outcome = outcomes.get(step.id);
-      if (outcome?.status !== "completed" || outcome.taskIds.length === 0) continue;
-      const stepTasks = (
-        await Promise.all(outcome.taskIds.map((id) => this.options.tasks.get(id)))
-      ).filter((task): task is NonNullable<typeof task> => task !== undefined);
-      const summaries = stepTasks
-        .map((task) => task.result?.summary)
-        .filter((summary): summary is string => summary !== undefined);
-      if (summaries.length > 0) resultSummary = summaries.join("\n");
-      break;
-    }
-
-    // Report system (§16–§17): collect, store and combine reports from the
-    // analysis tasks (research/analyze) — execution output is a result, not a report.
-    let combinedReportId: string | undefined;
-    if (this.options.reports) {
-      const taskIds = def.steps
-        .filter((step) => step.kind === "research" || step.kind === "analyze")
-        .flatMap((step) => outcomes.get(step.id)?.taskIds ?? []);
-      const tasks = (
-        await Promise.all(taskIds.map((id) => this.options.tasks.get(id)))
-      ).filter((task): task is NonNullable<typeof task> => task !== undefined);
-      const collected = await this.options.reports.collectFromTasks(tasks);
-      await this.options.reports.saveReports(collected);
-      const combined = await this.options.reports.generateCombined(collected, {
-        objective,
-        pipelineRunId: run.id,
-        taskIds,
-      });
-      combinedReportId = combined?.id;
-      if (collected.length > 0) {
-        run.reports = collected;
-      }
-    }
-
-    const finishedAt = new Date().toISOString();
-    this.activeRuns.delete(run.id);
-    const finished: PipelineRun = {
-      ...run,
-      status: finalStatus,
-      finishedAt,
-      attempts: [...(run.attempts ?? []), { attempt: run.attempt, startedAt: run.startedAt ?? finishedAt, finishedAt, status: finalStatus }],
-      ...(run.reports !== undefined && run.reports.length > 0 ? { reports: run.reports } : {}),
-      ...(combinedReportId !== undefined ? { combinedReportId } : {}),
-      ...(planId !== undefined ? { planId } : {}),
-      ...(resultSummary !== undefined ? { resultSummary } : {}),
-    };
-    await this.persist(finished);
-    this.log.info(`Pipeline ${def.id} finished: ${finalStatus}.`);
-    await this.auditSafely({
-      at: new Date().toISOString(),
-      action: cancelled ? "pipeline.run.cancelled" : finalStatus === "failed" ? "pipeline.run.failed" : "pipeline.run.finished",
-      id: run.id,
-      pipelineId: def.id,
-      detail: { pipeline: def.id, status: finalStatus },
-    });
-    return finished;
   }
 
   /** First-class cancellation (§9.2): requests cancellation and terminates

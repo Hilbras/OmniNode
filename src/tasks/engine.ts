@@ -81,9 +81,34 @@ export interface TaskEngineOptions {
 
 export class TaskEngine {
   private readonly log: Logger;
+  /** Tasks with an execution in progress — guards against a double run. */
+  private readonly inFlight = new Set<string>();
+  /** Serializes this engine's read-modify-write cycles per task. */
+  private readonly taskLocks = new Map<string, Promise<unknown>>();
 
   constructor(private readonly options: TaskEngineOptions) {
     this.log = (options.log ?? logger).child({ component: "tasks" });
+  }
+
+  /**
+   * Runs `fn` with exclusive access to one task's record.
+   *
+   * A task's state is read, decided on and written in several places
+   * (run, cancel, recovery). Without a lock a cancellation can land between
+   * another writer's read and its write, and the slower writer silently
+   * resurrects the task.
+   */
+  private async withTaskLock<T>(id: string, fn: () => Promise<T>): Promise<T> {
+    const previous = this.taskLocks.get(id) ?? Promise.resolve();
+    const result = previous.then(fn, fn);
+    this.taskLocks.set(
+      id,
+      result.then(
+        () => undefined,
+        () => undefined,
+      ),
+    );
+    return result;
   }
 
   get store(): TaskStore {
@@ -138,6 +163,23 @@ export class TaskEngine {
     if (task.status !== "created" && task.status !== "queued") {
       throw new TaskError("TASK_INVALID", `Task ${id} is "${task.status}" and cannot be run.`);
     }
+    // Two concurrent run() calls would both pass the status guard above and
+    // both invoke the adapter — the agent would execute twice and one update
+    // would be lost. The guard is claimed before the adapter is called and
+    // released when the run settles.
+    if (this.inFlight.has(id)) {
+      throw new TaskError("TASK_INVALID", `Task ${id} is already running.`);
+    }
+    this.inFlight.add(id);
+    try {
+      return await this.runClaimed(task, options);
+    } finally {
+      this.inFlight.delete(id);
+    }
+  }
+
+  private async runClaimed(task: Task, options: RunTaskOptions = {}): Promise<Task> {
+    const id = task.id;
     if (!task.agent) {
       throw new TaskError("TASK_INVALID", `Task ${id} has no agent assigned. Re-create it with --agent.`);
     }
@@ -230,17 +272,13 @@ export class TaskEngine {
           if (backoffMs > 0) await sleep(backoffMs * attempt);
           continue;
         }
-        if (this.options.memory) await this.options.memory.recordTaskOutcome(current);
+        await this.recordOutcomeInMemory(current);
         return current;
       }
 
-      // The task may have been cancelled while the agent was finishing —
-      // respect the terminal state instead of forcing a completed transition.
-      const currentState = await this.options.store.get(current.id);
-      if (currentState?.status === "cancelled") {
-        current = currentState;
-        break;
-      }
+      // A cancellation that landed while the agent was finishing is honoured
+      // by the transition below: the task stays `cancelled` and the
+      // interrupted attempt is still recorded.
 
       const result: TaskResult = {
         ...(output.summary !== undefined ? { summary: output.summary } : {}),
@@ -271,22 +309,42 @@ export class TaskEngine {
     }
 
     // §20: the outcome is written back to memory — best-effort, never fatal.
-    if (this.options.memory) {
-      await this.options.memory.recordTaskOutcome(current);
-    }
+    await this.recordOutcomeInMemory(current);
     return current;
   }
 
+  /**
+   * Writes the task outcome back to memory (§20). Best-effort: a failing
+   * memory backend must never turn a completed task into a failed call — the
+   * task record is the source of truth, memory is a side channel.
+   */
+  private async recordOutcomeInMemory(task: Task): Promise<void> {
+    if (!this.options.memory) return;
+    try {
+      await this.options.memory.recordTaskOutcome(task);
+    } catch (error) {
+      this.log.warn(
+        `Memory write-back failed for task ${task.id} (execution unaffected): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   async cancel(id: string): Promise<Task> {
-    const task = await this.mustGet(id);
-    if (!ALLOWED_TRANSITIONS[task.status].includes("cancelled")) {
-      throw new TaskError("TASK_INVALID", `Task ${id} is "${task.status}" and cannot be cancelled.`);
-    }
-    if (task.agent) {
-      const agent = this.options.agents.get(task.agent);
-      await agent?.cancel?.(task.id);
-    }
-    return this.transition(task, "cancelled");
+    // The lock is held for the whole cancellation: the agent is told to stop
+    // and the record is written as one atomic step, so a run that finishes
+    // concurrently can neither clobber the cancellation nor lose the
+    // attempt's history.
+    return this.withTaskLock(id, async () => {
+      const task = await this.mustGet(id);
+      if (!ALLOWED_TRANSITIONS[task.status].includes("cancelled")) {
+        throw new TaskError("TASK_INVALID", `Task ${id} is "${task.status}" and cannot be cancelled.`);
+      }
+      if (task.agent) {
+        const agent = this.options.agents.get(task.agent);
+        await agent?.cancel?.(task.id);
+      }
+      return this.transitionLocked(task, "cancelled");
+    });
   }
 
   /**
@@ -355,27 +413,59 @@ export class TaskEngine {
     to: TaskStatus,
     extra: { result?: TaskResult; attempt?: number; lastError?: string; execution?: ExecutionRecord } = {},
   ): Promise<Task> {
-    const allowed = ALLOWED_TRANSITIONS[task.status] ?? [];
+    return this.withTaskLock(task.id, () => this.transitionLocked(task, to, extra));
+  }
+
+  /**
+   * The state change itself. The caller must hold the task lock, so the
+   * decision to write and the write cannot be interleaved with a
+   * cancellation.
+   */
+  private async transitionLocked(
+    task: Task,
+    to: TaskStatus,
+    extra: { result?: TaskResult; attempt?: number; lastError?: string; execution?: ExecutionRecord } = {},
+  ): Promise<Task> {
+    // Always decide on the record as it is NOW, not on the snapshot the
+    // caller read earlier: a cancellation or a concurrent attempt may have
+    // changed it since.
+    const live = await this.mustGet(task.id);
+
+    // A cancellation is terminal: a run that finishes afterwards must not
+    // resurrect the task. The interrupted attempt is still recorded, so the
+    // execution history is not lost.
+    if (live.status === "cancelled" && to !== "cancelled") {
+      if (!extra.execution) return live;
+      const appended: Task = {
+        ...live,
+        updatedAt: new Date().toISOString(),
+        executions: [...(live.executions ?? []), extra.execution].slice(-EXECUTION_HISTORY_LIMIT),
+      };
+      await this.options.store.save(appended);
+      return appended;
+    }
+
+    const allowed = ALLOWED_TRANSITIONS[live.status] ?? [];
     if (!allowed.includes(to)) {
-      throw new TaskError("TASK_INVALID", `Task ${task.id} cannot move from "${task.status}" to "${to}".`);
+      throw new TaskError("TASK_INVALID", `Task ${task.id} cannot move from "${live.status}" to "${to}".`);
     }
     const executions = extra.execution
-      ? [...(task.executions ?? []), extra.execution].slice(-EXECUTION_HISTORY_LIMIT)
-      : task.executions;
+      ? [...(live.executions ?? []), extra.execution].slice(-EXECUTION_HISTORY_LIMIT)
+      : live.executions;
     const updated: Task = {
-      ...task,
+      ...live,
       status: to,
       updatedAt: new Date().toISOString(),
       ...(extra.attempt !== undefined ? { attempt: extra.attempt } : {}),
       ...(extra.lastError !== undefined ? { lastError: extra.lastError } : {}),
       ...(executions !== undefined ? { executions } : {}),
       ...(extra.result !== undefined
-        ? { result: { ...task.result, ...extra.result } }
+        ? { result: { ...live.result, ...extra.result } }
         : {}),
     };
     await this.options.store.save(updated);
     await this.audit(`task.${to === "queued" ? "queued" : to}` as AuditAction, updated, {
-      from: task.status,
+      from: live.status,
     });
     return updated;
   }
