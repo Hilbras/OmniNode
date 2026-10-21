@@ -22,6 +22,7 @@ export {
   PlannerError,
   ProtocolError,
   MemoryError,
+  StoreVersionError,
 } from "./errors/index.js";
 
 // Logging

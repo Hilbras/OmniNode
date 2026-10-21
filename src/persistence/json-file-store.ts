@@ -11,6 +11,8 @@
  */
 import { open, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { randomBytes } from "node:crypto";
+import { StoreVersionError } from "../errors/index.js";
 import { logger, type Logger } from "../logger/index.js";
 
 /** Current on-disk schema version. */
@@ -55,7 +57,9 @@ export async function writeFileAtomic(
   contents: string,
   durability: Durability = "rename",
 ): Promise<void> {
-  const tmp = `${target}.tmp`;
+  // The temp name must be unique per writer: a fixed `<target>.tmp` lets two
+  // concurrent writers truncate and interleave each other's file.
+  const tmp = `${target}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
   await mkdir(dirname(target), { recursive: true });
 
   if (durability === "fsync") {
@@ -207,6 +211,22 @@ export class JsonFileStore<T> {
   /** Read-modify-write helper: applies `mutate` to the current items. */
   protected async mutate<R>(mutate: (items: T[]) => Promise<[T[], R]> | [T[], R]): Promise<R> {
     return this.synchronized(async () => {
+      // A document written by a newer OmniNode is never overwritten: its
+      // data belongs to a version this one cannot read, and writing would
+      // destroy it silently.
+      const state = await inspectDocument(this.filePath);
+      if (state.status === "future") {
+        throw new StoreVersionError(
+          `${this.filePath} was written by a newer OmniNode (schema v${state.schemaVersion} > v${this.schemaVersion}) — refusing to overwrite it.`,
+          {
+            details: {
+              path: this.filePath,
+              schemaVersion: state.schemaVersion,
+              supported: this.schemaVersion,
+            },
+          },
+        );
+      }
       const items = await this.readAll();
       const [next, result] = await mutate(items);
       await this.writeAll(next);

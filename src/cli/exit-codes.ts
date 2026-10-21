@@ -25,7 +25,7 @@ export function exitCodeFor(error: unknown): number {
   const code = error.code;
   if (code === "NOT_IMPLEMENTED") return EXIT.notImplemented;
   if (code === "AGENT_TIMEOUT") return EXIT.timeout;
-  if (code.startsWith("CONFIG_")) return EXIT.config;
+  if (code.startsWith("CONFIG_") || code === "STORE_VERSION") return EXIT.config;
   if (code.startsWith("PROVIDER_") || code === "MODEL_NOT_FOUND") return EXIT.provider;
   if (code.startsWith("AGENT_")) return EXIT.agent;
   if (code.endsWith("_NOT_FOUND")) return EXIT.notFound;
