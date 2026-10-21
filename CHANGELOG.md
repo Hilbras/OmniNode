@@ -123,6 +123,30 @@ All notable changes to `@hilbras/omninode`. Format follows
   `unknown` is the normal outcome of an agent timeout, and reporting success
   made a CI pipeline treat a timed-out task as a pass. It now exits with the
   timeout code (6). See [DEPRECATIONS.md](docs/DEPRECATIONS.md).
+- **An empty configuration file is now a clear error** (v3 audit M6.1): an
+  empty or comment-only `omninode.yaml` crashed with an opaque `TypeError`
+  from deep inside the loader. It now reports `CONFIG_INVALID` with the file
+  name and what is wrong.
+- **A disabled provider is no longer used** (v3 audit M6.2): `enabled: false`
+  was parsed and displayed as `(disabled)` but never honoured, so the
+  provider was still created and called. Creating a disabled provider now
+  fails with `CONFIG_INVALID`. See
+  [CONFIGURATION.md](docs/CONFIGURATION.md).
+- **The agent half of the v1→v2 config migration runs again** (v3 audit
+  M6.3): the migration asked the YAML document for a `length` key, which a
+  sequence never has, so the count was always zero and v1 configs with
+  `agents:` were silently not migrated.
+- **The OmniHilbras provider uses its injected environment** (v3 audit M6.4):
+  `connectAndRegister` read `process.env` instead of the environment the
+  provider was constructed with, so a caller-supplied environment — and its
+  API key — was ignored.
+- **`listModels()` makes one request, not two** (v3 audit M6.5): the
+  OmniHilbras adapter fetched `/models` and then called the base
+  implementation, which fetched it again.
+- **A broken stream and a `Retry-After` header are handled** (v3 audit
+  M6.6): a mid-stream failure escaped as a raw error instead of the
+  normalized provider error, and the `Retry-After` header was never read, so
+  `details.retryAfterMs` was always absent.
 - **`docs/API.md` no longer lists withheld internals as public**
   (v3 audit M7a): `STORE_FILES` is documented as an internal implementation
   detail, matching the public-surface guard in `tests/public-api.test.ts`.
