@@ -183,6 +183,11 @@ All notable changes to `@hilbras/omninode`. Format follows
   agents proposed different fixes, every position was attributed the first
   agent's recommendation. Each agent's fix is now kept, and the aggregated
   finding carries `recommendationBySource`.
+- **`omninode agent add --allow-env <name>` no longer crashes** (v3 audit
+  M8.5): the repeatable-option accumulator spread `previous` directly, but
+  Commander passes `undefined` for an option that has no default value, so
+  `--allow-env` and `--deny-env` died with `TypeError: previous is not
+  iterable`.
 - **`docs/API.md` no longer lists withheld internals as public**
   (v3 audit M7a): `STORE_FILES` is documented as an internal implementation
   detail, matching the public-surface guard in `tests/public-api.test.ts`.
